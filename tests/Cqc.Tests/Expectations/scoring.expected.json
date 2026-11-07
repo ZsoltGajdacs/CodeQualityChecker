@@ -1,0 +1,756 @@
+[
+  {
+    "family": "code",
+    "entity": "java:scoring.Healthy",
+    "file": "java/src/main/java/scoring/Healthy.java",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:java:scoring.Healthy.evaluate(int):complexity": 1,
+      "method:java:scoring.Healthy.evaluate(int):coverage": 1,
+      "method:java:scoring.Healthy.evaluate(int):crap": 1
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.AtComplexity10",
+    "file": "java/src/main/java/scoring/AtComplexity10.java",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:java:scoring.AtComplexity10.evaluate(int):complexity": 10,
+      "method:java:scoring.AtComplexity10.evaluate(int):coverage": 1,
+      "method:java:scoring.AtComplexity10.evaluate(int):crap": 10
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.OverComplexity11",
+    "file": "java/src/main/java/scoring/OverComplexity11.java",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/OverComplexity11.java",
+        "startLine": 4,
+        "endLine": 37
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.OverComplexity11.evaluate(int):complexity": 11,
+      "method:java:scoring.OverComplexity11.evaluate(int):coverage": 1,
+      "method:java:scoring.OverComplexity11.evaluate(int):crap": 11
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.AtRisk30",
+    "file": "java/src/main/java/scoring/AtRisk30.java",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:java:scoring.AtRisk30.evaluate(int):complexity": 5,
+      "method:java:scoring.AtRisk30.evaluate(int):coverage": 0,
+      "method:java:scoring.AtRisk30.evaluate(int):crap": 30
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.OverRisk42",
+    "file": "java/src/main/java/scoring/OverRisk42.java",
+    "score": 9,
+    "rules": [
+      "code.crap"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/OverRisk42.java",
+        "startLine": 4,
+        "endLine": 22
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.OverRisk42.evaluate(int):complexity": 6,
+      "method:java:scoring.OverRisk42.evaluate(int):coverage": 0,
+      "method:java:scoring.OverRisk42.evaluate(int):crap": 42
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.HighRisk156",
+    "file": "java/src/main/java/scoring/HighRisk156.java",
+    "score": 8,
+    "rules": [
+      "code.complexity",
+      "code.crap"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/HighRisk156.java",
+        "startLine": 4,
+        "endLine": 40
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.HighRisk156.evaluate(int):complexity": 12,
+      "method:java:scoring.HighRisk156.evaluate(int):coverage": 0,
+      "method:java:scoring.HighRisk156.evaluate(int):crap": 156
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.AtSize50Tests",
+    "file": "java/src/test/java/scoring/tests/AtSize50Tests.java",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():executableLinesWithHelpers": 50,
+      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():assertionsWithHelpers": 1,
+      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():branchCountWithHelpers": 0
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.OverSize51Tests",
+    "file": "java/src/test/java/scoring/tests/OverSize51Tests.java",
+    "score": 9,
+    "rules": [
+      "tests.size"
+    ],
+    "locations": [
+      {
+        "file": "java/src/test/java/scoring/tests/OverSize51Tests.java",
+        "startLine": 7,
+        "endLine": 60
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():executableLinesWithHelpers": 51,
+      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():assertionsWithHelpers": 1,
+      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():branchCountWithHelpers": 0
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.BranchingTests",
+    "file": "java/src/test/java/scoring/tests/BranchingTests.java",
+    "score": 9,
+    "rules": [
+      "tests.branching"
+    ],
+    "locations": [
+      {
+        "file": "java/src/test/java/scoring/tests/BranchingTests.java",
+        "startLine": 7,
+        "endLine": 15
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():executableLinesWithHelpers": 5,
+      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():assertionsWithHelpers": 1,
+      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():branchCountWithHelpers": 1
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.WeakTests",
+    "file": "java/src/test/java/scoring/tests/WeakTests.java",
+    "score": 0,
+    "rules": [
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 6,
+        "endLine": 8
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 10,
+        "endLine": 12
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 14,
+        "endLine": 16
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 18,
+        "endLine": 20
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 22,
+        "endLine": 24
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 26,
+        "endLine": 28
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 30,
+        "endLine": 32
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 34,
+        "endLine": 36
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 38,
+        "endLine": 40
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 42,
+        "endLine": 44
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 46,
+        "endLine": 48
+      },
+      {
+        "file": "java/src/test/java/scoring/tests/WeakTests.java",
+        "startLine": 50,
+        "endLine": 52
+      }
+    ]
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.RollupTests",
+    "file": "java/src/test/java/scoring/tests/RollupTests.java",
+    "score": 9,
+    "rules": [
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "java/src/test/java/scoring/tests/RollupTests.java",
+        "startLine": 6,
+        "endLine": 8
+      }
+    ],
+    "fileScore": 8,
+    "fileRules": [
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ]
+  },
+  {
+    "family": "tests",
+    "entity": "java:scoring.tests.ExtraRollupTests",
+    "file": "java/src/test/java/scoring/tests/RollupTests.java",
+    "score": 9,
+    "rules": [
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "java/src/test/java/scoring/tests/RollupTests.java",
+        "startLine": 12,
+        "endLine": 14
+      }
+    ],
+    "fileScore": 8,
+    "fileRules": [
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ]
+  },
+  {
+    "family": "duplication",
+    "entity": "java:scoring.CloneLeft",
+    "file": "java/src/main/java/scoring/CloneLeft.java",
+    "score": 9,
+    "rules": [
+      "duplication.group"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/CloneLeft.java",
+        "startLine": 4,
+        "endLine": 9
+      }
+    ],
+    "groupMembers": [
+      "java:scoring.CloneLeft",
+      "java:scoring.CloneRight"
+    ],
+    "metrics": {
+      "eligibleMethods": 1,
+      "duplicateGroups": 1
+    }
+  },
+  {
+    "family": "duplication",
+    "entity": "java:scoring.CloneRight",
+    "file": "java/src/main/java/scoring/CloneRight.java",
+    "score": 9,
+    "rules": [
+      "duplication.group"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/CloneRight.java",
+        "startLine": 4,
+        "endLine": 9
+      }
+    ],
+    "groupMembers": [
+      "java:scoring.CloneLeft",
+      "java:scoring.CloneRight"
+    ],
+    "metrics": {
+      "eligibleMethods": 1,
+      "duplicateGroups": 1
+    }
+  },
+  {
+    "family": "dependencies",
+    "entity": "java:scoring.CycleLeft",
+    "file": "java/src/main/java/scoring/CycleLeft.java",
+    "score": 8,
+    "rules": [
+      "dependencies.cycle",
+      "dependencies.boundary"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/CycleLeft.java",
+        "startLine": 4,
+        "endLine": 4
+      }
+    ],
+    "metrics": {
+      "componentFanIn": 1,
+      "componentFanOut": 1,
+      "componentInstability": 0.5,
+      "componentAbstractness": 0,
+      "componentDistance": 0.5
+    }
+  },
+  {
+    "family": "dependencies",
+    "entity": "java:scoring.CycleRight",
+    "file": "java/src/main/java/scoring/CycleRight.java",
+    "score": 9,
+    "rules": [
+      "dependencies.cycle"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/CycleRight.java",
+        "startLine": 4,
+        "endLine": 4
+      }
+    ],
+    "metrics": {
+      "componentFanIn": 1,
+      "componentFanOut": 1,
+      "componentInstability": 0.5,
+      "componentAbstractness": 0,
+      "componentDistance": 0.5
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.Healthy",
+    "file": "csharp/Scoring.Cases/Healthy.cs",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):complexity": 1,
+      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):crap": 1
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.AtComplexity10",
+    "file": "csharp/Scoring.Cases/AtComplexity10.cs",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):complexity": 10,
+      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):crap": 10
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.OverComplexity11",
+    "file": "csharp/Scoring.Cases/OverComplexity11.cs",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/OverComplexity11.cs",
+        "startLine": 5,
+        "endLine": 49
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):complexity": 11,
+      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):crap": 11
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.AtRisk30",
+    "file": "csharp/Scoring.Cases/AtRisk30.cs",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):complexity": 5,
+      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):crap": 30
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.OverRisk42",
+    "file": "csharp/Scoring.Cases/OverRisk42.cs",
+    "score": 9,
+    "rules": [
+      "code.crap"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/OverRisk42.cs",
+        "startLine": 5,
+        "endLine": 29
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):complexity": 6,
+      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):crap": 42
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.HighRisk156",
+    "file": "csharp/Scoring.Cases/HighRisk156.cs",
+    "score": 8,
+    "rules": [
+      "code.complexity",
+      "code.crap"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/HighRisk156.cs",
+        "startLine": 5,
+        "endLine": 53
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):complexity": 12,
+      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):crap": 156
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.AtSize50Tests",
+    "file": "csharp/Scoring.Tests/AtSize50Tests.cs",
+    "score": 10,
+    "rules": [],
+    "locations": [],
+    "metrics": {
+      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():executableLinesWithHelpers": 50,
+      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():assertionsWithHelpers": 1,
+      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():branchCountWithHelpers": 0
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.OverSize51Tests",
+    "file": "csharp/Scoring.Tests/OverSize51Tests.cs",
+    "score": 9,
+    "rules": [
+      "tests.size"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Tests/OverSize51Tests.cs",
+        "startLine": 7,
+        "endLine": 61
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():executableLinesWithHelpers": 51,
+      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():assertionsWithHelpers": 1,
+      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():branchCountWithHelpers": 0
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.BranchingTests",
+    "file": "csharp/Scoring.Tests/BranchingTests.cs",
+    "score": 9,
+    "rules": [
+      "tests.branching"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Tests/BranchingTests.cs",
+        "startLine": 7,
+        "endLine": 17
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():executableLinesWithHelpers": 5,
+      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():assertionsWithHelpers": 1,
+      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():branchCountWithHelpers": 1
+    }
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.WeakTests",
+    "file": "csharp/Scoring.Tests/WeakTests.cs",
+    "score": 0,
+    "rules": [
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 7,
+        "endLine": 10
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 12,
+        "endLine": 15
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 17,
+        "endLine": 20
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 22,
+        "endLine": 25
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 27,
+        "endLine": 30
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 32,
+        "endLine": 35
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 37,
+        "endLine": 40
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 42,
+        "endLine": 45
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 47,
+        "endLine": 50
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 52,
+        "endLine": 55
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 57,
+        "endLine": 60
+      },
+      {
+        "file": "csharp/Scoring.Tests/WeakTests.cs",
+        "startLine": 62,
+        "endLine": 65
+      }
+    ]
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.RollupTests",
+    "file": "csharp/Scoring.Tests/RollupTests.cs",
+    "score": 9,
+    "rules": [
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Tests/RollupTests.cs",
+        "startLine": 7,
+        "endLine": 10
+      }
+    ],
+    "fileScore": 8,
+    "fileRules": [
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ]
+  },
+  {
+    "family": "tests",
+    "entity": "csharp:Scoring.Tests.ExtraRollupTests",
+    "file": "csharp/Scoring.Tests/RollupTests.cs",
+    "score": 9,
+    "rules": [
+      "tests.noAssertion"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Tests/RollupTests.cs",
+        "startLine": 15,
+        "endLine": 18
+      }
+    ],
+    "fileScore": 8,
+    "fileRules": [
+      "tests.noAssertion",
+      "tests.noAssertion"
+    ]
+  },
+  {
+    "family": "duplication",
+    "entity": "csharp:Scoring.CloneLeft",
+    "file": "csharp/Scoring.Cases/CloneLeft.cs",
+    "score": 9,
+    "rules": [
+      "duplication.group"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/CloneLeft.cs",
+        "startLine": 5,
+        "endLine": 11
+      }
+    ],
+    "groupMembers": [
+      "csharp:Scoring.CloneLeft",
+      "csharp:Scoring.CloneRight"
+    ],
+    "metrics": {
+      "eligibleMethods": 1,
+      "duplicateGroups": 1
+    }
+  },
+  {
+    "family": "duplication",
+    "entity": "csharp:Scoring.CloneRight",
+    "file": "csharp/Scoring.Cases/CloneRight.cs",
+    "score": 9,
+    "rules": [
+      "duplication.group"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/CloneRight.cs",
+        "startLine": 5,
+        "endLine": 11
+      }
+    ],
+    "groupMembers": [
+      "csharp:Scoring.CloneLeft",
+      "csharp:Scoring.CloneRight"
+    ],
+    "metrics": {
+      "eligibleMethods": 1,
+      "duplicateGroups": 1
+    }
+  },
+  {
+    "family": "dependencies",
+    "entity": "csharp:Scoring.CycleLeft",
+    "file": "csharp/Scoring.Cases/CycleLeft.cs",
+    "score": 8,
+    "rules": [
+      "dependencies.cycle",
+      "dependencies.boundary"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/CycleLeft.cs",
+        "startLine": 5,
+        "endLine": 5
+      }
+    ],
+    "metrics": {
+      "componentFanIn": 1,
+      "componentFanOut": 1,
+      "componentInstability": 0.5,
+      "componentAbstractness": 0,
+      "componentDistance": 0.5
+    }
+  },
+  {
+    "family": "dependencies",
+    "entity": "csharp:Scoring.CycleRight",
+    "file": "csharp/Scoring.Cases/CycleRight.cs",
+    "score": 9,
+    "rules": [
+      "dependencies.cycle"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/CycleRight.cs",
+        "startLine": 5,
+        "endLine": 5
+      }
+    ],
+    "metrics": {
+      "componentFanIn": 1,
+      "componentFanOut": 1,
+      "componentInstability": 0.5,
+      "componentAbstractness": 0,
+      "componentDistance": 0.5
+    }
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "components": {
+    "java-left": ["java:scoring.CycleLeft"],
+    "java-right": ["java:scoring.CycleRight"],
+    "cs-left": ["csharp:Scoring.CycleLeft"],
+    "cs-right": ["csharp:Scoring.CycleRight"]
+  },
+  "allowedDependencies": {
+    "java-left": [],
+    "cs-left": []
+  }
+}
