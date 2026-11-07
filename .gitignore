@@ -6,3 +6,5 @@ dist/
 .DS_Store
 .serena/
 TestResults/
+__pycache__/
+*.py[cod]

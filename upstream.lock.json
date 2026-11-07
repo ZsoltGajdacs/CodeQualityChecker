@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "upstreams": [
+    {
+      "repository": "https://github.com/unclebob/crapper",
+      "revision": "6fd92c4c9bcc56efb64a2f8743d5a2993bcfd42d",
+      "license": "0BSD",
+      "reuse": "independent implementation of documented behavior; no upstream source copied"
+    },
+    {
+      "repository": "https://github.com/unclebob/dryer",
+      "revision": "66ff6d21a42c04afcad89c78a80066176d1294b0",
+      "license": "0BSD",
+      "reuse": "independent implementation of documented behavior; no upstream source copied"
+    },
+    {
+      "repository": "https://github.com/unclebob/scrap",
+      "revision": "f793b28906d3c60e30b128e1ec08df6269a72b13",
+      "license": "not-declared",
+      "reuse": "independent implementation of documented behavior; no upstream source copied"
+    },
+    {
+      "repository": "https://github.com/unclebob/dependency-checker",
+      "revision": "61097ea222a377b781f003712bc54a73bb8a2d4d",
+      "license": "not-declared",
+      "reuse": "independent implementation of documented behavior; no upstream source copied"
+    }
+  ],
+  "analyzerRuntime": {
+    "vendor": "JetBrains s.r.o.",
+    "version": "25.0.2+10-b300.57",
+    "architecture": "aarch64",
+    "releaseSha256": "16a21383c65a6eb8a34cd6378f3ca1251bb295e66135d9eaa7b6a3450012c790",
+    "source": "https://github.com/JetBrains/JetBrainsRuntime",
+    "modules": {
+      "java.base": "f889525b581ef448361dc936f84d08492ef1fbc7041ad579fb61634d3c424c05",
+      "java.compiler": "fc6afbf544fc4dc475d423f72eb4482ef6fce3fed821376aae8b66bdac4c0bfb",
+      "java.datatransfer": "fc94e614ac38e16bef9bf2421e624485b1cc3867a5d8e13adb7d8c723c7bdf1e",
+      "java.desktop": "81f51b73f6f61492296d628d5a66cdef742e8fd86249678352c3594ff8a081af",
+      "java.instrument": "00c882c9297efc9324a7708be981b9649d3bfa46fcfd9ee7e0cac12ad4462f3a",
+      "java.logging": "633a5a2dce4135ff1f3db6fb271d152079f8bac63dd98b1a0fedd6809a9d000e",
+      "java.management": "a67a00ac5c44989c3418f58fc09ce19a4bd5701956b7b29250f81241ea9b6e9d",
+      "java.management.rmi": "4c014cc9f85382ea64b8f84384616da92f09cbec84018425d59065c6fda78f18",
+      "java.naming": "02126f84b1a2fd808c40d3c2d34215eaf3db7f61daa1b82b578307cdba25c5d4",
+      "java.net.http": "5653211e0ff0bd40b6e0e4ebd66fcd5cacd6c5a70e44e032ccf7ad115712f40a",
+      "java.prefs": "fb34f2b694352d896483fba7e77b771964480db0fc414ce7210ee76ce33d1f0b",
+      "java.rmi": "b604cbb3feece321228f36a0cb710cf92c0ac73e505fc146bd4817d011cb8b36",
+      "java.scripting": "61dc320c566a12d697152b480314a351cc1677f7cd062292b610b4e01b2da98d",
+      "java.se": "38433f138ca8fbc3523498c0892f7d3d9fbc58b8f71d85d29a4e828eff694c53",
+      "java.security.jgss": "e7b0ca2136888732ea74655f80fe64ea0381ca9fcadf84e57840c862f9da633c",
+      "java.security.sasl": "c7c6eac3e143b76eec959251caa925762184fb49be75cbbef9bbc29c89ad139d",
+      "java.sql": "ef370cb091e7e63666d9b1c2702c46a48be4b32faca8cb740a90347acb1deb65",
+      "java.sql.rowset": "3a2d686fed18452ae77e5784edc3f52780f28f28b71339fec82502bfd3b9e634",
+      "java.transaction.xa": "0e0f8834090ff512fd016e918580fe8e43c46b8e04684b300016fdf5e59097e0",
+      "java.xml": "f88ffa7d479276d942c5ec78f94a7011bf2aac931559c9c9218c22644cd9baa2",
+      "java.xml.crypto": "1c4f18725cef8dba5b4256823018af0037f7984a4582b4f517601f6bfd759309",
+      "jdk.compiler": "fde917a1373a8756edfff4af8985368009be8a9c1b7a828ef597c470a132b0cc",
+      "jdk.internal.opt": "65ae3e3e4091a0072a4b178ea60dc4bdaee9629e3cbd6e52e023ec4ef0df8ddb",
+      "jdk.unsupported": "849820e960f528232e7ca0fc4209af674c8c1621e070ff9ef300c9561aaa4c28",
+      "jdk.zipfs": "05fc235574520713c9d7fbccbaa7de0dd09ca3b84f0e20fc56354010aaa4274e"
+    },
+    "rootModules": [
+      "java.se",
+      "jdk.compiler",
+      "jdk.unsupported"
+    ]
+  },
+  "sdkLicenseSources": {
+    "repository": "https://github.com/modelcontextprotocol/csharp-sdk",
+    "revision": "61420937cbef3eab895cafc8a89418811fb71f54",
+    "packageVersion": "2.3.1",
+    "files": {
+      "docs/licenses/MCP-SDK-THIRD-PARTY-NOTICES.txt": "b9c35f6ab075077d5c2b644fdc58eb5696b8b70f539947f9e1e57331599fc5ce",
+      "docs/licenses/MCP-SDK-LICENSE.txt": "7c6a686d2b34b86ad8c726e0ac4d76903b525f251d73e617f8db3879fa8f11fc"
+    }
+  }
+}

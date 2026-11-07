@@ -1,0 +1,83 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Cqc.Core;
+
+public static class Wire
+{
+    public const string SchemaVersion = "1";
+    public const string Target = "10 is the desired score.";
+    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
+    public static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    public static string HashBytes(byte[] value) => Convert.ToHexStringLower(SHA256.HashData(value));
+}
+
+public sealed record Location(string File, int StartLine, int EndLine);
+public sealed record Diagnostic(string Code, string Message, string? File = null, string? Language = null);
+public sealed record MethodFact(
+    string Id, string TypeId, string Language, Location Location, int Complexity,
+    int ExecutableLines, bool IsTest, bool IsFixture, bool IsParameterized,
+    int Assertions, string[] Calls, string[] Fingerprints, int NodeCount,
+    bool Complete = true, string? CoverageSignature = null);
+public sealed record TypeFact(string Id, string Language, Location Location, bool IsAbstract, bool IsTest, bool Complete = true);
+public sealed record DependencyFact(string From, string To, Location Location);
+public sealed record AnalysisFacts(
+    TypeFact[] Types, MethodFact[] Methods, DependencyFact[] Dependencies,
+    Diagnostic[] Diagnostics, bool SemanticComplete, string SchemaVersion = Wire.SchemaVersion);
+public sealed record ProjectModule(string Language, string Path, string Integration, bool Supported);
+public sealed record ProjectSnapshot(
+    string Root, string[] Files, string[] SelectedFiles, ProjectModule[] Modules,
+    string SourceFingerprint, Diagnostic[] Diagnostics, string SchemaVersion = Wire.SchemaVersion);
+
+public sealed record AnalysisRequest
+{
+    public required string ProjectRoot { get; init; }
+    public string Scope { get; init; } = "repository";
+    public string[] Paths { get; init; } = [];
+    public string? GitBase { get; init; }
+    public bool Execute { get; init; }
+    public string? ConfigPath { get; init; }
+    public string? ReportPath { get; init; }
+    public int TimeoutSeconds { get; init; } = 300;
+}
+
+public sealed record QualityConfig
+{
+    public int ComplexityThreshold { get; init; } = 10;
+    public double CrapThreshold { get; init; } = 30;
+    public int TestLinesThreshold { get; init; } = 50;
+    public double DuplicateSimilarity { get; init; } = .82;
+    public int DuplicateMinLines { get; init; } = 4;
+    public int DuplicateMinNodes { get; init; } = 20;
+    public SortedDictionary<string, string[]> Components { get; init; } = new(StringComparer.Ordinal);
+    public SortedDictionary<string, string[]> AllowedDependencies { get; init; } = new(StringComparer.Ordinal);
+    public string[][] ForbiddenDependencies { get; init; } = [];
+    public string[] Exclude { get; init; } = [];
+}
+
+public sealed record Finding(string Id, string Rule, string Message, string Advice,
+    string[] EntityIds, Location[] Locations, int Deduction = 1);
+public sealed record EntityScore(string EntityId, string Kind, string File, string Status,
+    double? Score, string[] FindingIds, SortedDictionary<string, double?> Metrics);
+public sealed record FamilyResult(string Family, string Status, EntityScore[] Entities, Finding[] Findings, Diagnostic[] Diagnostics);
+public sealed record AnalysisResponse(string SchemaVersion, string RulesetVersion, string Message,
+    string SourceFingerprint, string ConfigurationFingerprint, string Scope,
+    string[] AnalyzedFiles, ProjectModule[] Modules, FamilyResult[] Results, Diagnostic[] Diagnostics);
+public sealed record InspectionResponse(string SchemaVersion, string Message, ProjectSnapshot Project, Diagnostic[] Prerequisites);
+
+public sealed record MethodCoverage(string MethodId, int CoveredBranches, int TotalBranches, int CoveredLines, int TotalLines);
+public sealed record CoverageEvidence(string SchemaVersion, string SourceFingerprint, string ConfigurationFingerprint,
+    bool Successful, SortedDictionary<string, string> ToolVersions, MethodCoverage[] Methods);
+
+public interface ILanguageAnalyzer
+{
+    string Language { get; }
+    Task<AnalysisFacts> AnalyzeAsync(ProjectSnapshot snapshot, CancellationToken cancellationToken);
+}

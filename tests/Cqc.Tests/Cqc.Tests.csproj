@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <ProjectReference Include="../../src/Cqc.Core/Cqc.Core.csproj" />
+    <ProjectReference Include="../../src/Cqc.CSharp/Cqc.CSharp.csproj" />
+    <ProjectReference Include="../../src/Cqc.Java/Cqc.Java.csproj" />
+    <ProjectReference Include="../../src/Cqc.Server/Cqc.Server.csproj" />
+  </ItemGroup>
+</Project>

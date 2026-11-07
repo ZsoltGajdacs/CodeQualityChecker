@@ -1,0 +1,29 @@
+# Evidence and controlled execution
+
+Analysis-only calls read source, cached reference metadata, and existing CQC coverage evidence. They never invoke project builds, tests, restores, or MSBuild evaluation. Ordinary Git commands are used for ignore and changed-file discovery. Missing evidence leaves relevant scores unavailable while still returning available facts.
+
+`execute: true` explicitly permits running project-controlled Maven/.NET commands and restores. The executor copies the project into a temporary workspace, performs builds/tests there, collects reports and resolved references, and deletes the temporary workspace afterward. Source/configuration in the original root remains unchanged; reusable CQC metadata is written under `.cqc/`.
+
+The initial Java integration runs Maven tests with pinned JaCoCo instrumentation/reporting and captures the test classpath. The .NET integration runs VSTest with pinned Coverlet collector and obtains resolved references through explicit MSBuild evaluation. Host Maven and appropriate project SDKs must be installed. Toolchain discovery does not install project SDKs. Projects with incompatible test platforms, missing dependencies, or unsupported integrations report failures and incomplete scores.
+
+Project execution can perform any actions authorized by the project's build/test code. An isolated copy protects original tracked inputs from routine build edits; it is not an operating-system sandbox. Network access can be used by Maven/NuGet restores through their normal configured repositories.
+
+## Coverage provenance
+
+Generated evidence is `.cqc/coverage.json`, a JSON `CoverageEvidence` object with:
+
+- Schema version `"1"`.
+- Source fingerprint covering source files and recognized build inputs.
+- Effective configuration fingerprint.
+- Successful execution status and collected tool versions.
+- Per-method coverage counters: covered/total branches and covered/total executable lines.
+
+The counters must have valid nonnegative bounds and unique, exact method identities. The production scorer requires evidence for every analyzed production method and returns covered/total branch and line counters alongside the derived coverage fraction. Source/configuration mismatches, failed execution, missing methods, invalid counters, and unsupported schema versions prevent affected scores. Branchless methods require executable-line evidence.
+
+Coverage mapping preserves overload identities. Java generic signatures use erased coverage aliases; C# generic signatures can use exact source-location fallback when needed. Complementary OpenCover branch/line points from multiple test-project reports are unioned before calculating counters. Ambiguous duplicate JaCoCo aggregate entries are withheld rather than selecting whichever report looks best.
+
+`reportPath` optionally reads an existing CQC evidence file. It is an input path, not a generated-output destination. Directly supplying a raw coverage XML file does not establish its source provenance. Keep CQC artifacts together with their original source/configuration; changes require recollection.
+
+The server rechecks fingerprints after execution and analysis. Concurrent input changes invalidate evidence. Calls for the same project root are serialized; request cancellation and the configured timeout propagate to language workers and project processes. Timeouts/cancellation terminate the process tree and cannot yield successful fresh evidence.
+
+Do not treat an empty result as a verified clean project without checking statuses and diagnostics. `notApplicable` means the family has no recognized applicable entities; `incomplete` means evidence or analysis is insufficient. A 10 is emitted only for a complete applicable assessment with no scored findings.

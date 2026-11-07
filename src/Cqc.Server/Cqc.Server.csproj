@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>cqc</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Cqc.Core/Cqc.Core.csproj" />
+    <ProjectReference Include="../Cqc.CSharp/Cqc.CSharp.csproj" />
+    <ProjectReference Include="../Cqc.Java/Cqc.Java.csproj" />
+    <PackageReference Include="ModelContextProtocol" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+  </ItemGroup>
+</Project>
