@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/target/
+.cqc/
+dist/
+.DS_Store
+.serena/
+TestResults/
