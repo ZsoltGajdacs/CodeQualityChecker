@@ -50,7 +50,7 @@ public sealed record AnalysisRequest
 
 public sealed record QualityConfig
 {
-    public int ComplexityThreshold { get; init; } = 10;
+    public int ComplexityThreshold { get; init; } = 8;
     public double CrapThreshold { get; init; } = 30;
     public int TestLinesThreshold { get; init; } = 50;
     public double DuplicateSimilarity { get; init; } = .82;

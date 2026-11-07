@@ -14,11 +14,53 @@
   },
   {
     "family": "code",
-    "entity": "java:scoring.AtComplexity10",
-    "file": "java/src/main/java/scoring/AtComplexity10.java",
+    "entity": "java:scoring.AtComplexity8",
+    "file": "java/src/main/java/scoring/AtComplexity8.java",
     "score": 10,
     "rules": [],
     "locations": [],
+    "metrics": {
+      "method:java:scoring.AtComplexity8.evaluate(int):complexity": 8,
+      "method:java:scoring.AtComplexity8.evaluate(int):coverage": 1,
+      "method:java:scoring.AtComplexity8.evaluate(int):crap": 8
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.OverComplexity9",
+    "file": "java/src/main/java/scoring/OverComplexity9.java",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/OverComplexity9.java",
+        "startLine": 4,
+        "endLine": 31
+      }
+    ],
+    "metrics": {
+      "method:java:scoring.OverComplexity9.evaluate(int):complexity": 9,
+      "method:java:scoring.OverComplexity9.evaluate(int):coverage": 1,
+      "method:java:scoring.OverComplexity9.evaluate(int):crap": 9
+    }
+  },
+  {
+    "family": "code",
+    "entity": "java:scoring.AtComplexity10",
+    "file": "java/src/main/java/scoring/AtComplexity10.java",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "java/src/main/java/scoring/AtComplexity10.java",
+        "startLine": 4,
+        "endLine": 34
+      }
+    ],
     "metrics": {
       "method:java:scoring.AtComplexity10.evaluate(int):complexity": 10,
       "method:java:scoring.AtComplexity10.evaluate(int):coverage": 1,
@@ -391,11 +433,53 @@
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.AtComplexity10",
-    "file": "csharp/Scoring.Cases/AtComplexity10.cs",
+    "entity": "csharp:Scoring.AtComplexity8",
+    "file": "csharp/Scoring.Cases/AtComplexity8.cs",
     "score": 10,
     "rules": [],
     "locations": [],
+    "metrics": {
+      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):complexity": 8,
+      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):crap": 8
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.OverComplexity9",
+    "file": "csharp/Scoring.Cases/OverComplexity9.cs",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/OverComplexity9.cs",
+        "startLine": 5,
+        "endLine": 41
+      }
+    ],
+    "metrics": {
+      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):complexity": 9,
+      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):crap": 9
+    }
+  },
+  {
+    "family": "code",
+    "entity": "csharp:Scoring.AtComplexity10",
+    "file": "csharp/Scoring.Cases/AtComplexity10.cs",
+    "score": 9,
+    "rules": [
+      "code.complexity"
+    ],
+    "locations": [
+      {
+        "file": "csharp/Scoring.Cases/AtComplexity10.cs",
+        "startLine": 5,
+        "endLine": 45
+      }
+    ],
     "metrics": {
       "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):complexity": 10,
       "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):coverage": 1,

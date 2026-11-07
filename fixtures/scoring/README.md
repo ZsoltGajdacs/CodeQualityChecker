@@ -6,24 +6,28 @@ The Java Maven/JUnit 5 project and the C# `Scoring.Cases`/xUnit `Scoring.Tests` 
 
 ## Production cases
 
-Every `evaluate(int)` / `Evaluate(int)` method contains exactly the stated number of independent `if` decisions. The expected complexity is therefore `1 + if count`. The coverage test class invokes only Healthy, AtComplexity10, and OverComplexity11, with -1 and 100; all of their branches are exercised. The risk-boundary classes are deliberately never called.
+Every `evaluate(int)` / `Evaluate(int)` method contains exactly the stated number of independent `if` decisions. The expected complexity is therefore `1 + if count`. The default complexity cutoff is 8: complexity 8 is accepted and complexity 9 receives one deduction. The coverage test class invokes only Healthy, AtComplexity8, OverComplexity9, AtComplexity10, and OverComplexity11, with -1 and 100; all of their branches are exercised. The risk-boundary classes are deliberately never called.
 
 | Class | Independent ifs | Executable lines | Expected coverage | Hand calculation of CRAP | Expected production score |
 | --- | ---: | ---: | --- | --- | ---: |
 | Healthy | 0 | 1 | Full executable-line coverage | 1 | 10 |
-| AtComplexity10 | 9 | 20 | All branches | 10 | 10 |
+| AtComplexity8 | 7 | 16 | All branches | 8 | 10 |
+| OverComplexity9 | 8 | 18 | All branches | 9 | 9 |
+| AtComplexity10 | 9 | 20 | All branches | 10 | 9 |
 | OverComplexity11 | 10 | 22 | All branches | 11 | 9 |
 | AtRisk30 | 4 | 10 | No branches covered | 5² + 5 = 30 | 10 |
 | OverRisk42 | 5 | 12 | No branches covered | 6² + 6 = 42 | 9 |
 | HighRisk156 | 11 | 24 | No branches covered | 12² + 12 = 156 | 8 |
 
-Expected outputs of the called methods are literal assertions: Healthy(-1)=0, Healthy(100)=101; AtComplexity10(-1)=0, AtComplexity10(100)=9; OverComplexity11(-1)=0, OverComplexity11(100)=10. Coverage tests contain no test-owned branches or loops.
+Expected outputs of the called methods are literal assertions: Healthy(-1)=0, Healthy(100)=101; AtComplexity8(-1)=0, AtComplexity8(100)=7; OverComplexity9(-1)=0, OverComplexity9(100)=8; AtComplexity10(-1)=0, AtComplexity10(100)=9; OverComplexity11(-1)=0, OverComplexity11(100)=10. Coverage tests contain no test-owned branches or loops.
 
 Production source witnesses, counted directly from the files:
 
 | File/class | Java method range | C# method range |
 | --- | --- | --- |
 | Healthy | 4–6 | 5–8 |
+| AtComplexity8 | 4–28 | 5–37 |
+| OverComplexity9 | 4–31 | 5–41 |
 | AtComplexity10 | 4–34 | 5–45 |
 | OverComplexity11 | 4–37 | 5–49 |
 | AtRisk30 | 4–19 | 5–25 |
@@ -46,7 +50,7 @@ The table's method ranges include their test annotation/attribute. Test-owned ex
 | RollupTests | One empty test | 0 | 6–8 | 7–10 | 9 per class |
 | ExtraRollupTests | One empty test in the same source file | 0 | 12–14 | 15–18 | 9 per class |
 
-The shared `RollupTests.java` / `RollupTests.cs` file has two distinct no-assertion findings, so its file score is 8 although both class scores are 9. Java's second top-level class is package-private, which JUnit 5 supports. Test class filenames end in `Tests` so Maven Surefire actually runs them. Each language's real test runner executes 20 tests, including the deliberately weak empty tests.
+The shared `RollupTests.java` / `RollupTests.cs` file has two distinct no-assertion findings, so its file score is 8 although both class scores are 9. Java's second top-level class is package-private, which JUnit 5 supports. Test class filenames end in `Tests` so Maven Surefire actually runs them. Each language's real test runner executes 22 tests, including the deliberately weak empty tests.
 
 Java test files are under `java/src/test/java/scoring/tests/`, package `scoring.tests`; C# test files are under `csharp/Scoring.Tests/`, namespace `Scoring.Tests`.
 

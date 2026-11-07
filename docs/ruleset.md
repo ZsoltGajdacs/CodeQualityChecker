@@ -4,7 +4,7 @@
 
 | Rule ID | Default condition |
 | --- | --- |
-| `code.complexity` | Method cyclomatic complexity > 10 |
+| `code.complexity` | Method cyclomatic complexity > 8 (9 and above) |
 | `code.crap` | Method CRAP > 30 |
 | `tests.branching` | Test or resolved fixture/helper has branching |
 | `tests.size` | Test plus resolved fixture/helper contribution > 50 executable lines |
@@ -21,13 +21,17 @@ Duplicate candidates default to at least four source lines and 20 normalized syn
 
 Dependency metrics include component fan-in/out, instability, abstractness, absolute distance from the main sequence, and zone (`-1` pain, `0` healthy, `1` useless, threshold 0.3). Metrics are advisory unless listed in the scored rules. Component cycles can exist even without individual type cycles. A class already scored for a type cycle does not receive an additional component-cycle deduction. Boundary findings attach to the source class. This check does not scan package vulnerabilities.
 
+The default complexity finding boundary matches the observed Java/C# Code Health cutoff: complexity 8 is accepted and complexity 9 is flagged. `complexityThreshold` is the maximum permitted complexity, so explicit overrides retain their existing meaning (for example, 10 flags 11 and above). CQC scores remain its own one-point deduction model.
+
+Changing the effective default changes the configuration fingerprint. Coverage collected under the previous default must be refreshed with explicit execution, or supplied with matching provenance. The scoring algorithm and ruleset version remain unchanged; the configuration fingerprint identifies the changed policy.
+
 ## Configuration
 
 An optional `.cqc.json` at the project root overrides defaults:
 
 ```json
 {
-  "complexityThreshold": 10,
+  "complexityThreshold": 8,
   "crapThreshold": 30,
   "testLinesThreshold": 50,
   "duplicateSimilarity": 0.82,
