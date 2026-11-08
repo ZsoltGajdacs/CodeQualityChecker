@@ -34,11 +34,13 @@ public static class ProjectDiscovery
     private sealed class DiscoveryScan(DirectoryInfo root, LanguageDefinition[] definitions)
     {
         private string[] allFiles = [];
+        private string[] ignoredBuildInputs = [];
         private string[] sources = [];
 
         public async Task<ProjectSnapshot> RunAsync(AnalysisRequest request, QualityConfig config, CancellationToken token)
         {
             allFiles = Enumerate(root).Where(path => !config.Exclude.Any(pattern => Glob(path, pattern))).Order(StringComparer.Ordinal).ToArray();
+            ignoredBuildInputs = allFiles.Where(path => definitions.Any(d => d.IgnoredBuildInputPatterns.Any(pattern => Glob(path, pattern)))).ToArray();
             allFiles = await GitScope.RemoveIgnoredAsync(root.FullName, allFiles, token);
             sources = allFiles.Where(path => definitions.Any(definition => definition.IsSource(path)))
                 .Where(path => !Generated(new FileInfo(Path.Combine(root.FullName, path)))).ToArray();
@@ -71,13 +73,16 @@ public static class ProjectDiscovery
 
         private async Task<string> Fingerprint(CancellationToken token)
         {
-            var inputs = allFiles.Where(path => definitions.Any(definition => Fingerprinted(definition, path))).Order(StringComparer.Ordinal);
+            var inputs = allFiles.Where(path => definitions.Any(definition => Fingerprinted(definition, path)))
+                .Concat(ignoredBuildInputs).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
             var fingerprint = new StringBuilder();
             foreach (var path in inputs)
             {
                 token.ThrowIfCancellationRequested();
                 var bytes = await File.ReadAllBytesAsync(Path.Combine(root.FullName, path), token);
                 fingerprint.Append(path).Append('\0').Append(Wire.HashBytes(bytes)).Append('\n');
+                if (!OperatingSystem.IsWindows() && definitions.Any(d => d.ExecutableBuildInputPatterns.Any(pattern => Glob(path, pattern))))
+                    fingerprint.Append("mode\0").Append(path).Append('\0').Append((int)File.GetUnixFileMode(Path.Combine(root.FullName, path))).Append('\n');
             }
             return Wire.Hash(fingerprint.ToString());
         }

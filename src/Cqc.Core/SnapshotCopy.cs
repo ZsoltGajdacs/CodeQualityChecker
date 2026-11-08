@@ -12,9 +12,14 @@ internal static class SnapshotCopy
             if ((File.GetAttributes(entry) & FileAttributes.ReparsePoint) != 0) continue;
             var name = Path.GetFileName(entry);
             if (Excluded.Contains(name)) continue;
-            var destination = Path.Combine(target, name);
-            if (Directory.Exists(entry)) { Directory.CreateDirectory(destination); Copy(entry, destination); }
-            else File.Copy(entry, destination);
+            CopyEntry(entry, Path.Combine(target, name));
         }
+    }
+
+    private static void CopyEntry(string entry, string destination)
+    {
+        if (Directory.Exists(entry)) { Directory.CreateDirectory(destination); Copy(entry, destination); return; }
+        File.Copy(entry, destination);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(destination, File.GetUnixFileMode(entry));
     }
 }

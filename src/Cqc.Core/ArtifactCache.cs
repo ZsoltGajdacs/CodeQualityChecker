@@ -5,6 +5,15 @@ namespace Cqc.Core;
 /// <summary>Shared atomic artifact IO; language modules own artifact names and contents.</summary>
 public sealed class ArtifactCache(ProjectSnapshot snapshot)
 {
+    public async Task InvalidateAsync(string name, CancellationToken token)
+    {
+        if (Path.GetFileName(name) != name) throw new ArgumentException("Artifact name must be a simple filename.");
+        EvidenceStore.EnsureArtifactDirectory(snapshot.Root);
+        var path = Path.Combine(snapshot.Root, ".cqc", name);
+        await ReplaceText(path + ".source", "incomplete", token);
+        if (!File.Exists(path)) await ReplaceText(path, "", token);
+    }
+
     public async Task ReplaceLinesAsync(string name, IEnumerable<string> lines, CancellationToken token)
     {
         if (Path.GetFileName(name) != name) throw new ArgumentException("Artifact name must be a simple filename.");

@@ -43,7 +43,7 @@ All tools take a nested `request` object:
 
 Use `scope: "paths"` with `paths: ["src/Feature.cs", "module/src"]`, or `scope: "changed"` with optional `gitBase: "main"`. Default changed scope includes staged, unstaged, and untracked source files. Checks assess complete selected files against the whole repository, so findings can point to unselected counterpart files.
 
-Source-only analysis never invokes project builds, tests, restores, or MSBuild evaluation. Set `execute: true` explicitly to allow project-controlled Maven/.NET restores, builds, and tests. Execution uses an isolated copy and writes reusable evidence under the original root's `.cqc/` directory. Maven and the project's Java/.NET SDKs must then be installed. Initial execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest; Gradle and Microsoft.Testing.Platform execution are outside the MVP.
+Source-only analysis never invokes project builds, tests, restores, or MSBuild evaluation. Set `execute: true` explicitly to allow project-controlled Maven/.NET restores, builds, and tests. Execution uses an isolated copy and writes reusable evidence under the original root's `.cqc/` directory. Maven execution uses a project wrapper when available, otherwise host Maven; the project's Java/.NET SDKs are also needed. Initial execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest; Gradle and Microsoft.Testing.Platform execution are outside the MVP.
 
 Optional inputs are `configPath`, `reportPath`, and `timeoutSeconds` (1–3600). `reportPath` reads existing CQC coverage evidence; generated evidence is written to `.cqc/coverage.json`. Raw JaCoCo/OpenCover XML alone cannot establish source-matched provenance.
 

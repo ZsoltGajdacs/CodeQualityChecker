@@ -1,0 +1,4 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion><parent><groupId>cqc.fixtures.reactor</groupId><artifactId>root</artifactId><version>1.0</version></parent>
+  <artifactId>group</artifactId><packaging>pom</packaging><modules><module>api</module><module>service</module></modules>
+</project>

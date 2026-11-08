@@ -12,12 +12,15 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         using var timeout = Timeout(request, cancellationToken);
         var (config, _) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
         var snapshot = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-        var prerequisites = new List<Diagnostic>();
-        foreach (var tool in Definitions.Where(d => snapshot.Modules.Any(m => m.Language == d.Language)).SelectMany(d => d.BuildTools).Distinct())
-        {
-            if (!OnPath(tool)) prerequisites.Add(new("missing_build_tool", $"Install {tool} to enable explicit project execution. Analysis-only remains available."));
-        }
-        return new("1", Wire.Target, snapshot, prerequisites.ToArray());
+        return new("1", Wire.Target, snapshot, Prerequisites(snapshot));
+    }
+
+    private Diagnostic[] Prerequisites(ProjectSnapshot snapshot)
+    {
+        var definitions = Definitions.Where(d => snapshot.Modules.Any(m => m.Language == d.Language)).ToArray();
+        var tools = definitions.SelectMany(d => d.BuildTools).Distinct().Where(tool => !OnPath(tool))
+            .Select(tool => new Diagnostic("missing_build_tool", $"Install {tool} to enable explicit project execution. Analysis-only remains available."));
+        return tools.Concat(definitions.SelectMany(d => d.InspectPrerequisites?.Invoke(snapshot, OnPath) ?? [])).ToArray();
     }
 
     public async Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, string[] families, CancellationToken cancellationToken)
@@ -44,6 +47,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 try { artifacts = await new BuildExecutor(adapters.OfType<ILanguageExecution>()).CollectAsync(snapshot, timeout.Token); }
                 catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
                 { diagnostics.Add(new("execution_failed", ex.Message)); }
+                AppendBuildDiagnostics(diagnostics, artifacts);
             }
             var afterBuild = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
             if (afterBuild.SourceFingerprint != snapshot.SourceFingerprint)
@@ -75,6 +79,11 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 snapshot.SelectedFiles, snapshot.Modules, results, diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray());
         }
         finally { artifacts?.Dispose(); }
+    }
+
+    private static void AppendBuildDiagnostics(List<Diagnostic> diagnostics, BuildArtifacts? artifacts)
+    {
+        if (artifacts is not null) diagnostics.AddRange(artifacts.Results.SelectMany(result => result.Diagnostics));
     }
 
     private async Task<AnalysisFacts> CollectFacts(ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)

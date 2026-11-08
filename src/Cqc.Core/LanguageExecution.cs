@@ -1,6 +1,9 @@
 namespace Cqc.Core;
 
-public sealed record LanguageBuildResult(string Language, string[] Reports, SortedDictionary<string, string> ToolVersions);
+public sealed record LanguageBuildResult(string Language, string[] Reports, SortedDictionary<string, string> ToolVersions)
+{
+    public Diagnostic[] Diagnostics { get; init; } = [];
+}
 
 /// <summary>Optional build/report integration supplied by each language module.</summary>
 public interface ILanguageExecution

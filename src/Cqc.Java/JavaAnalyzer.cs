@@ -12,7 +12,9 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         Language = "java", SourceExtensions = [".java"], ManifestPatterns = ["pom.xml"],
         InspectManifest = (_, path) => new("java", path, "maven", true),
         BuildInputPatterns = ["**/.mvn/**", "**/settings.xml", "**/mvnw", "**/mvnw.cmd"],
-        BuildTools = ["mvn", "java"]
+        IgnoredBuildInputPatterns = ["**/.mvn/wrapper/**", "**/mvnw", "**/mvnw.cmd"],
+        ExecutableBuildInputPatterns = ["**/mvnw"],
+        BuildTools = ["java"], InspectPrerequisites = MavenTool.InspectPrerequisites
     };
 
     public Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string scratchDirectory, CancellationToken cancellationToken)
