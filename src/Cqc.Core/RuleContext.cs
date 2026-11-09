@@ -5,8 +5,8 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
     public CancellationToken CancellationToken { get; } = cancellationToken;
     public ProjectSnapshot Snapshot { get; } = snapshot;
     public AnalysisFacts Facts { get; } = facts;
-    public MethodFact[] Methods { get; } = facts.Methods.OrderBy(m => m.Id, StringComparer.Ordinal)
-        .ThenBy(m => m.Location.File, StringComparer.Ordinal).ToArray();
+    public FactIndex Index { get; } = new(facts);
+    public MethodFact[] Methods => Index.Methods;
 
     public static SortedDictionary<string, double?> Metrics() => new(StringComparer.Ordinal);
 

@@ -8,14 +8,11 @@ internal static class GitScope
         {
             var probe = await ProcessRunner.RunAsync("git", ["-C", root, "rev-parse", "--show-toplevel"], root, token);
             if (probe.ExitCode != 0) return files;
-            var ignored = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var batch in files.Chunk(100))
-            {
-                var command = new ProcessCommand { Executable = "git", Arguments = ["check-ignore", "--no-index", "-z", "--stdin"], Directory = root, Input = string.Join('\0', batch) + '\0' };
-                var result = await ProcessRunner.RunAsync(command, token);
-                if (result.ExitCode > 1) throw new IOException("git check-ignore failed: " + result.Error);
-                foreach (var file in result.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries)) ignored.Add(file);
-            }
+            if (files.Length == 0) return files;
+            var command = new ProcessCommand { Executable = "git", Arguments = ["check-ignore", "--no-index", "-z", "--stdin"], Directory = root, Input = string.Join('\0', files) + '\0' };
+            var result = await ProcessRunner.RunAsync(command, token);
+            if (result.ExitCode > 1) throw new IOException("git check-ignore failed: " + result.Error);
+            var ignored = result.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
             return files.Where(p => !ignored.Contains(p)).ToArray();
         }
         catch (System.ComponentModel.Win32Exception) { return files; }

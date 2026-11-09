@@ -49,9 +49,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 { diagnostics.Add(new("execution_failed", ex.Message)); }
                 AppendBuildDiagnostics(diagnostics, artifacts);
             }
-            var afterBuild = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-            if (afterBuild.SourceFingerprint != snapshot.SourceFingerprint)
-                throw new InvalidOperationException("Source/build inputs changed during execution. Evidence is not accepted; rerun against a stable snapshot.");
+            await VerifyBuildSnapshot(request, config, snapshot, timeout.Token);
             var facts = await CollectFacts(snapshot, diagnostics, timeout.Token);
             diagnostics.AddRange(facts.Diagnostics);
             CoverageEvidence? coverage = null;
@@ -79,6 +77,14 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 snapshot.SelectedFiles, snapshot.Modules, results, diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray());
         }
         finally { artifacts?.Dispose(); }
+    }
+
+    private async Task VerifyBuildSnapshot(AnalysisRequest request, QualityConfig config, ProjectSnapshot snapshot, CancellationToken token)
+    {
+        if (!request.Execute) return;
+        var afterBuild = await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions);
+        if (afterBuild.SourceFingerprint != snapshot.SourceFingerprint)
+            throw new InvalidOperationException("Source/build inputs changed during execution. Evidence is not accepted; rerun against a stable snapshot.");
     }
 
     private static void AppendBuildDiagnostics(List<Diagnostic> diagnostics, BuildArtifacts? artifacts)

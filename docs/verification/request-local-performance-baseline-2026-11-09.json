@@ -1,0 +1,1242 @@
+[
+  {
+    "name": "fixture.discovery",
+    "hash": "e3e50a8722a991a322702c689f65a2aca9608253dff797344e01a84b24876130",
+    "samples": [
+      {
+        "milliseconds": 106.0655,
+        "allocatedBytes": 398152,
+        "gitProcesses": 2,
+        "workingSetBytes": 77643776
+      },
+      {
+        "milliseconds": 96.2955,
+        "allocatedBytes": 379344,
+        "gitProcesses": 2,
+        "workingSetBytes": 78086144
+      },
+      {
+        "milliseconds": 96.973,
+        "allocatedBytes": 370352,
+        "gitProcesses": 2,
+        "workingSetBytes": 78479360
+      },
+      {
+        "milliseconds": 100.3504,
+        "allocatedBytes": 375464,
+        "gitProcesses": 2,
+        "workingSetBytes": 78872576
+      },
+      {
+        "milliseconds": 108.058,
+        "allocatedBytes": 370352,
+        "gitProcesses": 2,
+        "workingSetBytes": 79282176
+      }
+    ]
+  },
+  {
+    "name": "fixture.csharp",
+    "hash": "df1c4824cfbe2d53ff3fa645b0f5c07f25d8aeb33630048b893c9bf4e3b495be",
+    "samples": [
+      {
+        "milliseconds": 37.3948,
+        "allocatedBytes": 10642552,
+        "gitProcesses": 0,
+        "workingSetBytes": 277135360
+      },
+      {
+        "milliseconds": 64.7833,
+        "allocatedBytes": 12090736,
+        "gitProcesses": 0,
+        "workingSetBytes": 350158848
+      },
+      {
+        "milliseconds": 55.407,
+        "allocatedBytes": 12153952,
+        "gitProcesses": 0,
+        "workingSetBytes": 354222080
+      },
+      {
+        "milliseconds": 40.5447,
+        "allocatedBytes": 11614296,
+        "gitProcesses": 0,
+        "workingSetBytes": 384237568
+      },
+      {
+        "milliseconds": 38.0886,
+        "allocatedBytes": 13771584,
+        "gitProcesses": 0,
+        "workingSetBytes": 452149248
+      }
+    ]
+  },
+  {
+    "name": "fixture.java",
+    "hash": "b0cacc4ace2516baa3c8b5a52e676385602ee3ca9620c901314275061b6a6001",
+    "samples": [
+      {
+        "milliseconds": 736.3665,
+        "allocatedBytes": 295488,
+        "gitProcesses": 0,
+        "workingSetBytes": 452329472
+      },
+      {
+        "milliseconds": 441.5861,
+        "allocatedBytes": 211264,
+        "gitProcesses": 0,
+        "workingSetBytes": 452395008
+      },
+      {
+        "milliseconds": 324.8547,
+        "allocatedBytes": 295488,
+        "gitProcesses": 0,
+        "workingSetBytes": 452788224
+      },
+      {
+        "milliseconds": 320.1195,
+        "allocatedBytes": 278024,
+        "gitProcesses": 0,
+        "workingSetBytes": 453148672
+      },
+      {
+        "milliseconds": 329.639,
+        "allocatedBytes": 207064,
+        "gitProcesses": 0,
+        "workingSetBytes": 453427200
+      }
+    ]
+  },
+  {
+    "name": "fixture.check_all",
+    "hash": "1cdf97c4e311220a2a4f5928bb438856569e8fa0df9d5dabf24c8afcdccf96dd",
+    "samples": [
+      {
+        "milliseconds": 1090.4415,
+        "allocatedBytes": 13132608,
+        "gitProcesses": 6,
+        "workingSetBytes": 469696512
+      },
+      {
+        "milliseconds": 763.8084,
+        "allocatedBytes": 15794072,
+        "gitProcesses": 6,
+        "workingSetBytes": 469467136
+      },
+      {
+        "milliseconds": 764.315,
+        "allocatedBytes": 15777104,
+        "gitProcesses": 6,
+        "workingSetBytes": 468271104
+      },
+      {
+        "milliseconds": 750.1176,
+        "allocatedBytes": 15550992,
+        "gitProcesses": 6,
+        "workingSetBytes": 456998912
+      },
+      {
+        "milliseconds": 829.8995,
+        "allocatedBytes": 15484384,
+        "gitProcesses": 6,
+        "workingSetBytes": 463192064
+      }
+    ]
+  },
+  {
+    "name": "repository.discovery",
+    "hash": "0d3e51e9f81ec8d5d7308a32ef55b77afeabf3a3eb29c1be8af8a9097adbbbc3",
+    "samples": [
+      {
+        "milliseconds": 312.7876,
+        "allocatedBytes": 3936560,
+        "gitProcesses": 4,
+        "workingSetBytes": 463863808
+      },
+      {
+        "milliseconds": 462.5081,
+        "allocatedBytes": 3942544,
+        "gitProcesses": 4,
+        "workingSetBytes": 409157632
+      },
+      {
+        "milliseconds": 278.5035,
+        "allocatedBytes": 3934920,
+        "gitProcesses": 4,
+        "workingSetBytes": 394854400
+      },
+      {
+        "milliseconds": 240.5825,
+        "allocatedBytes": 3946144,
+        "gitProcesses": 4,
+        "workingSetBytes": 394854400
+      },
+      {
+        "milliseconds": 252.837,
+        "allocatedBytes": 3932848,
+        "gitProcesses": 4,
+        "workingSetBytes": 394854400
+      }
+    ]
+  },
+  {
+    "name": "repository.csharp",
+    "hash": "bcf3d384ef80d63f59ca3cea3977f5a48f7bc3df87cccfa3eae9d514f35a59b2",
+    "samples": [
+      {
+        "milliseconds": 976.982,
+        "allocatedBytes": 296716600,
+        "gitProcesses": 0,
+        "workingSetBytes": 527974400
+      },
+      {
+        "milliseconds": 1015.2298,
+        "allocatedBytes": 297320768,
+        "gitProcesses": 0,
+        "workingSetBytes": 499515392
+      },
+      {
+        "milliseconds": 1013.2215,
+        "allocatedBytes": 292392984,
+        "gitProcesses": 0,
+        "workingSetBytes": 513130496
+      },
+      {
+        "milliseconds": 927.687,
+        "allocatedBytes": 295002888,
+        "gitProcesses": 0,
+        "workingSetBytes": 515096576
+      },
+      {
+        "milliseconds": 989.2547,
+        "allocatedBytes": 292320160,
+        "gitProcesses": 0,
+        "workingSetBytes": 523010048
+      }
+    ]
+  },
+  {
+    "name": "repository.java",
+    "hash": "057a2d673ba5bac68f9d1359b0cba3c8576fe53ce5bf41c467f968ea604c44ed",
+    "samples": [
+      {
+        "milliseconds": 1150.3422,
+        "allocatedBytes": 11234104,
+        "gitProcesses": 0,
+        "workingSetBytes": 527237120
+      },
+      {
+        "milliseconds": 1138.3395,
+        "allocatedBytes": 5454264,
+        "gitProcesses": 0,
+        "workingSetBytes": 531726336
+      },
+      {
+        "milliseconds": 1101.859,
+        "allocatedBytes": 5454408,
+        "gitProcesses": 0,
+        "workingSetBytes": 536199168
+      },
+      {
+        "milliseconds": 1082.1627,
+        "allocatedBytes": 5451304,
+        "gitProcesses": 0,
+        "workingSetBytes": 540622848
+      },
+      {
+        "milliseconds": 1148.3397,
+        "allocatedBytes": 5457288,
+        "gitProcesses": 0,
+        "workingSetBytes": 545112064
+      }
+    ]
+  },
+  {
+    "name": "repository.check_all",
+    "hash": "b525b2ceb04e68e859141f7606fd02e6c65ff9a44117ad15a84f28575ce5a10b",
+    "samples": [
+      {
+        "milliseconds": 2900.4312,
+        "allocatedBytes": 398779080,
+        "gitProcesses": 12,
+        "workingSetBytes": 535691264
+      },
+      {
+        "milliseconds": 2837.7538,
+        "allocatedBytes": 399412360,
+        "gitProcesses": 12,
+        "workingSetBytes": 551616512
+      },
+      {
+        "milliseconds": 3360.4627,
+        "allocatedBytes": 392485528,
+        "gitProcesses": 12,
+        "workingSetBytes": 554172416
+      },
+      {
+        "milliseconds": 3107.106,
+        "allocatedBytes": 398930384,
+        "gitProcesses": 12,
+        "workingSetBytes": 562053120
+      },
+      {
+        "milliseconds": 2865.2999,
+        "allocatedBytes": 403817368,
+        "gitProcesses": 12,
+        "workingSetBytes": 570703872
+      }
+    ]
+  },
+  {
+    "name": "java-modules.java",
+    "hash": "2410330743cacb2306ea58edbe5d1a80ca7ed2a26e851ac61305a0b7d0440506",
+    "samples": [
+      {
+        "milliseconds": 779.2668,
+        "allocatedBytes": 6517544,
+        "gitProcesses": 0,
+        "workingSetBytes": 576225280
+      },
+      {
+        "milliseconds": 764.2847,
+        "allocatedBytes": 4430144,
+        "gitProcesses": 0,
+        "workingSetBytes": 580141056
+      },
+      {
+        "milliseconds": 746.0005,
+        "allocatedBytes": 4437008,
+        "gitProcesses": 0,
+        "workingSetBytes": 584056832
+      },
+      {
+        "milliseconds": 745.4542,
+        "allocatedBytes": 4430448,
+        "gitProcesses": 0,
+        "workingSetBytes": 587972608
+      },
+      {
+        "milliseconds": 740.1286,
+        "allocatedBytes": 4429808,
+        "gitProcesses": 0,
+        "workingSetBytes": 591888384
+      }
+    ]
+  },
+  {
+    "name": "byte-budget.page",
+    "hash": "9049088c86c719e3819a103703e59524e0961eb70c9542822b5523d87d2ceb51",
+    "samples": [
+      {
+        "milliseconds": 8.4005,
+        "allocatedBytes": 4288560,
+        "gitProcesses": 0,
+        "workingSetBytes": 601047040
+      },
+      {
+        "milliseconds": 8.0194,
+        "allocatedBytes": 4275768,
+        "gitProcesses": 0,
+        "workingSetBytes": 604897280
+      },
+      {
+        "milliseconds": 8.322,
+        "allocatedBytes": 4275768,
+        "gitProcesses": 0,
+        "workingSetBytes": 609648640
+      },
+      {
+        "milliseconds": 8.2182,
+        "allocatedBytes": 4275768,
+        "gitProcesses": 0,
+        "workingSetBytes": 614547456
+      },
+      {
+        "milliseconds": 11.3342,
+        "allocatedBytes": 4275240,
+        "gitProcesses": 0,
+        "workingSetBytes": 614678528
+      }
+    ]
+  },
+  {
+    "name": "sparse.code",
+    "hash": "7ebc10de7f80f77d0916ccae7b2250a87fc126f16264123a59b19e154e9db2dc",
+    "samples": [
+      {
+        "milliseconds": 136.6619,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 547848192
+      },
+      {
+        "milliseconds": 136.9765,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 524550144
+      },
+      {
+        "milliseconds": 135.9684,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 526434304
+      },
+      {
+        "milliseconds": 137.6614,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 538476544
+      },
+      {
+        "milliseconds": 148.6646,
+        "allocatedBytes": 66893088,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      }
+    ]
+  },
+  {
+    "name": "sparse.tests",
+    "hash": "da56a5149bc7f162377a2338ff26e12305cc056823e8f443ee3a9fffb5e0bcb8",
+    "samples": [
+      {
+        "milliseconds": 0.269,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 0.2874,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 0.2475,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 0.2365,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 0.2222,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      }
+    ]
+  },
+  {
+    "name": "sparse.duplication",
+    "hash": "6a5bd9248756cbb935978b4b40a658d831ca4111bf3c816f0098f7a7e67e7ede",
+    "samples": [
+      {
+        "milliseconds": 522.3903,
+        "allocatedBytes": 162012584,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 650.385,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 527433728
+      },
+      {
+        "milliseconds": 560.5541,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 528089088
+      },
+      {
+        "milliseconds": 550.2007,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 528089088
+      },
+      {
+        "milliseconds": 511.8348,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 525729792
+      }
+    ]
+  },
+  {
+    "name": "sparse.dependencies",
+    "hash": "73b119929e6f5fbd8122937de23cb20676d788fb1e7d60792c5d3af860a45e76",
+    "samples": [
+      {
+        "milliseconds": 105.5795,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 525910016
+      },
+      {
+        "milliseconds": 95.3624,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 524566528
+      },
+      {
+        "milliseconds": 94.7262,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 526565376
+      },
+      {
+        "milliseconds": 93.8933,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 530366464
+      },
+      {
+        "milliseconds": 107.908,
+        "allocatedBytes": 78960936,
+        "gitProcesses": 0,
+        "workingSetBytes": 524713984
+      }
+    ]
+  },
+  {
+    "name": "sparse.publish",
+    "hash": "353892cc6138e0204ef0cbbc6ac53f3a3889c79e32226417e86c8f53aa1eed5f",
+    "samples": [
+      {
+        "milliseconds": 176.734,
+        "allocatedBytes": 42434872,
+        "gitProcesses": 0,
+        "workingSetBytes": 530710528
+      },
+      {
+        "milliseconds": 180.8562,
+        "allocatedBytes": 42452600,
+        "gitProcesses": 0,
+        "workingSetBytes": 528678912
+      },
+      {
+        "milliseconds": 196.1639,
+        "allocatedBytes": 42443344,
+        "gitProcesses": 0,
+        "workingSetBytes": 532086784
+      },
+      {
+        "milliseconds": 193.5469,
+        "allocatedBytes": 42434872,
+        "gitProcesses": 0,
+        "workingSetBytes": 532299776
+      },
+      {
+        "milliseconds": 194.2596,
+        "allocatedBytes": 42435248,
+        "gitProcesses": 0,
+        "workingSetBytes": 541786112
+      }
+    ]
+  },
+  {
+    "name": "sparse.page",
+    "hash": "d2532fbdc2e2d7a21165ae987e7e0c327a84e2c475b9197501328ccb3a954441",
+    "samples": [
+      {
+        "milliseconds": 6.48,
+        "allocatedBytes": 3065528,
+        "gitProcesses": 0,
+        "workingSetBytes": 544047104
+      },
+      {
+        "milliseconds": 6.7777,
+        "allocatedBytes": 2541056,
+        "gitProcesses": 0,
+        "workingSetBytes": 544047104
+      },
+      {
+        "milliseconds": 6.2845,
+        "allocatedBytes": 3065528,
+        "gitProcesses": 0,
+        "workingSetBytes": 544096256
+      },
+      {
+        "milliseconds": 7.0238,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 544096256
+      },
+      {
+        "milliseconds": 6.1226,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 544096256
+      }
+    ]
+  },
+  {
+    "name": "sparse.operations",
+    "duplicateComparisons": 719400
+  },
+  {
+    "name": "dense.code",
+    "hash": "d8b4bb2294375774c5ce84edc4b7b5bf550c08399f8853abb533a9b4c535b52a",
+    "samples": [
+      {
+        "milliseconds": 17.6657,
+        "allocatedBytes": 11968544,
+        "gitProcesses": 0,
+        "workingSetBytes": 544112640
+      },
+      {
+        "milliseconds": 17.4619,
+        "allocatedBytes": 11968544,
+        "gitProcesses": 0,
+        "workingSetBytes": 544178176
+      },
+      {
+        "milliseconds": 19.5316,
+        "allocatedBytes": 11968544,
+        "gitProcesses": 0,
+        "workingSetBytes": 545144832
+      },
+      {
+        "milliseconds": 17.4573,
+        "allocatedBytes": 11968544,
+        "gitProcesses": 0,
+        "workingSetBytes": 546570240
+      },
+      {
+        "milliseconds": 19.5098,
+        "allocatedBytes": 11968544,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      }
+    ]
+  },
+  {
+    "name": "dense.tests",
+    "hash": "da56a5149bc7f162377a2338ff26e12305cc056823e8f443ee3a9fffb5e0bcb8",
+    "samples": [
+      {
+        "milliseconds": 0.0735,
+        "allocatedBytes": 119600,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      },
+      {
+        "milliseconds": 0.0865,
+        "allocatedBytes": 119600,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      },
+      {
+        "milliseconds": 0.0709,
+        "allocatedBytes": 119600,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      },
+      {
+        "milliseconds": 0.0677,
+        "allocatedBytes": 119600,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      },
+      {
+        "milliseconds": 0.0664,
+        "allocatedBytes": 119600,
+        "gitProcesses": 0,
+        "workingSetBytes": 545816576
+      }
+    ]
+  },
+  {
+    "name": "dense.duplication",
+    "hash": "2944fa2a85d68fe96e449aed17af8e40d2d629c58b257bd700fec447778d2120",
+    "samples": [
+      {
+        "milliseconds": 233.825,
+        "allocatedBytes": 50043656,
+        "gitProcesses": 0,
+        "workingSetBytes": 560824320
+      },
+      {
+        "milliseconds": 224.777,
+        "allocatedBytes": 50043656,
+        "gitProcesses": 0,
+        "workingSetBytes": 575979520
+      },
+      {
+        "milliseconds": 221.5495,
+        "allocatedBytes": 50043656,
+        "gitProcesses": 0,
+        "workingSetBytes": 591183872
+      },
+      {
+        "milliseconds": 211.5411,
+        "allocatedBytes": 50043656,
+        "gitProcesses": 0,
+        "workingSetBytes": 606486528
+      },
+      {
+        "milliseconds": 216.3126,
+        "allocatedBytes": 50043656,
+        "gitProcesses": 0,
+        "workingSetBytes": 628998144
+      }
+    ]
+  },
+  {
+    "name": "dense.dependencies",
+    "hash": "bec227edcf419df117eb61884fd735338ed7481808d237f2272ddb7c91395eba",
+    "samples": [
+      {
+        "milliseconds": 15.5398,
+        "allocatedBytes": 12279048,
+        "gitProcesses": 0,
+        "workingSetBytes": 631029760
+      },
+      {
+        "milliseconds": 40.0943,
+        "allocatedBytes": 12287400,
+        "gitProcesses": 0,
+        "workingSetBytes": 591609856
+      },
+      {
+        "milliseconds": 13.0485,
+        "allocatedBytes": 12279048,
+        "gitProcesses": 0,
+        "workingSetBytes": 587808768
+      },
+      {
+        "milliseconds": 11.9047,
+        "allocatedBytes": 12279048,
+        "gitProcesses": 0,
+        "workingSetBytes": 587808768
+      },
+      {
+        "milliseconds": 12.436,
+        "allocatedBytes": 12279048,
+        "gitProcesses": 0,
+        "workingSetBytes": 587808768
+      }
+    ]
+  },
+  {
+    "name": "dense.publish",
+    "hash": "808ee1826f32e4ba6568da8cee6999e7d3242d9fccf14b3e1d27966c988fe10c",
+    "samples": [
+      {
+        "milliseconds": 54.7244,
+        "allocatedBytes": 13572416,
+        "gitProcesses": 0,
+        "workingSetBytes": 587956224
+      },
+      {
+        "milliseconds": 45.5584,
+        "allocatedBytes": 13605368,
+        "gitProcesses": 0,
+        "workingSetBytes": 587956224
+      },
+      {
+        "milliseconds": 48.4895,
+        "allocatedBytes": 13572416,
+        "gitProcesses": 0,
+        "workingSetBytes": 588021760
+      },
+      {
+        "milliseconds": 68.8731,
+        "allocatedBytes": 13596200,
+        "gitProcesses": 0,
+        "workingSetBytes": 582631424
+      },
+      {
+        "milliseconds": 45.003,
+        "allocatedBytes": 13572192,
+        "gitProcesses": 0,
+        "workingSetBytes": 582631424
+      }
+    ]
+  },
+  {
+    "name": "dense.page",
+    "hash": "fcf574044ea56879b912598472370e81497a37b6195681b7a0feb0fe013a9441",
+    "samples": [
+      {
+        "milliseconds": 6.1776,
+        "allocatedBytes": 2321624,
+        "gitProcesses": 0,
+        "workingSetBytes": 578224128
+      },
+      {
+        "milliseconds": 6.2124,
+        "allocatedBytes": 2321624,
+        "gitProcesses": 0,
+        "workingSetBytes": 570867712
+      },
+      {
+        "milliseconds": 6.2228,
+        "allocatedBytes": 2321624,
+        "gitProcesses": 0,
+        "workingSetBytes": 570867712
+      },
+      {
+        "milliseconds": 6.086,
+        "allocatedBytes": 2321624,
+        "gitProcesses": 0,
+        "workingSetBytes": 570867712
+      },
+      {
+        "milliseconds": 6.138,
+        "allocatedBytes": 2321624,
+        "gitProcesses": 0,
+        "workingSetBytes": 570867712
+      }
+    ]
+  },
+  {
+    "name": "dense.operations",
+    "duplicateComparisons": 79800
+  },
+  {
+    "name": "contexts.code",
+    "hash": "7ebc10de7f80f77d0916ccae7b2250a87fc126f16264123a59b19e154e9db2dc",
+    "samples": [
+      {
+        "milliseconds": 131.4859,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 528613376
+      },
+      {
+        "milliseconds": 131.6132,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 537853952
+      },
+      {
+        "milliseconds": 131.9758,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 550518784
+      },
+      {
+        "milliseconds": 169.7211,
+        "allocatedBytes": 66893096,
+        "gitProcesses": 0,
+        "workingSetBytes": 539459584
+      },
+      {
+        "milliseconds": 139.5007,
+        "allocatedBytes": 66884736,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      }
+    ]
+  },
+  {
+    "name": "contexts.tests",
+    "hash": "da56a5149bc7f162377a2338ff26e12305cc056823e8f443ee3a9fffb5e0bcb8",
+    "samples": [
+      {
+        "milliseconds": 0.2523,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      },
+      {
+        "milliseconds": 0.3215,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      },
+      {
+        "milliseconds": 0.2382,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      },
+      {
+        "milliseconds": 0.2505,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      },
+      {
+        "milliseconds": 0.2158,
+        "allocatedBytes": 350640,
+        "gitProcesses": 0,
+        "workingSetBytes": 552615936
+      }
+    ]
+  },
+  {
+    "name": "contexts.duplication",
+    "hash": "6a5bd9248756cbb935978b4b40a658d831ca4111bf3c816f0098f7a7e67e7ede",
+    "samples": [
+      {
+        "milliseconds": 501.4761,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 551534592
+      },
+      {
+        "milliseconds": 542.2844,
+        "allocatedBytes": 162012560,
+        "gitProcesses": 0,
+        "workingSetBytes": 530497536
+      },
+      {
+        "milliseconds": 505.9362,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 532791296
+      },
+      {
+        "milliseconds": 518.053,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 536674304
+      },
+      {
+        "milliseconds": 508.5519,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 540917760
+      }
+    ]
+  },
+  {
+    "name": "contexts.dependencies",
+    "hash": "73b119929e6f5fbd8122937de23cb20676d788fb1e7d60792c5d3af860a45e76",
+    "samples": [
+      {
+        "milliseconds": 431.2342,
+        "allocatedBytes": 664386480,
+        "gitProcesses": 0,
+        "workingSetBytes": 541982720
+      },
+      {
+        "milliseconds": 418.0374,
+        "allocatedBytes": 664386480,
+        "gitProcesses": 0,
+        "workingSetBytes": 545783808
+      },
+      {
+        "milliseconds": 414.1156,
+        "allocatedBytes": 664386480,
+        "gitProcesses": 0,
+        "workingSetBytes": 549568512
+      },
+      {
+        "milliseconds": 420.0487,
+        "allocatedBytes": 664386480,
+        "gitProcesses": 0,
+        "workingSetBytes": 553123840
+      },
+      {
+        "milliseconds": 417.3565,
+        "allocatedBytes": 664386480,
+        "gitProcesses": 0,
+        "workingSetBytes": 556924928
+      }
+    ]
+  },
+  {
+    "name": "contexts.publish",
+    "hash": "353892cc6138e0204ef0cbbc6ac53f3a3889c79e32226417e86c8f53aa1eed5f",
+    "samples": [
+      {
+        "milliseconds": 197.1037,
+        "allocatedBytes": 42434936,
+        "gitProcesses": 0,
+        "workingSetBytes": 561856512
+      },
+      {
+        "milliseconds": 223.8884,
+        "allocatedBytes": 42444128,
+        "gitProcesses": 0,
+        "workingSetBytes": 541507584
+      },
+      {
+        "milliseconds": 216.6699,
+        "allocatedBytes": 42455784,
+        "gitProcesses": 0,
+        "workingSetBytes": 541540352
+      },
+      {
+        "milliseconds": 196.0231,
+        "allocatedBytes": 42434800,
+        "gitProcesses": 0,
+        "workingSetBytes": 541638656
+      },
+      {
+        "milliseconds": 197.6239,
+        "allocatedBytes": 42434872,
+        "gitProcesses": 0,
+        "workingSetBytes": 541638656
+      }
+    ]
+  },
+  {
+    "name": "contexts.page",
+    "hash": "d2532fbdc2e2d7a21165ae987e7e0c327a84e2c475b9197501328ccb3a954441",
+    "samples": [
+      {
+        "milliseconds": 6.224,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 7.6425,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 6.289,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 6.1452,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 6.119,
+        "allocatedBytes": 2540592,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      }
+    ]
+  },
+  {
+    "name": "contexts.operations",
+    "duplicateComparisons": 719400
+  },
+  {
+    "name": "helpers.code",
+    "hash": "3814054a59332d7451081793d5fa50d1a4eaf62dbb9905f67ca0fc115dfd3a80",
+    "samples": [
+      {
+        "milliseconds": 0.192,
+        "allocatedBytes": 175064,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 0.1842,
+        "allocatedBytes": 175064,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 0.1797,
+        "allocatedBytes": 175064,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 0.175,
+        "allocatedBytes": 175064,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      },
+      {
+        "milliseconds": 0.1742,
+        "allocatedBytes": 175064,
+        "gitProcesses": 0,
+        "workingSetBytes": 541802496
+      }
+    ]
+  },
+  {
+    "name": "helpers.tests",
+    "hash": "d2b99db3dabe8559381c19abb4ac89c9e0185605f0f11b31a2a647d22993535f",
+    "samples": [
+      {
+        "milliseconds": 219.3021,
+        "allocatedBytes": 193789544,
+        "gitProcesses": 0,
+        "workingSetBytes": 556924928
+      },
+      {
+        "milliseconds": 185.7417,
+        "allocatedBytes": 193781192,
+        "gitProcesses": 0,
+        "workingSetBytes": 559890432
+      },
+      {
+        "milliseconds": 208.1779,
+        "allocatedBytes": 193789608,
+        "gitProcesses": 0,
+        "workingSetBytes": 559972352
+      },
+      {
+        "milliseconds": 190.7076,
+        "allocatedBytes": 193781192,
+        "gitProcesses": 0,
+        "workingSetBytes": 566607872
+      },
+      {
+        "milliseconds": 186.4633,
+        "allocatedBytes": 193781192,
+        "gitProcesses": 0,
+        "workingSetBytes": 572211200
+      }
+    ]
+  },
+  {
+    "name": "helpers.duplication",
+    "hash": "6a5bd9248756cbb935978b4b40a658d831ca4111bf3c816f0098f7a7e67e7ede",
+    "samples": [
+      {
+        "milliseconds": 504.9619,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 572293120
+      },
+      {
+        "milliseconds": 525.7007,
+        "allocatedBytes": 162012560,
+        "gitProcesses": 0,
+        "workingSetBytes": 566706176
+      },
+      {
+        "milliseconds": 497.9347,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 566706176
+      },
+      {
+        "milliseconds": 494.9889,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      },
+      {
+        "milliseconds": 511.7212,
+        "allocatedBytes": 162004200,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      }
+    ]
+  },
+  {
+    "name": "helpers.dependencies",
+    "hash": "73b119929e6f5fbd8122937de23cb20676d788fb1e7d60792c5d3af860a45e76",
+    "samples": [
+      {
+        "milliseconds": 100.655,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      },
+      {
+        "milliseconds": 96.5884,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      },
+      {
+        "milliseconds": 119.0271,
+        "allocatedBytes": 78960936,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      },
+      {
+        "milliseconds": 101.5523,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      },
+      {
+        "milliseconds": 97.1855,
+        "allocatedBytes": 78952560,
+        "gitProcesses": 0,
+        "workingSetBytes": 566689792
+      }
+    ]
+  },
+  {
+    "name": "helpers.publish",
+    "hash": "9232bd5607cde19f5b13ff055139d53ff09cb50f510f8d1c3527985808cda387",
+    "samples": [
+      {
+        "milliseconds": 265.2606,
+        "allocatedBytes": 41154632,
+        "gitProcesses": 0,
+        "workingSetBytes": 567394304
+      },
+      {
+        "milliseconds": 264.7643,
+        "allocatedBytes": 41155168,
+        "gitProcesses": 0,
+        "workingSetBytes": 567410688
+      },
+      {
+        "milliseconds": 270.7144,
+        "allocatedBytes": 41158608,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 281.1797,
+        "allocatedBytes": 41142112,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 278.6388,
+        "allocatedBytes": 41166144,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      }
+    ]
+  },
+  {
+    "name": "helpers.page",
+    "hash": "6d90c85e03190fef1b14e6cc1d8a7c4e7cd62a69473798afa10946cb402d4b0c",
+    "samples": [
+      {
+        "milliseconds": 15.0832,
+        "allocatedBytes": 2709040,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 6.5528,
+        "allocatedBytes": 2693152,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 6.397,
+        "allocatedBytes": 2693152,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 6.7756,
+        "allocatedBytes": 2693152,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      },
+      {
+        "milliseconds": 6.2545,
+        "allocatedBytes": 2693152,
+        "gitProcesses": 0,
+        "workingSetBytes": 568557568
+      }
+    ]
+  },
+  {
+    "name": "helpers.operations",
+    "duplicateComparisons": 719400
+  }
+]

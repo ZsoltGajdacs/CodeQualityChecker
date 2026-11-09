@@ -11,22 +11,26 @@ internal static class TestRules
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config)
     {
         var tests = context.Methods.Where(m => m.IsTest).ToArray();
+        if (tests.Length == 0) return context.Finish(new() { Family = "tests", Types = [], Findings = [] });
         var testTypes = context.Facts.Types.Where(t => t.IsTest).Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
-        var lookup = context.Methods.Where(m => testTypes.Contains(m.TypeId) || IsTestPath(m.Location.File) || tests.Any(t => t.TypeId == m.TypeId))
+        testTypes.UnionWith(tests.Select(t => t.TypeId));
+        var lookup = context.Methods.Where(m => testTypes.Contains(m.TypeId) || IsTestPath(m.Location.File))
             .GroupBy(m => m.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var assessments = tests.Select(test =>
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             return Assess(test, context, lookup);
         }).ToArray();
+        var byType = assessments.ToLookup(a => a.Test.TypeId, StringComparer.Ordinal);
+        var blockers = byType.ToDictionary(g => g.Key, g => g.SelectMany(a => a.Blockers)
+            .Concat(context.Index.TypesById[g.Key].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
         var incomplete = assessments.Where(a => !a.Complete).Select(a => a.Test.TypeId).ToHashSet(StringComparer.Ordinal);
         var metrics = assessments.GroupBy(a => a.Test.TypeId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var diagnostics = incomplete.Count == 0 ? Array.Empty<Diagnostic>() :
             [new Diagnostic("tests.incomplete", "Some test/fixture/helper facts are unresolved. Resolve diagnostics before scoring affected test classes.")];
         return context.Finish(new() { Family = "tests", Types = context.TypesFor(tests), Findings = assessments.SelectMany(a => Findings(a, config)),
-            Blockers = id => assessments.Where(a => a.Test.TypeId == id).SelectMany(a => a.Blockers)
-                .Concat(context.Facts.Types.Where(t => t.Id == id).SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), Metrics = id => metrics[id], Diagnostics = diagnostics });
+            Blockers = id => blockers[id], Metrics = id => metrics[id], Diagnostics = diagnostics });
     }
 
     private static bool IsTestPath(string file) => file.Split('/').Any(part => part.Equals("test", StringComparison.OrdinalIgnoreCase)
@@ -34,11 +38,12 @@ internal static class TestRules
 
     private static Assessment Assess(MethodFact test, RuleContext context, Dictionary<string, MethodFact> lookup)
     {
-        var fixtures = context.Methods.Where(m => m.TypeId == test.TypeId && m.IsFixture);
+        var fixtures = context.Index.FixturesByType[test.TypeId];
         var closure = Helpers(test, fixtures, lookup);
+        var types = closure.Select(m => m.TypeId).ToHashSet(StringComparer.Ordinal);
         return new(test, closure.Sum(m => m.ExecutableLines), closure.Sum(m => m.Assertions),
             closure.Sum(m => Math.Max(0, m.Complexity - 1))) { Blockers = closure.SelectMany(AssessmentEvidence.Test)
-                .Concat(context.Facts.Types.Where(type => closure.Any(method => method.TypeId == type.Id))
+                .Concat(types.SelectMany(id => context.Index.TypesById[id])
                     .SelectMany(type => AssessmentEvidence.Syntax(type, []))).Distinct().Order(StringComparer.Ordinal).ToArray() };
     }
 

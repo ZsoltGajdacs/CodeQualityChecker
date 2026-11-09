@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace Cqc.Core;
@@ -27,20 +28,32 @@ public static class ProjectDiscovery
 
     public static bool Glob(string path, string pattern)
     {
+        return CreateMatcher(pattern).IsMatch(path);
+    }
+
+    private static Regex CreateMatcher(string pattern)
+    {
         var regex = Regex.Escape(pattern.Replace('\\', '/')).Replace("\\*\\*/", "(?:.*/)?").Replace("\\*\\*", ".*").Replace("\\*", "[^/]*").Replace("\\?", "[^/]");
-        return Regex.IsMatch(path, "^" + regex + "$", RegexOptions.CultureInvariant);
+        return new Regex("^" + regex + "$", RegexOptions.CultureInvariant);
     }
 
     private sealed class DiscoveryScan(DirectoryInfo root, LanguageDefinition[] definitions)
     {
+        private readonly Dictionary<string, Regex> matchers = new(StringComparer.Ordinal);
+        private bool Matches(string path, string pattern)
+        {
+            if (!matchers.TryGetValue(pattern, out var matcher)) matchers.Add(pattern, matcher = CreateMatcher(pattern));
+            return matcher.IsMatch(path);
+        }
+        private bool Manifest(LanguageDefinition definition, string path) => definition.ManifestPatterns.Any(pattern => Matches(Path.GetFileName(path), pattern));
         private string[] allFiles = [];
         private string[] ignoredBuildInputs = [];
         private string[] sources = [];
 
         public async Task<ProjectSnapshot> RunAsync(AnalysisRequest request, QualityConfig config, CancellationToken token)
         {
-            allFiles = Enumerate(root).Where(path => !config.Exclude.Any(pattern => Glob(path, pattern))).Order(StringComparer.Ordinal).ToArray();
-            ignoredBuildInputs = allFiles.Where(path => definitions.Any(d => d.IgnoredBuildInputPatterns.Any(pattern => Glob(path, pattern)))).ToArray();
+            allFiles = Enumerate(root).Where(path => !config.Exclude.Any(pattern => Matches(path, pattern))).Order(StringComparer.Ordinal).ToArray();
+            ignoredBuildInputs = allFiles.Where(path => definitions.Any(d => d.IgnoredBuildInputPatterns.Any(pattern => Matches(path, pattern)))).ToArray();
             allFiles = await GitScope.RemoveIgnoredAsync(root.FullName, allFiles, token);
             sources = allFiles.Where(path => definitions.Any(definition => definition.IsSource(path)))
                 .Where(path => !Generated(new FileInfo(Path.Combine(root.FullName, path)))).ToArray();
@@ -52,7 +65,7 @@ public static class ProjectDiscovery
 
         private ProjectModule[] Modules()
         {
-            var modules = definitions.SelectMany(definition => allFiles.Where(definition.IsManifest)
+            var modules = definitions.SelectMany(definition => allFiles.Where(path => Manifest(definition, path))
                 .Select(path => definition.InspectManifest(root.FullName, path))).ToList();
             foreach (var definition in definitions.Where(definition => sources.Any(definition.IsSource)))
                 if (!modules.Any(module => module.Language == definition.Language)) modules.Add(new(definition.Language, ".", "source-only", false));
@@ -79,16 +92,18 @@ public static class ProjectDiscovery
             foreach (var path in inputs)
             {
                 token.ThrowIfCancellationRequested();
-                var bytes = await File.ReadAllBytesAsync(Path.Combine(root.FullName, path), token);
-                fingerprint.Append(path).Append('\0').Append(Wire.HashBytes(bytes)).Append('\n');
-                if (!OperatingSystem.IsWindows() && definitions.Any(d => d.ExecutableBuildInputPatterns.Any(pattern => Glob(path, pattern))))
+                await using var stream = new FileStream(Path.Combine(root.FullName, path), FileMode.Open,
+                    FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                var hash = await SHA256.HashDataAsync(stream, token);
+                fingerprint.Append(path).Append('\0').Append(Convert.ToHexStringLower(hash)).Append('\n');
+                if (!OperatingSystem.IsWindows() && definitions.Any(d => d.ExecutableBuildInputPatterns.Any(pattern => Matches(path, pattern))))
                     fingerprint.Append("mode\0").Append(path).Append('\0').Append((int)File.GetUnixFileMode(Path.Combine(root.FullName, path))).Append('\n');
             }
             return Wire.Hash(fingerprint.ToString());
         }
 
-        private static bool Fingerprinted(LanguageDefinition definition, string path) => definition.IsSource(path) || definition.IsManifest(path)
-            || (definition.BuildInputPatterns ?? []).Any(pattern => Glob(path, pattern));
+        private bool Fingerprinted(LanguageDefinition definition, string path) => definition.IsSource(path) || Manifest(definition, path)
+            || (definition.BuildInputPatterns ?? []).Any(pattern => Matches(path, pattern));
 
         private IEnumerable<string> Enumerate(DirectoryInfo directory)
         {

@@ -6,7 +6,8 @@ internal static class DependencyRules
 {
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config)
     {
-        var types = context.Facts.Types.GroupBy(t => t.Id, StringComparer.Ordinal)
+        var evidence = new DependencyEvidence(context.Facts, context.Index);
+        var types = context.Index.TypesById
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var edges = context.Facts.Dependencies.Where(d => types.ContainsKey(d.From) && types.ContainsKey(d.To)
             && d.From != d.To).DistinctBy(d => (d.From, d.To)).OrderBy(d => d.From, StringComparer.Ordinal)
@@ -19,7 +20,7 @@ internal static class DependencyRules
         var diagnostics = context.Facts.SemanticComplete ? Array.Empty<Diagnostic>() :
             [new Diagnostic("dependencies.incomplete", "Symbol resolution is incomplete. Resolve language diagnostics or execute a supported build before architecture scoring.")];
         return context.Finish(new() { Family = "dependencies", Types = context.Facts.Types, Findings = findings,
-            Blockers = id => DependencyEvidence.Blockers(context.Facts, types[id]), Metrics = id => metrics[components[id]], Diagnostics = diagnostics });
+            Blockers = id => evidence.Blockers(types[id]), Metrics = id => metrics[components[id]], Diagnostics = diagnostics });
     }
 
     private static IEnumerable<Finding> ComponentCycles(DependencyFact[] edges, Dictionary<string, string> components, List<Finding> existing)

@@ -28,8 +28,10 @@ internal sealed class ReportIndexWriter(Stream stream, long maximumBytes, long r
     }
     private async Task Family(FamilyResult family)
     {
+        var findingEntities = family.Entities.SelectMany(entity => entity.FindingIds.Select(id => (id, entity.EntityId)))
+            .ToLookup(entry => entry.id, entry => entry.EntityId, StringComparer.Ordinal);
         foreach (var diagnostic in family.Diagnostics) await Add("diagnostics", family.Family, [], new { family = family.Family, diagnostic.Code, diagnostic.Message, diagnostic.File, diagnostic.Language });
-        foreach (var finding in family.Findings) await Add("findings", family.Family, FindingEntities(family, finding), new { family = family.Family, finding.Id, finding.Rule, finding.Message, finding.Advice, finding.EntityIds, finding.Locations, finding.Deduction });
+        foreach (var finding in family.Findings) await Add("findings", family.Family, finding.EntityIds.Concat(findingEntities[finding.Id]).Distinct(StringComparer.Ordinal).ToArray(), new { family = family.Family, finding.Id, finding.Rule, finding.Message, finding.Advice, finding.EntityIds, finding.Locations, finding.Deduction });
         foreach (var entity in family.Entities)
         {
             await Add("entities", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, entity.Kind, entity.File, entity.Status,
@@ -38,9 +40,6 @@ internal sealed class ReportIndexWriter(Stream stream, long maximumBytes, long r
                 await Add("metrics", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, name = metric.Key, value = metric.Value });
         }
     }
-    private static string[] FindingEntities(FamilyResult family, Finding finding) => finding.EntityIds
-        .Concat(family.Entities.Where(e => e.FindingIds.Contains(finding.Id, StringComparer.Ordinal)).Select(e => e.EntityId))
-        .Distinct(StringComparer.Ordinal).ToArray();
     private async Task Add(string section, string? family, string[] entities, object value)
     {
         token.ThrowIfCancellationRequested();

@@ -9,34 +9,22 @@ internal sealed record SourceFileOptions(CSharpParseOptions ParseOptions, bool C
 /// <summary>Conservative static Debug configuration. This does not evaluate MSBuild.</summary>
 internal sealed class SourceOptions(ProjectSnapshot snapshot)
 {
+    private readonly ProjectOwnership ownership = new(snapshot.Modules);
     private readonly Dictionary<string, SourceFileOptions> projects = new(StringComparer.Ordinal);
 
     public SourceFileOptions ForFile(string file)
     {
-        var project = snapshot.Modules.Where(x => x.Language == "csharp" && x.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
-            .Where(x => ContainsFile(x.Path, file)).OrderByDescending(x => x.Path.Count(c => c == '/')).FirstOrDefault();
+        var project = ownership.ForFile(file);
         var key = project?.Path ?? ".";
         if (!projects.TryGetValue(key, out var options))
         {
             var settings = StaticProjectSettings.Read(snapshot, project);
-            if (IsAmbiguous(project))
+            if (ownership.IsAmbiguous(project))
                 settings.Problems.Add("Multiple projects share this source directory; analyze an unambiguous module configuration for verified scores.");
             options = Build(settings, project?.Path ?? file);
             projects.Add(key, options);
         }
         return options;
-    }
-
-    private bool IsAmbiguous(ProjectModule? project)
-    {
-        if (project == null) return false;
-        return snapshot.Modules.Count(x => x.Language == "csharp" && Path.GetDirectoryName(x.Path) == Path.GetDirectoryName(project.Path)) > 1;
-    }
-
-    private static bool ContainsFile(string project, string file)
-    {
-        var directory = Path.GetDirectoryName(project)?.Replace('\\', '/');
-        return string.IsNullOrEmpty(directory) || file.StartsWith(directory + "/", StringComparison.Ordinal);
     }
 
     private static SourceFileOptions Build(StaticProjectSettings settings, string file)

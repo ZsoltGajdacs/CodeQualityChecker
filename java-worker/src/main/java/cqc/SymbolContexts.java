@@ -7,6 +7,7 @@ import java.util.*;
 final class SymbolContexts {
     private final Map<String, List<String>> owners = new HashMap<>();
     private final Map<String, ContextManifest.Context> contexts = new HashMap<>();
+    private final Map<String, Set<String>> visibility = new HashMap<>();
 
     SymbolContexts(List<Worker.Source> sources, List<ContextManifest.Context> definitions) {
         for (var context : definitions) contexts.put(context.id(), context);
@@ -30,6 +31,10 @@ final class SymbolContexts {
     }
 
     Set<String> visible(String caller) {
+        return visibility.computeIfAbsent(caller, this::reachable);
+    }
+
+    private Set<String> reachable(String caller) {
         var seen = new LinkedHashSet<String>();
         var pending = new ArrayDeque<String>();
         pending.add(caller);
@@ -39,7 +44,7 @@ final class SymbolContexts {
             var context = contexts.get(id);
             if (context != null) Collections.addAll(pending, context.reachable());
         }
-        return seen;
+        return Collections.unmodifiableSet(seen);
     }
 
     static String qualify(String context, String symbol) { return context + "::" + symbol; }

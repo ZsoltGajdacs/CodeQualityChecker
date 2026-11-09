@@ -7,14 +7,14 @@ internal static class DependencyMetrics
     {
         var links = edges.Select(e => (From: components[e.From], To: components[e.To]))
             .Where(e => e.From != e.To).Distinct().ToArray();
+        var inputs = links.ToLookup(e => e.To, StringComparer.Ordinal);
+        var outputs = links.ToLookup(e => e.From, StringComparer.Ordinal);
         return types.Values.GroupBy(t => components[t.Id], StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => Measure(group, links), StringComparer.Ordinal);
+            .ToDictionary(group => group.Key, group => Measure(group, inputs[group.Key].Count(), outputs[group.Key].Count()), StringComparer.Ordinal);
     }
 
-    private static SortedDictionary<string, double?> Measure(IGrouping<string, TypeFact> group, (string From, string To)[] links)
+    private static SortedDictionary<string, double?> Measure(IGrouping<string, TypeFact> group, int input, int output)
     {
-        var input = links.Count(e => e.To == group.Key);
-        var output = links.Count(e => e.From == group.Key);
         var instability = input + output == 0 ? 0 : (double)output / (input + output);
         var abstractness = (double)group.Count(t => t.IsAbstract) / group.Count();
         return new(StringComparer.Ordinal)

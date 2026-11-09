@@ -15,13 +15,15 @@ internal sealed class ReportPager(ReportCursor cursors)
         var items = new List<JsonElement>();
         await using var stream = File.OpenRead(Path.Combine(report.Directory, "rows"));
         var next = (int)position;
+        var itemBytes = 2; // JSON array brackets, plus one comma between records.
         while (next < rows.Length && items.Count < request.Limit)
         {
             var row = rows[next];
             var item = await ReadRow(stream, row, next, token);
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(item, CompactJson.Options).Length + (items.Count == 0 ? 0 : 1);
+            if (itemBytes + bytes > 200 * 1024) break;
             items.Add(item);
-            if (JsonSerializer.SerializeToUtf8Bytes(items, CompactJson.Options).Length > 200 * 1024)
-            { items.RemoveAt(items.Count - 1); break; }
+            itemBytes += bytes;
             next++;
         }
         return new(report.Id, request.Section, rows.Length) { Items = items.ToArray(), NextCursor = next < rows.Length ? cursors.Encode(request, next) : null };

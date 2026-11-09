@@ -21,7 +21,7 @@ internal sealed record MethodResolution
         var callsComplete = resolved.All(KnownTarget)
             && !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
         var identityComplete = symbol.Parameters.All(parameter => Resolved(parameter.Type));
-        return new() { Calls = calls, Assertions = invocations.Count(x => TestRecognition.IsAssertion(x, context.Model, context.Token)),
+        return new() { Calls = calls, Assertions = resolved.Count(TestRecognition.IsAssertion),
             IdentityComplete = identityComplete, CallsComplete = callsComplete };
     }
 

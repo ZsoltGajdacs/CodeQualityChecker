@@ -32,9 +32,13 @@ public sealed class CSharpExecution : ILanguageExecution
     {
         var scratch = environment.Scratch;
         var project = Path.Combine(scratch, module.Path);
-        environment.Versions["dotnet"] = (await Required("dotnet", ["--version"], scratch, token)).Output.Trim();
-        environment.Versions["coverlet"] = CoverletVersion;
-        var collector = await CollectorPath(scratch, token);
+        if (environment.Collector is null)
+        {
+            environment.Versions["dotnet"] = (await Required("dotnet", ["--version"], scratch, token)).Output.Trim();
+            environment.Versions["coverlet"] = CoverletVersion;
+            environment.Collector = await CollectorPath(scratch, token);
+        }
+        var collector = environment.Collector;
         await Required("dotnet", ["test", project, "--test-adapter-path", collector, "--collect",
             "XPlat Code Coverage;Format=opencover", "--results-directory", environment.Results], scratch, token);
         var references = await Required("dotnet", ["msbuild", project, "-target:ResolveReferences", "-getItem:ReferencePath", "-nologo"], scratch, token);
@@ -43,7 +47,10 @@ public sealed class CSharpExecution : ILanguageExecution
             .Select(item => item.GetProperty("Identity").GetString()!).Where(File.Exists).ToArray();
     }
 
-    private sealed record ExecutionEnvironment(string Scratch, string Results, SortedDictionary<string, string> Versions);
+    private sealed record ExecutionEnvironment(string Scratch, string Results, SortedDictionary<string, string> Versions)
+    {
+        public string? Collector { get; set; }
+    }
 
     private static async Task<string> CollectorPath(string scratch, CancellationToken token)
     {

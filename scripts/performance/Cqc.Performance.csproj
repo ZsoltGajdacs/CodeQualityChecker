@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <CqcSourceRoot Condition="'$(CqcSourceRoot)' == ''">$(MSBuildThisFileDirectory)../..</CqcSourceRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(CqcSourceRoot)/src/Cqc.Core/Cqc.Core.csproj" />
+    <ProjectReference Include="$(CqcSourceRoot)/src/Cqc.CSharp/Cqc.CSharp.csproj" />
+    <ProjectReference Include="$(CqcSourceRoot)/src/Cqc.Java/Cqc.Java.csproj" />
+    <ProjectReference Include="$(CqcSourceRoot)/src/Cqc.Server/Cqc.Server.csproj" />
+  </ItemGroup>
+</Project>

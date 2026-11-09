@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Cqc.CSharp;
 
@@ -20,9 +19,9 @@ internal static class TestRecognition
     public static bool IsFixture(IMethodSymbol symbol, bool testType) => testType &&
         (symbol.MethodKind == MethodKind.Constructor || symbol.Name is "Dispose" or "DisposeAsync" or "InitializeAsync");
 
-    public static bool IsAssertion(InvocationExpressionSyntax invocation, SemanticModel model, CancellationToken cancellationToken)
+    public static bool IsAssertion(IMethodSymbol? symbol)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol symbol) return false;
+        if (symbol is null) return false;
         var type = symbol.ContainingType;
         var ns = type.ContainingNamespace.ToDisplayString();
         if (ns == "Xunit" && type.Name == "Assert") return true;

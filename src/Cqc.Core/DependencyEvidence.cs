@@ -1,21 +1,38 @@
 namespace Cqc.Core;
 
 /// <summary>Architecture scores require a complete reachable resolution context, not unrelated modules.</summary>
-internal static class DependencyEvidence
+internal sealed class DependencyEvidence
 {
-    internal static string[] Blockers(AnalysisFacts facts, TypeFact type)
+    private readonly Dictionary<string, AnalysisContext> contexts;
+    private readonly ILookup<string, TypeFact> types;
+    private readonly HashSet<string> gaps;
+    private readonly Dictionary<string, string[]> cache = new(StringComparer.Ordinal);
+
+    internal DependencyEvidence(AnalysisFacts facts, FactIndex index)
+    {
+        contexts = facts.Contexts.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        types = index.TypesByContext;
+        gaps = facts.SyntaxGaps.Select(g => g.ContextId).OfType<string>().ToHashSet(StringComparer.Ordinal);
+    }
+
+    internal string[] Blockers(TypeFact type)
     {
         if (type.ContextId is not { } id) return Local(type);
-        var contexts = facts.Contexts.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        if (!cache.TryGetValue(id, out var blockers)) cache.Add(id, blockers = ContextBlockers(id));
+        return blockers;
+    }
+
+    private string[] ContextBlockers(string id)
+    {
         var reachable = Reachable(id, contexts);
-        var relevant = facts.Types.Where(t => t.ContextId is not null && reachable.Contains(t.ContextId));
+        var relevant = reachable.SelectMany(key => types[key]);
         var blockers = relevant.SelectMany(t => AssessmentEvidence.Reasons(
             (AssessmentEvidence.Of(t).Syntax, "syntax.incomplete"),
             (AssessmentEvidence.Of(t).Dependencies, "dependencies.unresolved"),
             (AssessmentEvidence.Of(t).VerifiedContext, "context.unverified"))).ToList();
         if (reachable.Any(key => !contexts.TryGetValue(key, out var context) || !context.Verified)) blockers.Add("context.unverified");
         blockers.AddRange(reachable.Where(contexts.ContainsKey).SelectMany(key => contexts[key].Blockers));
-        if (facts.SyntaxGaps.Any(g => g.ContextId is not null && reachable.Contains(g.ContextId))) blockers.Add("syntax.incomplete");
+        if (reachable.Any(gaps.Contains)) blockers.Add("syntax.incomplete");
         return blockers.Distinct().Order(StringComparer.Ordinal).ToArray();
     }
 

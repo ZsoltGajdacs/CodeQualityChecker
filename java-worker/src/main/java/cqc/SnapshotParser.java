@@ -35,21 +35,18 @@ final class SnapshotParser {
         }
         var contexts = new ArrayList<>(definitions.contexts());
         var symbols = new SymbolContexts(sources, contexts);
-        for (int index = 0; index < contexts.size(); index++)
-            contexts.set(index, inject(contexts.get(index), contexts, sources, symbols));
+        var index = new ResolutionSources(contexts, sources);
+        for (int position = 0; position < contexts.size(); position++)
+            contexts.set(position, inject(contexts.get(position), index, symbols));
         var effective = contexts.stream().collect(java.util.stream.Collectors.toMap(ContextManifest.Context::id, context -> context));
         var configuredSources = sources.stream().map(source -> new Worker.Source(source.file(), source.unit(), effective.get(source.context().id()))).toList();
         return new Context(configuredSources, contexts, List.copyOf(gaps), symbols);
     }
 
-    private ContextManifest.Context inject(ContextManifest.Context context, List<ContextManifest.Context> contexts, List<Worker.Source> sources, SymbolContexts symbols) {
+    private ContextManifest.Context inject(ContextManifest.Context context, ResolutionSources sources, SymbolContexts symbols) {
         var solver = new CombinedTypeSolver(new ReflectionTypeSolver(ReflectionTypeSolver.JCL_ONLY));
         Set<String> visible = symbols.visible(context.id());
-        var roots = new LinkedHashSet<String>();
-        for (String id : visible)
-            contexts.stream().filter(candidate -> candidate.id().equals(id)).findFirst().ifPresent(candidate -> Collections.addAll(roots, candidate.roots()));
-        // Fallback roots are inferred from actual packages rather than guessed Maven conventions.
-        sources.stream().filter(source -> visible.contains(source.context().id())).map(SourceContexts::sourceRoot).forEach(roots::add);
+        var roots = sources.roots(visible);
         for (String sourceRoot : roots) {
             Path path = root.resolve(sourceRoot).normalize();
             if (path.startsWith(root) && Files.isDirectory(path)) solver.add(new JavaParserTypeSolver(path, configuration()));
@@ -57,7 +54,7 @@ final class SnapshotParser {
         boolean complete = true;
         for (String jar : context.jars()) complete &= addJar(solver, jar, context);
         var resolver = new JavaSymbolSolver(solver);
-        sources.stream().filter(source -> source.context().id().equals(context.id())).forEach(source -> resolver.inject(source.unit()));
+        sources.owned(context.id()).forEach(source -> resolver.inject(source.unit()));
         if (complete) return context;
         var blockers = new TreeSet<>(Arrays.asList(context.blockers()));
         blockers.add("context.artifactChanged");

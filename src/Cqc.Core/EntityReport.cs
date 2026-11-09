@@ -6,6 +6,9 @@ internal sealed class EntityReport
     private readonly IGrouping<string, TypeFact>[] types;
     private readonly Finding[] findings;
     private readonly FamilyAssessment assessment;
+    private readonly ILookup<string, string> typesByFile;
+    private readonly ILookup<string, Finding> findingsByEntity;
+    private readonly ILookup<string, Finding> findingsByFile;
     internal sealed record Result(EntityScore[] Entities, Finding[] Findings);
 
     internal EntityReport(FamilyAssessment assessment)
@@ -13,6 +16,12 @@ internal sealed class EntityReport
         this.assessment = assessment;
         types = assessment.Types.GroupBy(t => t.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).ToArray();
         findings = assessment.Findings.DistinctBy(f => f.Id).OrderBy(f => f.Id, StringComparer.Ordinal).ToArray();
+        typesByFile = types.SelectMany(g => g.Select(t => t.Location.File).Distinct(StringComparer.Ordinal)
+            .Select(file => (File: file, Id: g.Key))).ToLookup(p => p.File, p => p.Id, StringComparer.Ordinal);
+        findingsByEntity = findings.SelectMany(f => f.EntityIds.Distinct(StringComparer.Ordinal)
+            .Select(id => (Id: id, Finding: f))).ToLookup(p => p.Id, p => p.Finding, StringComparer.Ordinal);
+        findingsByFile = findings.SelectMany(f => f.Locations.Select(l => l.File).Distinct(StringComparer.Ordinal)
+            .Select(file => (File: file, Finding: f))).ToLookup(p => p.File, p => p.Finding, StringComparer.Ordinal);
     }
 
     internal Result Build(string[] selectedFiles)
@@ -33,14 +42,14 @@ internal sealed class EntityReport
     private EntityScore ClassScore(IGrouping<string, TypeFact> type) => Score(new()
     {
         Id = type.Key, Kind = "class", File = type.Select(t => t.Location.File).Order(StringComparer.Ordinal).First(),
-        TypeIds = [type.Key], Findings = findings.Where(f => f.EntityIds.Contains(type.Key, StringComparer.Ordinal)).ToArray(),
+        TypeIds = [type.Key], Findings = findingsByEntity[type.Key].ToArray(),
         Metrics = assessment.Metrics(type.Key)
     });
 
     private EntityScore FileScore(string file)
     {
-        var ids = types.Where(g => g.Any(t => t.Location.File == file)).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
-        var applicable = findings.Where(f => f.Locations.Any(l => l.File == file) && f.EntityIds.Any(ids.Contains)).ToArray();
+        var ids = typesByFile[file].ToHashSet(StringComparer.Ordinal);
+        var applicable = findingsByFile[file].Where(f => f.EntityIds.Any(ids.Contains)).ToArray();
         return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids.ToArray(), Findings = applicable, Metrics = FileMetrics(ids) });
     }
 
