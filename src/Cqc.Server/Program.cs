@@ -1,4 +1,5 @@
 using Cqc.Core;
+using Cqc.Server.Reporting;
 using Cqc.CSharp;
 using Cqc.Java;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,5 +12,7 @@ builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogL
 builder.Services.AddSingleton<ILanguageAnalyzer, CSharpAnalyzer>();
 builder.Services.AddSingleton<ILanguageAnalyzer, JavaAnalyzer>();
 builder.Services.AddSingleton<AnalysisService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ReportStore>();
 builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<QualityTools>();
 await builder.Build().RunAsync();

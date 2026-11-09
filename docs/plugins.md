@@ -1,6 +1,6 @@
 # Local Claude Code and Codex plugins
 
-The `cqc` plugins (version `0.1.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. The installer scripts build that installation by default. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
+The `cqc` plugins (version `0.2.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v2 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. The installer scripts build that installation by default. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
 
 ## Generate
 
@@ -65,7 +65,7 @@ The skill supports review-only requests and requested fixes with rechecks. Sourc
 
 ## Update, relocate, or remove
 
-Keep the generated marketplace directories available at their registered locations. Rerun an installer to rebuild and refresh its plugin, or use `--mcp-dir` after moving a prebuilt MCP installation. The installer removes only that client's matching CQC plugin/catalog before adding the prepared package, ensuring cached `0.1.0` copies pick up the new command and skill. Restart the client afterward. Moving only the plugin directory does not update the absolute CQC command. For manual installation, uninstall/remove the old local marketplace before adding the newly generated output.
+Keep the generated marketplace directories available at their registered locations. Rerun an installer to rebuild and refresh its plugin, or use `--mcp-dir` after moving a prebuilt MCP installation. The installer removes only that client's matching CQC plugin/catalog before adding the prepared package, ensuring cached copies pick up the new command and skill. Restart the client afterward. Moving only the plugin directory does not update the absolute CQC command. For manual installation, uninstall/remove the old local marketplace before adding the newly generated output.
 
 Remove Claude's local installation:
 
@@ -94,15 +94,15 @@ claude plugin validate --strict dist/cqc-plugins/claude
 python3 scripts/verify-plugin-clients.py dist/cqc-plugins
 ```
 
-The packaging tests use a small local executable to verify path handling and output protection. The MCP smoke test starts the real server using both generated configurations, calls all six tools against copies of existing Java/C# scoring fixtures, checks missing-coverage scores and unsupported source handling, and verifies unchanged fixture bytes. It also compares generated skill bytes to their canonical source.
+The packaging tests use a small local executable to verify path handling and output protection. The MCP smoke test starts the real server using both generated configurations, discovers seven tools, and calls all inspection/check tools against copies of existing Java/C# scoring fixtures. It retrieves complete reports through raw pages, checks message sizes, missing-coverage scores and unsupported source handling, and verifies unchanged fixture bytes. It also compares generated skill bytes to their canonical source.
 
 The installer tests exercise the public entrypoints in a disposable checkout with build/client command stand-ins and the real package generator. They verify default build order, the configured MCP path, prebuilt overrides, refresh, and failures before settings changes. Client refresh commands run from a neutral temporary directory. Claude user marketplace declarations are checked in user settings, since its cached marketplace inventory can also contain project registrations.
 
-The client verifier uses temporary `CODEX_HOME` and `CLAUDE_CONFIG_DIR` directories, without copying credentials or calling a model. It checks persistent local installation and component discovery, plus all six live MCP tools in Codex through its app-server protocol. Claude's inventory check is supplemented by the independent real-MCP smoke check. Run it from a context that permits local server processes: this machine's restricted execution sandbox stalled the bundled .NET server before MCP initialization; the same checks passed outside that sandbox.
+The client verifier uses temporary `CODEX_HOME` and `CLAUDE_CONFIG_DIR` directories, without copying credentials or calling a model. It checks persistent local installation and component discovery, plus all seven live MCP tools in Codex through its app-server protocol. Claude's inventory check is supplemented by the independent real-MCP smoke check. Run it from a context that permits local server processes: this machine's restricted execution sandbox stalled the bundled .NET server before MCP initialization; the same checks passed outside that sandbox.
 
 For a missing server, restore the original complete extracted installation or regenerate with a valid path. A successful manifest check alone does not prove the server can start. Public-directory warnings about listing assets are separate from strict local plugin validation; public submission is deferred.
 
-## Validation evidence
+## Historical validation evidence for 0.1.0
 
 Verified on 2026-11-09: six packaging tests passed; canonical skill and strict Claude plugin/marketplace validation passed; both generated MCP configurations invoked all six tools successfully. Codex 0.166.0 discovered the enabled skill and six live tools; Claude Code 2.1.306 discovered the skill and reported its MCP server connected. All five touched Python files received Code Health 10.0, and the change safeguard passed. Normal client settings were left unchanged.
 

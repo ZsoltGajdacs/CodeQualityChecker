@@ -24,8 +24,7 @@ def verify_analysis(result):
 def verify_unsupported(session, root):
     inspection = session.request('tools/call', {'name': 'inspect_project', 'arguments': {
         'request': {'projectRoot': str(root / 'unsupported'), 'execute': False}}})
-    assert not inspection.get('isError'), inspection
-    data = json.loads(next(c['text'] for c in inspection['content'] if c['type'] == 'text'))
+    data = SMOKE['retrieve_full'](session, SMOKE['structured'](inspection))
     assert not data['project']['selectedFiles'], data
 
 
@@ -56,7 +55,7 @@ def run(output):
         for client in ('claude', 'codex'):
             verify_client(output / client, root)
             assert SMOKE['digest_sources'](root) == original, 'Source-only analysis changed fixtures'
-            print(f'PASS: {client}: six real tools, Java/C#, missing coverage, unsupported source, unchanged inputs')
+            print(f'PASS: {client}: seven real tools, bounded pages, Java/C#, missing coverage, unchanged inputs')
 
 
 if __name__ == '__main__':

@@ -29,8 +29,9 @@ For a bundled review-and-improve skill and local plugin installation in Claude C
 | `check_duplication` | Structural duplicate groups within each language |
 | `check_dependencies` | Semantic type/component cycles, coupling, and optional boundaries |
 | `check_all` | All four check families with shared discovery/parsing |
+| `get_report_page` | Bounded detail pages from an immutable completed report |
 
-All tools take a nested `request` object:
+Inspection and check tools take a nested `request` object:
 
 ```json
 {
@@ -49,7 +50,26 @@ Source-only analysis never invokes project builds, tests, restores, or MSBuild e
 
 Optional inputs are `configPath`, `reportPath`, and `timeoutSeconds` (1–3600). `reportPath` reads existing CQC coverage evidence; generated evidence is written to `.cqc/coverage.json`. Raw JaCoCo/OpenCover XML alone cannot establish source-matched provenance.
 
-Results identify schema/ruleset/configuration/source versions, analyzed files, completeness, raw metrics, findings, symbol identities, source ranges, and advice. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
+Every inspection and check returns a compact schema-v2 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content is a short explanation, not a second copy of the report. Diagnostic counts show at most 20 code groups and identify remaining groups. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
+
+Retrieve details without rerunning analysis:
+
+```json
+{
+  "request": {
+    "reportId": "<reportId from summary>",
+    "section": "findings",
+    "family": "code",
+    "limit": 50
+  }
+}
+```
+
+`get_report_page` supports selected `files`, `modules`, `entities`, `findings`, `diagnostics`, `metrics`, and inspection `prerequisites`. Use optional `family` and `entityId` filters where applicable; keep them unchanged when passing a returned `nextCursor`. The default limit is 50 records, with 1–200 accepted. A null `nextCursor` means that section is exhausted. Detail retrieval does not execute project code or reread source files.
+
+All tool results are bounded to 512 KiB, including JSON escaping and text content; a byte budget may reduce the record count. Exceptionally large records explicitly direct you to `section: "raw"`. Raw pages contain `rawChunk` strings: concatenate them in cursor order to reconstruct the complete original report JSON without loss. A partial page does not mean analysis is incomplete; use family statuses to assess analysis completeness.
+
+Reports live in private server temporary storage for 60 minutes, with at most 10 reports and 512 MiB total storage. Old reports can be evicted before expiry, and restarting the server removes access. Expired, evicted, or unknown IDs return explicit errors; rerun the appropriate check only when a fresh report is needed. Storage and page retrieval do not write into the analyzed repository. This release replaces the previous full-report MCP response format.
 
 ## Build and verify
 

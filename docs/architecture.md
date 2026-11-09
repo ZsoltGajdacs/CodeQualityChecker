@@ -1,6 +1,6 @@
 # Architecture and language extension contract
 
-The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery orchestration, scope selection, configuration, isolated-execution lifetime, normalized evidence, four check engines, scoring, and response formatting. `Cqc.CSharp` uses Roslyn; `Cqc.Java` invokes the JavaParser worker through a private JSON protocol. Each language module owns its build commands and native coverage-report reader. The Java worker is isolated behind a process boundary; this is not a public plugin API.
+The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery orchestration, scope selection, configuration, isolated-execution lifetime, normalized evidence, four check engines, scoring, and full internal reports. `Cqc.Server` owns the schema-v2 MCP summaries, report storage, pagination, and byte-budget enforcement. `Cqc.CSharp` uses Roslyn; `Cqc.Java` invokes the JavaParser worker through a private JSON protocol. Each language module owns its build commands and native coverage-report reader. The Java worker is isolated behind a process boundary; this is not a public plugin API.
 
 The processing pipeline is:
 
@@ -11,8 +11,17 @@ The processing pipeline is:
 5. Qualify identities with a language prefix and merge immutable facts.
 6. Evaluate shared rules with full repository context.
 7. Filter reported entities to selected files and return deterministic ordered data.
+8. Store the immutable report and its detail indexes outside the target repository, then return a bounded MCP summary.
 
 Repository context remains available for cross-file dependencies, clone groups, helpers, and partial classes when only one file is selected. Stable method identities include the declaring type and parameter signature, preserving overloads. Class identities merge partial declarations; facts retain individual declaration locations.
+
+## MCP report delivery
+
+Tool handlers delegate to focused components for typed report projections, storage/lifetime management, cursor pagination, and bounded serialization. These components remain in the server; analysis engines and language adapters do not depend on MCP contracts or pagination. Summary projection does not alter scores, findings, diagnostic messages, or original metric values.
+
+Inspection and analysis always return schema-v2 summaries through `structuredContent`; text content is a short explanation. `get_report_page` reads indexed sections of the completed snapshot without parsing the whole report on each request or rerunning analysis. Entity lists omit full metrics, which are available separately. Raw pages reconstruct the complete canonical report JSON and provide a lossless escape hatch for oversized individual records.
+
+The complete serialized tool result, including escaping and text, is limited to 512 KiB. Page boundaries follow both a record limit and the byte budget. IDs are random and cursors are opaque and bound to the report, section, and filters. Temporary reports have a 60-minute lifetime and limits of 10 reports and 512 MiB including indexes. Eviction protects active readers; cancellation removes partial artifacts. IDs become invalid after expiry, eviction, or restart. Source-only operations do not create report files in the target repository.
 
 ## Add a language module
 

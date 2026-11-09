@@ -18,7 +18,7 @@ export JAVA_HOME=/absolute/path/to/pinned/jbr-sdk/Contents/Home
 ./scripts/package-macos.sh
 ```
 
-The script builds the Java worker, publishes the self-contained server, links the pinned Java modules, gathers notices, records build/file hashes, and starts a real MCP client smoke test. Tool dependency builds use dedicated public Maven Central settings without changing host settings or target-project execution policy. The smoke process removes Java/.NET discovery environment variables and restricts `PATH` to a temporary directory containing only Git. It invokes all six tools against a mixed Java/C# source fixture and verifies both language analyzers produced entities without modifying inputs.
+The script builds the Java worker, publishes the self-contained server, links the pinned Java modules, gathers notices, records build/file hashes, and starts a real MCP client smoke test. Tool dependency builds use dedicated public Maven Central settings without changing host settings or target-project execution policy. The smoke process removes Java/.NET discovery environment variables and restricts `PATH` to a temporary directory containing only Git. It discovers all seven tools, invokes the six inspection/check tools against a mixed Java/C# source fixture, and reconstructs reports through `get_report_page` raw pages. It verifies bounded messages, both language analyzers, and unchanged input bytes.
 
 Outputs:
 

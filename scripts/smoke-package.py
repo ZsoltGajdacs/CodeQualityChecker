@@ -39,7 +39,9 @@ class McpSession:
         self.send({'jsonrpc': '2.0', 'id': self.sequence, 'method': method, 'params': params})
         while True:
             try:
-                result = json.loads(self.responses.get(timeout=60))
+                line = self.responses.get(timeout=60)
+                assert len(line.encode('utf-8')) < 1024 * 1024, 'MCP message exceeded 1 MiB'
+                result = json.loads(line)
             except queue.Empty as error:
                 raise AssertionError('MCP response timed out: ' + ''.join(self.errors)) from error
             if result.get('id') != self.sequence:
@@ -73,18 +75,39 @@ def initialize(session):
     session.send({'jsonrpc': '2.0', 'method': 'notifications/initialized'})
     tools = session.request('tools/list', {})['tools']
     expected = {'inspect_project', 'check_code_quality', 'check_test_quality',
-                'check_duplication', 'check_dependencies', 'check_all'}
+                'check_duplication', 'check_dependencies', 'check_all', 'get_report_page'}
     assert {tool['name'] for tool in tools} == expected
-    return tools
+    return [tool for tool in tools if tool['name'] != 'get_report_page']
+
+
+def structured(response):
+    assert not response.get('isError'), response
+    size = len(json.dumps(response, separators=(',', ':')).encode('utf-8'))
+    assert size <= 512 * 1024, 'Tool result exceeded 512 KiB'
+    return response['structuredContent']
+
+
+def retrieve_full(session, summary):
+    assert summary['schemaVersion'] == '2', summary
+    chunks = []
+    cursor = None
+    while True:
+        request = {'reportId': summary['reportId'], 'section': 'raw'}
+        if cursor is not None:
+            request['cursor'] = cursor
+        page = structured(session.request('tools/call', {
+            'name': 'get_report_page', 'arguments': {'request': request}}))
+        chunks.append(page['rawChunk'])
+        cursor = page.get('nextCursor')
+        if cursor is None:
+            return json.loads(''.join(chunks))
 
 
 def invoke(session, tool, root):
     assert '10 is the desired score.' in tool['description']
     response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
         'projectRoot': str(root), 'execute': False}}})
-    assert not response.get('isError'), response
-    text = ''.join(block['text'] for block in response['content'] if block['type'] == 'text')
-    result = json.loads(text)
+    result = retrieve_full(session, structured(response))
     assert result['message'] == '10 is the desired score.'
     return result
 
@@ -128,7 +151,7 @@ def run(package):
             assert digest_sources(root) == original, 'Analysis-only changed fixture files'
         finally:
             session.close()
-    print('PASS: packaged MCP initialized and all six tools analyzed Java/C# without host runtimes.')
+    print('PASS: seven packaged MCP tools, bounded summaries/raw pages, Java/C# without host runtimes.')
 
 
 if __name__ == '__main__':
