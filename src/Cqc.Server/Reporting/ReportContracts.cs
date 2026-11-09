@@ -18,12 +18,24 @@ public sealed record ReportPageRequest
 }
 public sealed record DiagnosticCount(string Code, int Count);
 public sealed record ScoreCount(double? Score, int Count);
-public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount, ScoreCount[] Scores);
-public sealed record ReportSummary(string ReportId, DateTimeOffset ExpiresAt, string SourceFingerprint,
-    string? ConfigurationFingerprint, string Scope, int FileCount, int ModuleCount, FamilySummary[] Families,
-    DiagnosticCount[] Diagnostics, int RemainingDiagnosticGroups, string Kind)
+public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount, ScoreCount[] Scores)
 {
-    public string SchemaVersion => "2";
+    public ScoreCount[] StaticComplexityScores { get; init; } = [];
+}
+public sealed record ReportSummary
+{
+    public required string ReportId { get; init; }
+    public required DateTimeOffset ExpiresAt { get; init; }
+    public required string SourceFingerprint { get; init; }
+    public string? ConfigurationFingerprint { get; init; }
+    public required string Scope { get; init; }
+    public required int FileCount { get; init; }
+    public required int ModuleCount { get; init; }
+    public required FamilySummary[] Families { get; init; }
+    public required DiagnosticCount[] Diagnostics { get; init; }
+    public required int RemainingDiagnosticGroups { get; init; }
+    public required string Kind { get; init; }
+    public string SchemaVersion => "3";
     public string Message => Wire.Target;
 }
 public sealed record ReportPage(string ReportId, string Section, int Total)
@@ -31,7 +43,7 @@ public sealed record ReportPage(string ReportId, string Section, int Total)
     public JsonElement[] Items { get; init; } = [];
     public string? NextCursor { get; init; }
     public string? RawChunk { get; init; }
-    public string SchemaVersion => "2";
+    public string SchemaVersion => "3";
     public string Message => Wire.Target;
 }
 public sealed record ReportStoreOptions

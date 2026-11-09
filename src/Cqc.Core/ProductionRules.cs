@@ -5,7 +5,8 @@ internal static class ProductionRules
     private sealed record Assessment(MethodFact Method, double? Coverage, double? Crap, Finding[] Findings)
     {
         public MethodCoverage? Report { get; init; }
-        public bool Complete => Method.Complete && Coverage is not null;
+        public string[] Blockers => AssessmentEvidence.Production(Method, Coverage is not null);
+        public bool Complete => Blockers.Length == 0;
     }
 
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config,
@@ -23,14 +24,18 @@ internal static class ProductionRules
         var metrics = assessments.GroupBy(a => a.Method.TypeId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var diagnostics = missing.Count == 0 ? Array.Empty<Diagnostic>() :
-            [new Diagnostic("coverage.incomplete", "Scoring requires successful source/configuration-matched coverage for every analyzed production method. Run with execute=true or supply matching provenance.")];
-        return context.Finish(new() { Family = "code", Types = context.TypesFor(methods), Findings = assessments.SelectMany(a => a.Findings),
-            Complete = id => !missing.Contains(id), Metrics = id => metrics[id], Diagnostics = diagnostics });
+            [new Diagnostic("coverage.incomplete", "Combined scoring requires complete syntax, resolved method identities and source/configuration-matched coverage. Inspect entity blockers; execute=true can collect coverage but may not resolve every blocker.")];
+        return context.Finish(new() { Family = "code", Types = context.TypesFor(methods)
+                .Concat(context.Facts.Types.Where(type => !type.IsTest && !AssessmentEvidence.Of(type).Syntax)).Distinct(), Findings = assessments.SelectMany(a => a.Findings),
+            Blockers = id => assessments.Where(a => a.Method.TypeId == id).SelectMany(a => a.Blockers)
+                .Concat(context.Facts.Types.Where(t => t.Id == id).SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(),
+            StaticBlockers = id => context.Facts.Types.Where(t => t.Id == id)
+                .SelectMany(t => AssessmentEvidence.Syntax(t, methods.Where(m => m.TypeId == id))).Distinct().ToArray(), Metrics = id => metrics.GetValueOrDefault(id) ?? RuleContext.Metrics(), Diagnostics = diagnostics });
     }
 
     private static Dictionary<string, MethodCoverage> MatchingCoverage(string source, string config, CoverageEvidence? evidence)
     {
-        if (evidence is not { Successful: true, SchemaVersion: "1" }) return [];
+        if (evidence is not { Successful: true, SchemaVersion: "2" }) return [];
         if (evidence.SourceFingerprint != source || evidence.ConfigurationFingerprint != config) return [];
         return evidence.Methods.GroupBy(m => m.MethodId, StringComparer.Ordinal).Where(g => g.Count() == 1)
             .ToDictionary(g => g.Key, g => g.Single(), StringComparer.Ordinal);

@@ -13,7 +13,7 @@ internal static class DuplicationRules
         var incompleteLanguages = IncompleteLanguages(context.Facts);
         var types = context.Facts.Types.GroupBy(t => t.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First());
         return context.Finish(new() { Family = "duplication", Types = context.Facts.Types, Findings = findings,
-            Complete = id => !incompleteLanguages.Contains(types[id].Language),
+            Blockers = id => incompleteLanguages.Contains(types[id].Language) ? ["structure.incomplete"] : [],
             Metrics = id => new(StringComparer.Ordinal)
             {
                 ["eligibleMethods"] = eligible.Count(m => m.TypeId == id),
@@ -26,8 +26,9 @@ internal static class DuplicationRules
             && method.NodeCount >= config.DuplicateMinNodes && method.Fingerprints.Length > 0;
 
     private static HashSet<string> IncompleteLanguages(AnalysisFacts facts)
-        => facts.Methods.Where(m => !m.Complete).Select(m => m.Language)
-            .Concat(facts.Types.Where(t => !t.Complete).Select(t => t.Language))
+        => facts.Methods.Where(m => !AssessmentEvidence.Of(m).Syntax).Select(m => m.Language)
+            .Concat(facts.Types.Where(t => !AssessmentEvidence.Of(t).Syntax).Select(t => t.Language))
+            .Concat(facts.SyntaxGaps.Select(g => g.Language))
             .Concat(facts.Diagnostics.Where(d => d.Code is "analyzer_failed" or "java.parse").Select(d => d.Language).OfType<string>())
             .ToHashSet(StringComparer.Ordinal);
 

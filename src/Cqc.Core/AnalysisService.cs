@@ -12,7 +12,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         using var timeout = Timeout(request, cancellationToken);
         var (config, _) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
         var snapshot = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-        return new("1", Wire.Target, snapshot, Prerequisites(snapshot));
+        return new(Wire.SchemaVersion, Wire.Target, snapshot, Prerequisites(snapshot));
     }
 
     private Diagnostic[] Prerequisites(ProjectSnapshot snapshot)
@@ -57,7 +57,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             CoverageEvidence? coverage = null;
             try
             {
-                coverage = await EvidenceAsync(new EvidenceInput
+                coverage = await new CoverageCollection(adapters).CollectAsync(new CoverageInput
                 {
                     Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
                     Facts = facts, Artifacts = artifacts
@@ -75,7 +75,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = timeout.Token
             });
             timeout.Token.ThrowIfCancellationRequested();
-            return new("1", "1", Wire.Target, snapshot.SourceFingerprint, configFingerprint, request.Scope,
+            return new(Wire.SchemaVersion, "2", Wire.Target, snapshot.SourceFingerprint, configFingerprint, request.Scope,
                 snapshot.SelectedFiles, snapshot.Modules, results, diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray());
         }
         finally { artifacts?.Dispose(); }
@@ -105,44 +105,11 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             }
         }
         return new(results.SelectMany(r => r.Types).ToArray(), results.SelectMany(r => r.Methods).ToArray(),
-            results.SelectMany(r => r.Dependencies).ToArray(), results.SelectMany(r => r.Diagnostics).ToArray(), results.All(r => r.SemanticComplete));
-    }
-
-    private sealed record EvidenceInput
-    {
-        public required ProjectSnapshot Snapshot { get; init; }
-        public required string ConfigurationFingerprint { get; init; }
-        public required AnalysisRequest Request { get; init; }
-        public required AnalysisFacts Facts { get; init; }
-        public BuildArtifacts? Artifacts { get; init; }
-    }
-
-    private async Task<CoverageEvidence?> EvidenceAsync(EvidenceInput input, CancellationToken token)
-    {
-        var snapshot = input.Snapshot;
-        var configFingerprint = input.ConfigurationFingerprint;
-        var request = input.Request;
-        var facts = input.Facts;
-        var artifacts = input.Artifacts;
-        var path = Path.GetFullPath(artifacts is null ? request.ReportPath ?? ".cqc/coverage.json" : ".cqc/coverage.json", snapshot.Root);
-        if (artifacts is null)
+            results.SelectMany(r => r.Dependencies).ToArray(), results.SelectMany(r => r.Diagnostics).ToArray(), results.All(r => r.SemanticComplete))
         {
-            if (!File.Exists(path)) return null;
-            return EvidenceStore.Read(await File.ReadAllTextAsync(path, token));
-        }
-        var drivers = adapters.OfType<ILanguageExecution>().ToDictionary(x => x.Language, StringComparer.Ordinal);
-        var entries = artifacts.Results.SelectMany(build => drivers[build.Language].ReadCoverage(build, facts.Methods.Where(m => m.Language == build.Language)))
-            .GroupBy(m => m.MethodId).Where(g => g.Count() == 1).Select(g => g.Single()).OrderBy(m => m.MethodId, StringComparer.Ordinal).ToArray();
-        var evidence = new CoverageEvidence("1", snapshot.SourceFingerprint, configFingerprint, true, artifacts.ToolVersions, entries);
-        EvidenceStore.EnsureArtifactDirectory(snapshot.Root);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(evidence, Wire.Json), token);
-            File.Move(temporary, path, true);
-        }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
-        return evidence;
+            Contexts = results.SelectMany(r => r.Contexts).ToArray(),
+            SyntaxGaps = results.SelectMany(r => r.SyntaxGaps).ToArray()
+        };
     }
 
     private static CancellationTokenSource Timeout(AnalysisRequest request, CancellationToken token)

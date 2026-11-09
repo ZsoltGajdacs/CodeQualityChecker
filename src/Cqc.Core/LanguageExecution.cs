@@ -2,6 +2,7 @@ namespace Cqc.Core;
 
 public sealed record LanguageBuildResult(string Language, string[] Reports, SortedDictionary<string, string> ToolVersions)
 {
+    public SortedDictionary<string, string> ReportModules { get; init; } = new(StringComparer.Ordinal);
     public Diagnostic[] Diagnostics { get; init; } = [];
 }
 

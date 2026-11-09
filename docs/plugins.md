@@ -1,6 +1,6 @@
 # Local Claude Code and Codex plugins
 
-The `cqc` plugins (version `0.2.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v2 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. The installer scripts build that installation by default. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
+The `cqc` plugins (version `0.3.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v3 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. The installer scripts build that installation by default. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
 
 ## Generate
 

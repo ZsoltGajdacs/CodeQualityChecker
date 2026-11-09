@@ -28,7 +28,7 @@ public sealed class McpTests
                     new Dictionary<string, object?> { ["request"] = new { projectRoot = root } }, cancellationToken: timeout.Token);
                 Assert.NotEqual(true, result.IsError);
                 var json = JsonSerializer.SerializeToElement(result.StructuredContent);
-                Assert.Equal("2", json.GetProperty("schemaVersion").GetString());
+                Assert.Equal("3", json.GetProperty("schemaVersion").GetString());
                 Assert.Equal(Wire.Target, json.GetProperty("message").GetString());
                 var raw = new System.Text.StringBuilder();
                 string? cursor = null;

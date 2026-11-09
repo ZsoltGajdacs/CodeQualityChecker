@@ -5,6 +5,7 @@ namespace Cqc.Tests;
 
 public sealed class CoreEngineTests
 {
+    private static readonly EvidenceState Verified = new(true, true, true, true, true, []);
     [Fact]
     public void ProductionDeductionsRequireMatchingCoverageAndExplainEachMethod()
     {
@@ -77,7 +78,7 @@ public sealed class CoreEngineTests
     public void UnresolvedTestHelperBlocksItsClassScore()
     {
         var test = Method("Tests.test()", "Tests", new() { Test = true }) with { Calls = ["Tests.helper()"] };
-        var helper = Method("Tests.helper()", "Tests") with { Complete = false };
+        var helper = Method("Tests.helper()", "Tests") with { Complete = false, Evidence = Verified with { Calls = false } };
         var result = Evaluate(Facts([test, helper]), "tests");
         Assert.Null(Class(result, "Tests").Score);
         Assert.DoesNotContain(result.Findings, f => f.Rule == "tests.noAssertion");
@@ -130,7 +131,7 @@ public sealed class CoreEngineTests
         var facts = Facts(methods, [new("A", "B", new("A.cs", 1, 1)), new("A", "C", new("A.cs", 2, 2)),
             new("B", "C", new("B.cs", 1, 1))]);
         Assert.Empty(Evaluate(facts, "dependencies").Findings);
-        var incomplete = Evaluate(facts with { SemanticComplete = false }, "dependencies");
+        var incomplete = Evaluate(facts with { SemanticComplete = false, Types = facts.Types.Select(t => t with { Evidence = Verified with { Dependencies = false } }).ToArray() }, "dependencies");
         Assert.All(incomplete.Entities, e => Assert.Null(e.Score));
     }
 
@@ -139,8 +140,8 @@ public sealed class CoreEngineTests
     {
         var first = Method("Partial.a()", "Partial", new() { Test = true }) with { Location = new("First.cs", 2, 6) };
         var second = Method("Partial.b()", "Partial", new() { Test = true, Assertions = 1 }) with { Location = new("Second.cs", 2, 6) };
-        var facts = new AnalysisFacts([new("Partial", "csharp", new("First.cs", 1, 7), false, true),
-            new("Partial", "csharp", new("Second.cs", 1, 7), false, true)], [first, second], [], [], true);
+        var facts = new AnalysisFacts([new("Partial", "csharp", new("First.cs", 1, 7), false) { IsTest = true, Evidence = Verified },
+            new("Partial", "csharp", new("Second.cs", 1, 7), false) { IsTest = true, Evidence = Verified }], [first, second], [], [], true);
         var result = Evaluate(facts, "tests");
         Assert.Equal(9, Class(result, "Partial").Score);
         Assert.Equal(9, Assert.Single(result.Entities, e => e.EntityId == "file:First.cs").Score);
@@ -177,6 +178,7 @@ public sealed class CoreEngineTests
         var first = Method("A.m()", "A");
         var second = Method("B.m()", "B") with { Language = "java" };
         var facts = Facts([first, second]) with { SemanticComplete = false,
+            Types = Facts([first, second]).Types.Select(t => t with { Evidence = Verified with { Dependencies = t.Language != "csharp" } }).ToArray(),
             Diagnostics = [new("unresolved", "Missing C# reference", Language: "csharp")] };
         var result = Evaluate(facts, "dependencies");
         Assert.Null(Class(result, "A").Score);
@@ -217,12 +219,12 @@ public sealed class CoreEngineTests
     {
         options ??= new();
         return new(id, type, "csharp", new(type + ".cs", 2, 8), options.Complexity, options.Lines,
-            options.Test, false, false, options.Assertions, [], ["a", "b", "c"], 25);
+            options.Test, false, false, options.Assertions, [], ["a", "b", "c"], 25) { Evidence = Verified };
     }
     private static AnalysisFacts Facts(MethodFact[] methods, DependencyFact[]? edges = null) => new(
-        methods.Select(m => new TypeFact(m.TypeId, m.Language, new(m.Location.File, 1, 20), false, methods.Any(t => t.TypeId == m.TypeId && t.IsTest)))
+        methods.Select(m => new TypeFact(m.TypeId, m.Language, new(m.Location.File, 1, 20), false) { IsTest = methods.Any(t => t.TypeId == m.TypeId && t.IsTest), Evidence = Verified })
             .DistinctBy(t => (t.Id, t.Location.File)).ToArray(), methods, edges ?? [], [], true);
-    private static CoverageEvidence Evidence(MethodCoverage[] methods) => new("1", "source", "config", true, new(StringComparer.Ordinal), methods);
+    private static CoverageEvidence Evidence(MethodCoverage[] methods) => new("2", "source", "config", true, new(StringComparer.Ordinal), methods);
     private static FamilyResult Evaluate(AnalysisFacts facts, string family, EvaluationOptions? options = null)
     {
         options ??= new();

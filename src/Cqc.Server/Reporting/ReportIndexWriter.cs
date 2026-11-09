@@ -33,7 +33,7 @@ internal sealed class ReportIndexWriter(Stream stream, long maximumBytes, long r
         foreach (var entity in family.Entities)
         {
             await Add("entities", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, entity.Kind, entity.File, entity.Status,
-                entity.Score, findingCount = entity.FindingIds.Length, metricCount = entity.Metrics.Count });
+                entity.Score, entity.Blockers, entity.StaticComplexity, findingCount = entity.FindingIds.Length, metricCount = entity.Metrics.Count });
             foreach (var metric in entity.Metrics)
                 await Add("metrics", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, name = metric.Key, value = metric.Value });
         }

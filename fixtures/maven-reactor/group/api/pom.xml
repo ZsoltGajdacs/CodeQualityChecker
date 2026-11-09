@@ -1,3 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion><parent><groupId>cqc.fixtures.reactor</groupId><artifactId>group</artifactId><version>1.0</version></parent><artifactId>api</artifactId>
+  <build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.5.1</version>
+    <executions><execution><id>early-main</id><phase>process-classes</phase><goals><goal>jar</goal></goals></execution>
+    <execution><id>test-support</id><phase>process-test-classes</phase><goals><goal>test-jar</goal></goals></execution></executions>
+  </plugin></plugins></build>
 </project>

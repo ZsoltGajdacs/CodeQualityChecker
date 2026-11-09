@@ -1,0 +1,169 @@
+{
+  "elapsedSeconds": 42.562,
+  "summaryToolResultBytes": 1913,
+  "selectedFileCount": 607,
+  "allSelectedFilesWithinImpl": true,
+  "staticComplexity": {
+    "class": {
+      "entities": 361,
+      "scored": 231,
+      "incomplete": 130,
+      "scores": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 2,
+        "9": 11,
+        "10": 218
+      }
+    },
+    "file": {
+      "entities": 337,
+      "scored": 211,
+      "incomplete": 126,
+      "scores": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 2,
+        "9": 10,
+        "10": 199
+      }
+    }
+  },
+  "unsupportedExtensions": [
+    "Files with .js extension are not analyzed.",
+    "Files with .kt extension are not analyzed.",
+    "Files with .py extension are not analyzed.",
+    "Files with .ts extension are not analyzed.",
+    "Files with .tsx extension are not analyzed."
+  ],
+  "continuedRequestsSucceeded": true,
+  "unchangedSourceAndPomFiles": 2220,
+  "execute": false,
+  "sourceFingerprint": "9132865ed5d0d3acfc68a3abff83f9bac8834ae695e4b593f050b8595c56db21",
+  "configurationFingerprint": "9eede6dddcc466fa1342ce7b315a96a097e336eff10f096386f44ce57200c1a0",
+  "families": [
+    {
+      "family": "code",
+      "status": "incomplete",
+      "entityCount": 698,
+      "findingCount": 24,
+      "scores": [
+        {
+          "score": null,
+          "count": 698
+        }
+      ],
+      "staticComplexityScores": [
+        {
+          "score": null,
+          "count": 256
+        },
+        {
+          "score": 8,
+          "count": 4
+        },
+        {
+          "score": 9,
+          "count": 21
+        },
+        {
+          "score": 10,
+          "count": 417
+        }
+      ]
+    },
+    {
+      "family": "dependencies",
+      "status": "incomplete",
+      "entityCount": 1479,
+      "findingCount": 287,
+      "scores": [
+        {
+          "score": null,
+          "count": 1479
+        }
+      ],
+      "staticComplexityScores": []
+    },
+    {
+      "family": "duplication",
+      "status": "incomplete",
+      "entityCount": 1479,
+      "findingCount": 295,
+      "scores": [
+        {
+          "score": null,
+          "count": 1479
+        }
+      ],
+      "staticComplexityScores": []
+    },
+    {
+      "family": "tests",
+      "status": "incomplete",
+      "entityCount": 562,
+      "findingCount": 232,
+      "scores": [
+        {
+          "score": null,
+          "count": 562
+        }
+      ],
+      "staticComplexityScores": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "coverage.incomplete",
+      "count": 1
+    },
+    {
+      "code": "dependencies.incomplete",
+      "count": 1
+    },
+    {
+      "code": "java.context_unverified",
+      "count": 13
+    },
+    {
+      "code": "java.unmodeled_executable",
+      "count": 391
+    },
+    {
+      "code": "java.unresolved_call",
+      "count": 75475
+    },
+    {
+      "code": "java.unresolved_field",
+      "count": 5646
+    },
+    {
+      "code": "java.unresolved_signature",
+      "count": 2182
+    },
+    {
+      "code": "java.unresolved_type",
+      "count": 6292
+    },
+    {
+      "code": "tests.incomplete",
+      "count": 1
+    },
+    {
+      "code": "unsupported_language",
+      "count": 5
+    }
+  ]
+}

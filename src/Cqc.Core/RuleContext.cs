@@ -25,7 +25,10 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
         var orderedDiagnostics = assessment.Diagnostics.Concat(failures).Distinct()
             .OrderBy(d => d.File, StringComparer.Ordinal).ThenBy(d => d.Code, StringComparer.Ordinal)
             .ThenBy(d => d.Message, StringComparer.Ordinal).ToArray();
-        return new(assessment.Family, Status(report.Entities, failures.Length != 0), report.Entities, report.Findings, orderedDiagnostics);
+        var selected = Snapshot.SelectedFiles.ToHashSet(StringComparer.Ordinal);
+        var applicable = assessment.Types.Select(type => type.Location.File).ToHashSet(StringComparer.Ordinal);
+        var missingSyntax = Facts.SyntaxGaps.Any(g => selected.Contains(g.File) && (g.UnknownEntities || applicable.Contains(g.File)));
+        return new(assessment.Family, Status(report.Entities, failures.Length != 0 || missingSyntax), report.Entities, report.Findings, orderedDiagnostics);
     }
 
     private static string Status(EntityScore[] entities, bool failed)

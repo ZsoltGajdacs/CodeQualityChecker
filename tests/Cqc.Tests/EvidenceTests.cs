@@ -13,7 +13,7 @@ public sealed class EvidenceTests
     [InlineData(0, 0, 2, 1)]
     public void InvalidCountersAreRejectedAtBoundary(int branches, int totalBranches, int lines, int totalLines)
     {
-        var evidence = new CoverageEvidence("1", "source", "config", true, new(), [new("method", branches, totalBranches, lines, totalLines)]);
+        var evidence = new CoverageEvidence("2", "source", "config", true, new(), [new("method", branches, totalBranches, lines, totalLines)]);
         Assert.Throws<ArgumentException>(() => EvidenceStore.Read(System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json)));
     }
 
@@ -21,7 +21,7 @@ public sealed class EvidenceTests
     public void DuplicateCoverageIdentitiesAreRejected()
     {
         var entry = new MethodCoverage("method", 1, 2, 2, 3);
-        var evidence = new CoverageEvidence("1", "source", "config", true, new(), [entry, entry]);
+        var evidence = new CoverageEvidence("2", "source", "config", true, new(), [entry, entry]);
         Assert.Throws<ArgumentException>(() => EvidenceStore.Read(System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json)));
     }
 

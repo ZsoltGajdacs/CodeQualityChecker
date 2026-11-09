@@ -88,7 +88,7 @@ def structured(response):
 
 
 def retrieve_full(session, summary):
-    assert summary['schemaVersion'] == '2', summary
+    assert summary['schemaVersion'] == '3', summary
     chunks = []
     cursor = None
     while True:
@@ -123,7 +123,26 @@ def verify_languages(result):
 def verify_standard_modules(result):
     dependencies = next(family for family in result['results'] if family['family'] == 'dependencies')
     classes = [entity for entity in dependencies['entities'] if entity['kind'] == 'class']
-    assert classes and all(entity['status'] == 'complete' for entity in classes), dependencies
+    assert classes, dependencies
+    verify_unverified_java_contexts(classes)
+    verify_platform_symbols(result)
+    verify_static_assessments(result)
+
+
+def verify_unverified_java_contexts(classes):
+    java = [entity for entity in classes if entity['entityId'].startswith('java:')]
+    assert java and all('context.unverified' in entity['blockers'] for entity in java), classes
+
+
+def verify_static_assessments(result):
+    production = next(family for family in result['results'] if family['family'] == 'code')
+    assert production['entities'], production
+    assert all(e['staticComplexity']['status'] == 'complete' for e in production['entities']), production
+
+
+def verify_platform_symbols(result):
+    unresolved = ('java.unresolved_type', 'java.unresolved_call')
+    assert not any(d['code'] in unresolved for d in result['diagnostics']), result
 
 
 def verify_diagnostics(result):

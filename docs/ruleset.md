@@ -1,4 +1,4 @@
-# Ruleset 1
+# Ruleset 2
 
 **10 is the desired score.** Each distinct finding below deducts one point. Scores are `max(0, 10 - deductions)`, separately for every applicable family and class/file. Class scores include all partial declarations; file scores use the deduplicated union of findings located in that file. Scores never average healthy methods against problematic methods. Every deduction retains its locations and advice, including after a score reaches zero.
 
@@ -55,3 +55,11 @@ Component patterns match qualified type names. Plain patterns match an exact nam
 An allowed list constrains only the named source component; `"*"` permits any target. Explicit forbidden edges still apply. Self-component edges are permitted. Policy names must refer to declared components. Invalid settings and unknown configuration fields are rejected. The effective configuration has a stable fingerprint in every analysis response.
 
 Default exclusions include Git, Backlog/Serena state, `.cqc`, build output (`bin`, `obj`, `target`, `dist`, `TestResults`), `node_modules`, and `vendor`. Git-ignored files, symlinks, common generated C# filenames, and files with an auto-generated/`@Generated` marker in the first 12 lines are not analyzed. Unsupported languages and unsupported execution integrations are reported explicitly.
+
+## Independent evidence requirements
+
+`staticComplexity` is a separate production class/file assessment: `max(0, 10 - distinct code.complexity deductions)`. It shares finding IDs with the combined production assessment and does not double-count findings. It requires complete syntax/executable-body extraction. Combined production scoring additionally requires an unambiguous method identity, verified resolution context and matching coverage for every production method; call resolution is not required.
+
+Duplication requires complete structural extraction across the language comparison universe. Semantic resolution failures alone do not block it, but missing parsed files and unmodeled bodies do. Tests require resolved identity, assertion/helper calls and a verified resolution context. Dependencies require complete verified reachable module contexts; unrelated module failures do not block healthy contexts. Blockers explain incomplete assessments explicitly. A selected file that cannot be parsed also makes the family status incomplete, even when no entity could be extracted from that file.
+
+Java symbol IDs now include module/source-set context. Component patterns still match qualified language/type names, not context IDs. Report envelopes use schema 3; worker/core facts and coverage use schema 2.

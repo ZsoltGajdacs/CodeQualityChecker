@@ -26,25 +26,10 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
         if (trees.Length == 0) return new([], [], [], diagnostics.ToArray(), diagnostics.Count == 0);
 
         var references = CachedReferences.Read(snapshot, diagnostics);
-        var imports = sources.Imports;
-        var compilationTrees = imports is null ? trees : trees.Append(imports);
-        var compilation = CSharpCompilation.Create("CqcSourceAnalysis", compilationTrees, references,
-            new CSharpCompilationOptions(trees.Any(x => x.GetRoot(cancellationToken).DescendantNodes().OfType<GlobalStatementSyntax>().Any()) ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
-        var errors = compilation.GetDiagnostics(cancellationToken).Where(x => x.Severity == DiagnosticSeverity.Error).ToArray();
-        foreach (var error in errors)
-        {
-            var file = error.Location.IsInSource ? error.Location.SourceTree?.FilePath : null;
-            diagnostics.Add(new(error.Id, error.GetMessage(System.Globalization.CultureInfo.InvariantCulture), file, Language));
-        }
-
-        var collector = new FactCollector();
-        for (var index = 0; index < trees.Length; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var tree = trees[index];
-            collector.Collect(tree, compilation.GetSemanticModel(tree), cancellationToken,
-                sources.Options[index] with { Complete = sources.Consistent && sources.Options[index].Complete });
-        }
+        var verifiedContext = sources.Consistent && sources.Options.All(x => x.Complete) && diagnostics.Count == 0;
+        var compilation = Compilation(sources, references, cancellationToken);
+        diagnostics.AddRange(CompilationDiagnostics(compilation, cancellationToken));
+        var collector = Collect(sources, compilation, verifiedContext, cancellationToken);
         var types = collector.Types;
         var methods = collector.Methods;
         var dependencies = collector.Dependencies;
@@ -52,11 +37,45 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
         var internalDependencies = dependencies.Where(x => knownTypes.Contains(x.To))
             .DistinctBy(x => (x.From, x.To, x.Location.File, x.Location.StartLine)).OrderBy(x => x.From, StringComparer.Ordinal)
             .ThenBy(x => x.To, StringComparer.Ordinal).ThenBy(x => x.Location.File, StringComparer.Ordinal).ThenBy(x => x.Location.StartLine).ToArray();
+        var gaps = SourceEvidence.Gaps(sources, cancellationToken);
+        var semanticComplete = diagnostics.Count == 0;
+        diagnostics.AddRange(gaps.Where(gap => gap.Code == "csharp.unmodeled_executable")
+            .Select(gap => new Diagnostic(gap.Code, "Executable initializers, primary constructors, or top-level statements are not modeled; structural scores remain incomplete.", gap.File, Language)));
         return new(types.OrderBy(x => x.Location.File, StringComparer.Ordinal).ThenBy(x => x.Location.StartLine).ToArray(),
             methods.OrderBy(x => x.Location.File, StringComparer.Ordinal).ThenBy(x => x.Location.StartLine).ToArray(),
-            internalDependencies, diagnostics.ToArray(), diagnostics.Count == 0);
+            internalDependencies, diagnostics.ToArray(), semanticComplete)
+        {
+            Contexts = [new(SourceEvidence.ContextId, ".", "compilation", [], verifiedContext,
+                verifiedContext ? [] : ["context.unverified"])],
+            SyntaxGaps = gaps
+        };
     }
 
+    private static IEnumerable<Diagnostic> CompilationDiagnostics(CSharpCompilation compilation, CancellationToken token) =>
+        compilation.GetDiagnostics(token).Where(x => x.Severity == DiagnosticSeverity.Error).Select(error =>
+            new Diagnostic(error.Id, error.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+                error.Location.IsInSource ? error.Location.SourceTree?.FilePath : null, "csharp"));
+
+    private static FactCollector Collect(ParsedSources sources, CSharpCompilation compilation, bool verifiedContext, CancellationToken token)
+    {
+        var collector = new FactCollector();
+        for (var index = 0; index < sources.Trees.Length; index++)
+        {
+            token.ThrowIfCancellationRequested();
+            var tree = sources.Trees[index];
+            collector.Collect(tree, new(compilation.GetSemanticModel(tree), token,
+                sources.Options[index] with { Complete = sources.Consistent && sources.Options[index].Complete }, verifiedContext));
+        }
+        return collector;
+    }
+
+    private static CSharpCompilation Compilation(ParsedSources sources, MetadataReference[] references, CancellationToken token)
+    {
+        var trees = sources.Imports is null ? sources.Trees : sources.Trees.Append(sources.Imports);
+        var topLevel = sources.Trees.Any(tree => tree.GetRoot(token).DescendantNodes().OfType<GlobalStatementSyntax>().Any());
+        return CSharpCompilation.Create("CqcSourceAnalysis", trees, references,
+            new CSharpCompilationOptions(topLevel ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+    }
 }
 
 internal static class SymbolNames

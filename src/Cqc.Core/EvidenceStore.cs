@@ -8,6 +8,7 @@ public static class EvidenceStore
     {
         var evidence = JsonSerializer.Deserialize<CoverageEvidence>(json, Wire.Json)
             ?? throw new ArgumentException("Coverage evidence must be an object.");
+        if (evidence.SchemaVersion != Wire.SchemaVersion) throw new ArgumentException("Coverage evidence schema must be 2. Refresh evidence with explicit execution.");
         if (evidence.Methods is null || evidence.ToolVersions is null) throw new ArgumentException("Coverage methods and tool versions are required.");
         if (evidence.Methods.Any(m => !Valid(m))) throw new ArgumentException("Invalid coverage counters or method identity.");
         if (evidence.Methods.DistinctBy(m => m.MethodId).Count() != evidence.Methods.Length)

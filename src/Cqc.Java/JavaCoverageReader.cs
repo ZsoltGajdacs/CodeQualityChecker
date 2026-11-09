@@ -21,12 +21,18 @@ public static class JavaCoverageReader
         var member = name == "<init>" ? ".ctor" : name;
         var parameters = JvmDescriptor.Parameters((string?)method.Attribute("desc") ?? "");
         var signature = typeId + "." + member + "(" + string.Join(',', parameters) + ")";
-        var fact = facts.SingleOrDefault(m => JavaMatches(m, signature));
+        var fact = UniqueMatch(facts, signature);
         if (fact is null && name == "<init>") fact = InnerConstructor(typeId, parameters, facts);
         if (fact is null) return null;
         var branch = Counter(method, "BRANCH");
         var line = Counter(method, "LINE");
         return new(fact.Id, branch.Covered, branch.Total, line.Covered, line.Total);
+    }
+
+    private static MethodFact? UniqueMatch(MethodFact[] facts, string signature)
+    {
+        var matches = facts.Where(fact => JavaMatches(fact, signature)).Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
     }
 
     private static bool JavaMatches(MethodFact fact, string signature) => fact.Id == signature || fact.Id == "java:" + signature
@@ -38,7 +44,7 @@ public static class JavaCoverageReader
         if (separator < 0 || parameters.Length == 0) return null;
         if (parameters[0] != typeId[..separator]) return null;
         var signature = typeId + "..ctor(" + string.Join(',', parameters.Skip(1)) + ")";
-        return facts.SingleOrDefault(m => JavaMatches(m, signature));
+        return UniqueMatch(facts, signature);
     }
 
     private static (int Covered, int Total) Counter(XElement method, string name)

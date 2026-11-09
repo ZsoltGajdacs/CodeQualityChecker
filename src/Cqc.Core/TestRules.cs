@@ -4,7 +4,8 @@ internal static class TestRules
 {
     private sealed record Assessment(MethodFact Test, int Lines, int Assertions, int Branches)
     {
-        public bool Complete { get; init; }
+        public string[] Blockers { get; init; } = [];
+        public bool Complete => Blockers.Length == 0;
     }
 
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config)
@@ -16,7 +17,7 @@ internal static class TestRules
         var assessments = tests.Select(test =>
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            return Assess(test, context.Methods, lookup);
+            return Assess(test, context, lookup);
         }).ToArray();
         var incomplete = assessments.Where(a => !a.Complete).Select(a => a.Test.TypeId).ToHashSet(StringComparer.Ordinal);
         var metrics = assessments.GroupBy(a => a.Test.TypeId, StringComparer.Ordinal)
@@ -24,18 +25,21 @@ internal static class TestRules
         var diagnostics = incomplete.Count == 0 ? Array.Empty<Diagnostic>() :
             [new Diagnostic("tests.incomplete", "Some test/fixture/helper facts are unresolved. Resolve diagnostics before scoring affected test classes.")];
         return context.Finish(new() { Family = "tests", Types = context.TypesFor(tests), Findings = assessments.SelectMany(a => Findings(a, config)),
-            Complete = id => !incomplete.Contains(id), Metrics = id => metrics[id], Diagnostics = diagnostics });
+            Blockers = id => assessments.Where(a => a.Test.TypeId == id).SelectMany(a => a.Blockers)
+                .Concat(context.Facts.Types.Where(t => t.Id == id).SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), Metrics = id => metrics[id], Diagnostics = diagnostics });
     }
 
     private static bool IsTestPath(string file) => file.Split('/').Any(part => part.Equals("test", StringComparison.OrdinalIgnoreCase)
         || part.Equals("tests", StringComparison.OrdinalIgnoreCase) || part.Equals("spec", StringComparison.OrdinalIgnoreCase) || part.EndsWith(".Tests", StringComparison.Ordinal));
 
-    private static Assessment Assess(MethodFact test, MethodFact[] methods, Dictionary<string, MethodFact> lookup)
+    private static Assessment Assess(MethodFact test, RuleContext context, Dictionary<string, MethodFact> lookup)
     {
-        var fixtures = methods.Where(m => m.TypeId == test.TypeId && m.IsFixture);
+        var fixtures = context.Methods.Where(m => m.TypeId == test.TypeId && m.IsFixture);
         var closure = Helpers(test, fixtures, lookup);
         return new(test, closure.Sum(m => m.ExecutableLines), closure.Sum(m => m.Assertions),
-            closure.Sum(m => Math.Max(0, m.Complexity - 1))) { Complete = closure.All(m => m.Complete) };
+            closure.Sum(m => Math.Max(0, m.Complexity - 1))) { Blockers = closure.SelectMany(AssessmentEvidence.Test)
+                .Concat(context.Facts.Types.Where(type => closure.Any(method => method.TypeId == type.Id))
+                    .SelectMany(type => AssessmentEvidence.Syntax(type, []))).Distinct().Order(StringComparer.Ordinal).ToArray() };
     }
 
     private static IEnumerable<Finding> Findings(Assessment assessment, QualityConfig config)

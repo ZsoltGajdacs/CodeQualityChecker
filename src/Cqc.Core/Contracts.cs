@@ -7,7 +7,7 @@ namespace Cqc.Core;
 
 public static class Wire
 {
-    public const string SchemaVersion = "1";
+    public const string SchemaVersion = "2";
     public const string Target = "10 is the desired score.";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -25,12 +25,28 @@ public sealed record MethodFact(
     string Id, string TypeId, string Language, Location Location, int Complexity,
     int ExecutableLines, bool IsTest, bool IsFixture, bool IsParameterized,
     int Assertions, string[] Calls, string[] Fingerprints, int NodeCount,
-    bool Complete = true, string? CoverageSignature = null);
-public sealed record TypeFact(string Id, string Language, Location Location, bool IsAbstract, bool IsTest, bool Complete = true);
+    bool Complete = true, string? CoverageSignature = null)
+{
+    public string? ContextId { get; init; }
+    public string? QualifiedName { get; init; }
+    public EvidenceState? Evidence { get; init; }
+}
+public sealed record TypeFact(string Id, string Language, Location Location, bool IsAbstract)
+{
+    public bool IsTest { get; init; }
+    public bool Complete { get; init; } = true;
+    public string? ContextId { get; init; }
+    public string? QualifiedName { get; init; }
+    public EvidenceState? Evidence { get; init; }
+}
 public sealed record DependencyFact(string From, string To, Location Location);
 public sealed record AnalysisFacts(
     TypeFact[] Types, MethodFact[] Methods, DependencyFact[] Dependencies,
-    Diagnostic[] Diagnostics, bool SemanticComplete, string SchemaVersion = Wire.SchemaVersion);
+    Diagnostic[] Diagnostics, bool SemanticComplete, string SchemaVersion = Wire.SchemaVersion)
+{
+    public AnalysisContext[] Contexts { get; init; } = [];
+    public SyntaxGap[] SyntaxGaps { get; init; } = [];
+}
 public sealed record ProjectModule(string Language, string Path, string Integration, bool Supported);
 public sealed record ProjectSnapshot(
     string Root, string[] Files, string[] SelectedFiles, ProjectModule[] Modules,
@@ -65,7 +81,11 @@ public sealed record QualityConfig
 public sealed record Finding(string Id, string Rule, string Message, string Advice,
     string[] EntityIds, Location[] Locations, int Deduction = 1);
 public sealed record EntityScore(string EntityId, string Kind, string File, string Status,
-    double? Score, string[] FindingIds, SortedDictionary<string, double?> Metrics);
+    double? Score, string[] FindingIds, SortedDictionary<string, double?> Metrics)
+{
+    public string[] Blockers { get; init; } = [];
+    public AssessmentResult? StaticComplexity { get; init; }
+}
 public sealed record FamilyResult(string Family, string Status, EntityScore[] Entities, Finding[] Findings, Diagnostic[] Diagnostics);
 public sealed record AnalysisResponse(string SchemaVersion, string RulesetVersion, string Message,
     string SourceFingerprint, string ConfigurationFingerprint, string Scope,

@@ -9,12 +9,32 @@ namespace Cqc.Tests;
 public sealed class ReportDeliveryTests
 {
     [Fact]
+    public async Task StaticAssessmentAndBlockersSurviveSummaryPagesAndRawReconstruction()
+    {
+        using var store = new ReportStore(TimeProvider.System);
+        var original = Report(1);
+        var family = original.Results.Single();
+        var entity = family.Entities.Single() with { Score = null, Status = "incomplete", Blockers = ["coverage.missing"],
+            StaticComplexity = new("complete", 9, ["finding"], []) };
+        original = original with { Results = [family with { Entities = [entity] }] };
+        var summary = await store.PublishAsync(original, CancellationToken.None);
+        Assert.Equal(9, Assert.Single(summary.Families.Single().StaticComplexityScores).Score);
+        Assert.Null(Assert.Single(summary.Families.Single().Scores).Score);
+        var page = await store.ReadPageAsync(new() { ReportId = summary.ReportId, Section = "entities", Family = "code" }, CancellationToken.None);
+        var item = Assert.Single(page.Items);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("score").ValueKind);
+        Assert.Equal("coverage.missing", item.GetProperty("blockers")[0].GetString());
+        Assert.Equal(9, item.GetProperty("staticComplexity").GetProperty("score").GetDouble());
+        Assert.Equal(JsonSerializer.Serialize(original, CompactJson.Options), await Raw(store, summary.ReportId));
+    }
+
+    [Fact]
     public async Task SummaryAndPagesPreserveScoresFiltersAndEveryRecord()
     {
         using var store = new ReportStore(TimeProvider.System);
         var original = Report(123);
         var summary = await store.PublishAsync(original, CancellationToken.None);
-        Assert.Equal("2", summary.SchemaVersion);
+        Assert.Equal("3", summary.SchemaVersion);
         Assert.Equal(123, summary.Families.Single().EntityCount);
         Assert.Contains(summary.Families.Single().Scores, s => s.Score is null && s.Count > 0);
         Assert.DoesNotContain("results", JsonSerializer.Serialize(summary, CompactJson.Options));

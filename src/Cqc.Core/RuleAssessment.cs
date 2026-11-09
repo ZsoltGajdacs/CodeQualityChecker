@@ -15,7 +15,8 @@ internal sealed record FamilyAssessment
     public required string Family { get; init; }
     public required IEnumerable<TypeFact> Types { get; init; }
     public required IEnumerable<Finding> Findings { get; init; }
-    public Func<string, bool> Complete { get; init; } = _ => true;
+    public Func<string, string[]> Blockers { get; init; } = _ => [];
+    public Func<string, string[]>? StaticBlockers { get; init; }
     public Func<string, SortedDictionary<string, double?>> Metrics { get; init; } = _ => RuleContext.Metrics();
     public IEnumerable<Diagnostic> Diagnostics { get; init; } = [];
 }
@@ -26,6 +27,6 @@ internal sealed record EntityAssessment
     public required string Kind { get; init; }
     public required string File { get; init; }
     public required Finding[] Findings { get; init; }
-    public required bool Complete { get; init; }
+    public required string[] TypeIds { get; init; }
     public required SortedDictionary<string, double?> Metrics { get; init; }
 }

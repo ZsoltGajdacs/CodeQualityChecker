@@ -10,31 +10,33 @@ internal sealed class FactCollector
     public List<MethodFact> Methods { get; } = [];
     public List<DependencyFact> Dependencies { get; } = [];
 
-    public void Collect(SyntaxTree tree, SemanticModel model, CancellationToken token, SourceFileOptions options)
+    public void Collect(SyntaxTree tree, SourceAnalysisContext context)
     {
-        var context = new TreeContext(model, token, options);
-        foreach (var declaration in tree.GetRoot(token).DescendantNodes().OfType<BaseTypeDeclarationSyntax>())
+        foreach (var declaration in tree.GetRoot(context.Token).DescendantNodes().OfType<BaseTypeDeclarationSyntax>())
         {
-            if (model.GetDeclaredSymbol(declaration, token) is INamedTypeSymbol symbol)
+            if (context.Model.GetDeclaredSymbol(declaration, context.Token) is INamedTypeSymbol symbol)
                 CollectType(declaration, symbol, context);
         }
     }
 
-    private void CollectType(BaseTypeDeclarationSyntax declaration, INamedTypeSymbol symbol, TreeContext context)
+    private void CollectType(BaseTypeDeclarationSyntax declaration, INamedTypeSymbol symbol, SourceAnalysisContext context)
     {
         var isTest = context.Options.TestProject || TestRecognition.IsTestType(symbol);
-        var complete = context.Options.Complete && !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
-        Types.Add(new(SymbolNames.Type(symbol), "csharp", SourceLocation.Of(declaration), symbol.IsAbstract || symbol.TypeKind == TypeKind.Interface, isTest, complete));
+        var evidence = SourceEvidence.Type(declaration, context);
+        var complete = evidence.Syntax && evidence.Dependencies && evidence.VerifiedContext;
+        Types.Add(new(SymbolNames.Type(symbol), "csharp", SourceLocation.Of(declaration), symbol.IsAbstract || symbol.TypeKind == TypeKind.Interface)
+        { IsTest = isTest, Complete = complete, ContextId = SourceEvidence.ContextId, QualifiedName = SymbolNames.Type(symbol), Evidence = evidence });
         foreach (var method in MethodDeclarations.InType(declaration))
         {
             if (MethodDeclarations.Symbol(method, context.Model, context.Token) is { } methodSymbol)
             {
-                var fact = MethodFacts.Create(method, methodSymbol, new(context.Model, isTest, context.Token));
-                Methods.Add(fact with { Complete = fact.Complete && complete });
+                Methods.Add(MethodFacts.Create(method, methodSymbol, new(context.Model, isTest, context.Token,
+                    context.Options.Complete, context.VerifiedContext)));
             }
         }
         Dependencies.AddRange(TypeDependencies.Read(declaration, symbol, context.Model, context.Token));
     }
 
-    private sealed record TreeContext(SemanticModel Model, CancellationToken Token, SourceFileOptions Options);
 }
+
+internal sealed record SourceAnalysisContext(SemanticModel Model, CancellationToken Token, SourceFileOptions Options, bool VerifiedContext);

@@ -50,7 +50,7 @@ Source-only analysis never invokes project builds, tests, restores, or MSBuild e
 
 Optional inputs are `configPath`, `reportPath`, and `timeoutSeconds` (1–3600). `reportPath` reads existing CQC coverage evidence; generated evidence is written to `.cqc/coverage.json`. Raw JaCoCo/OpenCover XML alone cannot establish source-matched provenance.
 
-Every inspection and check returns a compact schema-v2 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content is a short explanation, not a second copy of the report. Diagnostic counts show at most 20 code groups and identify remaining groups. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
+Every inspection and check returns a compact schema-v3 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content is a short explanation, not a second copy of the report. Diagnostic counts show at most 20 code groups and identify remaining groups. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
 
 Retrieve details without rerunning analysis:
 
@@ -82,3 +82,9 @@ dotnet test CodeQualityChecker.sln
 The build requires .NET SDK 10.0.403, Maven, and the pinned JBR JDK described in [distribution](docs/distribution.md). Package generation runs a real MCP smoke test with host Java/.NET runtime discovery disabled. Package artifacts remain under ignored `dist/`.
 
 See [ruleset and configuration](docs/ruleset.md), [architecture and extension contract](docs/architecture.md), [evidence and execution](docs/evidence.md), and [third-party attribution](THIRD_PARTY.md).
+
+## Evidence-specific assessments (ruleset 2)
+
+Production entities retain their combined complexity/CRAP score and expose a separate `staticComplexity` assessment. The static score deducts once per complexity finding and requires complete syntax, without requiring coverage or call resolution. A numeric static score never establishes a combined production score. Entity pages expose `blockers` for the primary score and status, score, finding IDs and blockers for `staticComplexity`; summaries include separate static score distributions.
+
+Java schema-2 facts identify symbols by Maven module and main/test source set. Explicit execution collects evaluated module contexts, preserves dependency order, and caches hashed resolution artifacts under `.cqc/java-contexts.json`. Source-only analysis can reuse verified matching contexts; without them semantic-dependent scores remain incomplete while valid syntax assessments remain available. Different dependency versions in unrelated modules are permitted. Legacy classpath and coverage evidence require refresh; server and worker must be upgraded together. Builds can still leave unsupported constructs or unresolved generated methods.

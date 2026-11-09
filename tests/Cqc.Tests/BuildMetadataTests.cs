@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.IO.Compression;
 using Cqc.Core;
 using Cqc.Java;
 using Xunit;
@@ -47,18 +49,27 @@ public sealed class BuildMetadataTests
     }
 
     [Fact]
-    public void MavenClasspathPersistsScratchJarsAndOmitsTemporaryDirectories()
+    public async Task MavenContextCacheRetainsJarsAndCompiledDirectoryContents()
     {
         using var fixture = new ScratchProject();
         using var scratch = new ScratchProject();
         scratch.Write("module/target/dependency.jar", "jar content");
-        Directory.CreateDirectory(Path.Combine(scratch.Root, "module/target/classes"));
+        scratch.Write("module/target/classes/Generated.class", "compiled content");
+        var classes = Path.Combine(scratch.Root, "module/target/classes");
         var jar = Path.Combine(scratch.Root, "module/target/dependency.jar");
-        var directory = Path.Combine(scratch.Root, "module/target/classes");
-        var cache = new ArtifactCache(new ProjectSnapshot(fixture.Root, [], [], [], "source", []));
-        var retained = Assert.Single(Cqc.Java.JavaExecution.PersistClasspath([jar, directory], scratch.Root, cache));
-        Assert.StartsWith(Path.Combine(fixture.Root, ".cqc", "references"), retained);
-        Assert.Equal("jar content", File.ReadAllText(retained));
+        var module = new MavenMetadata { Pom = Path.Combine(scratch.Root, "module/pom.xml"),
+            BuildDirectory = Path.Combine(scratch.Root, "module/target"), MainOutput = classes,
+            TestOutput = Path.Combine(scratch.Root, "module/target/test-classes"),
+            SourceSets = [new("main", [], [classes, jar])] };
+        await new JavaContextCache(new(fixture.Root, [], [], [], "source", []), scratch.Root)
+            .PublishAsync([module], CancellationToken.None);
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        var retained = manifest.RootElement.GetProperty("contexts")[0].GetProperty("classpath").EnumerateArray().ToArray();
+        var compiled = retained[0].GetProperty("path").GetString()!;
+        using var archive = ZipFile.OpenRead(compiled);
+        Assert.NotNull(archive.GetEntry("Generated.class"));
+        Assert.Equal("jar content", await File.ReadAllTextAsync(retained[1].GetProperty("path").GetString()!));
+        Assert.All(retained, entry => Assert.StartsWith(Path.Combine(fixture.Root, ".cqc/references"), entry.GetProperty("path").GetString()));
     }
 
     [Fact]
@@ -112,7 +123,7 @@ public sealed class BuildMetadataTests
         using var fixture = new ScratchProject();
         using var scratch = new ScratchProject();
         fixture.Write("pom.xml", "<project />");
-        fixture.Write("mvnw", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo wrapper-version; else echo used > wrapper-ran; mkdir -p target/site/jacoco; touch target/cqc-classpath.txt target/site/jacoco/jacoco.xml; fi\n");
+        fixture.Write("mvnw", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo wrapper-version; else echo used > wrapper-ran; mkdir -p target/site/jacoco; touch target/site/jacoco/jacoco.xml; " + MetadataScript() + "fi\n");
         File.SetUnixFileMode(Path.Combine(fixture.Root, "mvnw"), UnixFileMode.UserRead | UnixFileMode.UserExecute);
         SnapshotCopy.Copy(fixture.Root, scratch.Root);
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("pom.xml")], "fingerprint", []);
@@ -133,14 +144,13 @@ public sealed class BuildMetadataTests
     }
 
     [Fact]
-    public async Task MissingJacocoReportIsReportedInsteadOfAccepted()
+    public async Task PomOnlyModulesDoNotReportMissingCoverage()
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
-        var snapshot = WrapperProject(fixture, "#!/bin/sh\nmkdir -p target\ntouch target/cqc-classpath.txt\n");
+        var snapshot = WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript());
         var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
-        Assert.Contains(build.Diagnostics, d => d.Code == "java.coverage_missing");
-        Assert.DoesNotContain(build.Diagnostics, d => d.Code == "java.classpath_missing");
+        Assert.DoesNotContain(build.Diagnostics, d => d.Code is "java.coverage_missing" or "java.classpath_missing");
     }
 
     [Fact]
@@ -151,15 +161,15 @@ public sealed class BuildMetadataTests
         fixture.Write("one/pom.xml", "<project />");
         fixture.Write("one/mvnw", "#!/bin/sh\necho ok\n");
         fixture.Write("two/pom.xml", "<project />");
-        fixture.Write("two/mvnw", "#!/bin/sh\nmkdir -p target/site/jacoco\ntouch target/cqc-classpath.txt target/site/jacoco/jacoco.xml\n");
+        fixture.Write("two/mvnw", "#!/bin/sh\nmkdir -p target/site/jacoco\ntouch target/site/jacoco/jacoco.xml\n" + MetadataScript());
         foreach (var path in new[] { "one/mvnw", "two/mvnw" }) File.SetUnixFileMode(Path.Combine(fixture.Root, path), UnixFileMode.UserRead | UnixFileMode.UserExecute);
         fixture.Write(".cqc/java-classpath.txt.source", "fingerprint");
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("one/pom.xml"), Maven("two/pom.xml")], "fingerprint", []);
         var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
         Assert.Single(build.Reports);
         Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing" && d.File == "one/pom.xml");
-        Assert.Contains(build.Diagnostics, d => d.Code == "java.coverage_missing" && d.File == "one/pom.xml");
-        Assert.NotEqual("fingerprint", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-classpath.txt.source")));
+        Assert.DoesNotContain(build.Diagnostics, d => d.Code == "java.coverage_missing");
+        Assert.True(File.Exists(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
     }
 
     [Fact]
@@ -167,11 +177,11 @@ public sealed class BuildMetadataTests
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
-        var snapshot = WrapperProject(fixture, "#!/bin/sh\nmkdir -p target/site/jacoco\necho /missing-cqc-fixture/dependency.jar > target/cqc-classpath.txt\ntouch target/site/jacoco/jacoco.xml\n");
+        var snapshot = WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript("/missing-cqc-fixture/dependency.jar"));
         fixture.Write(".cqc/java-classpath.txt.source", "fingerprint");
         var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
         Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing" && d.Message.Contains("dependency.jar"));
-        Assert.NotEqual("fingerprint", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-classpath.txt.source")));
+        Assert.Contains("0000000000000000000000000000000000000000000000000000000000000000", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
     }
 
     [Fact]
@@ -185,9 +195,9 @@ public sealed class BuildMetadataTests
         var request = new AnalysisRequest { ProjectRoot = fixture.Root, Execute = true, TimeoutSeconds = 60 };
         var first = await service.AnalyzeAsync(request, ["dependencies"], CancellationToken.None);
         Assert.Contains(first.Diagnostics, d => d.Code == "java.classpath_missing");
-        Assert.Contains(first.Diagnostics, d => d.Code == "java.stale_classpath");
+        Assert.Contains(first.Diagnostics, d => d.Code == "java.context_unverified");
         var replay = await service.AnalyzeAsync(request with { Execute = false }, ["dependencies"], CancellationToken.None);
-        Assert.Contains(replay.Diagnostics, d => d.Code == "java.stale_classpath");
+        Assert.Contains(replay.Diagnostics, d => d.Code == "java.context_unverified");
     }
 
     [Fact]
@@ -270,6 +280,13 @@ public sealed class BuildMetadataTests
         Assert.Equal(method.Id, Assert.Single(execution.ReadCoverage(single, [method])).MethodId);
         Assert.Empty(execution.ReadCoverage(single with { Reports = [report, report] }, [method]));
     }
+
+    private static string MetadataScript(string? missingJar = null) =>
+        "mkdir -p target\ncat > target/cqc-metadata.xml <<EOF\n" +
+        "<project><pom>$PWD/pom.xml</pom><buildDirectory>$PWD/target</buildDirectory>" +
+        "<mainOutput>$PWD/target/classes</mainOutput><testOutput>$PWD/target/test-classes</testOutput>" +
+        "<context sourceSet='main'>" + (missingJar is null ? "" : "<classpath>" + missingJar + "</classpath>") +
+        "</context><context sourceSet='test'/></project>\nEOF\n";
 
     private static ProjectModule Maven(string path) => new("java", path, "maven", true);
 

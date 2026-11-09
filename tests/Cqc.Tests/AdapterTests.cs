@@ -75,8 +75,10 @@ public sealed class AdapterTests
         Assert.Contains(facts.Types, x => x.Id.Contains("Calculator.Nested", StringComparison.Ordinal));
         Assert.Equal(2, facts.Methods.Count(x => x.Id.Contains("Calculator.choose(", StringComparison.Ordinal)));
         Assert.Contains(facts.Methods, x => x.Id.Contains("Calculator.choose(int)", StringComparison.Ordinal) && x.Complexity == 2);
-        Assert.Contains(facts.Dependencies, x => x.From == "demo.Left" && x.To == "demo.Right");
-        Assert.Contains(facts.Dependencies, x => x.From == "demo.Right" && x.To == "demo.Left");
-        Assert.True(facts.SemanticComplete, string.Join("\n", facts.Diagnostics.Select(x => x.Message)));
+        Assert.Contains(facts.Dependencies, x => x.From == "pom.xml#main::demo.Left" && x.To == "pom.xml#main::demo.Right");
+        Assert.Contains(facts.Dependencies, x => x.From == "pom.xml#main::demo.Right" && x.To == "pom.xml#main::demo.Left");
+        Assert.False(facts.SemanticComplete);
+        Assert.Contains(facts.Diagnostics, diagnostic => diagnostic.Code == "java.context_unverified");
+        Assert.All(facts.Methods, method => Assert.True(method.Evidence!.Syntax));
     }
 }

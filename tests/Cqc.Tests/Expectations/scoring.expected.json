@@ -1,33 +1,33 @@
 [
   {
     "family": "code",
-    "entity": "java:scoring.Healthy",
+    "entity": "java:java/pom.xml#main::scoring.Healthy",
     "file": "java/src/main/java/scoring/Healthy.java",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:java:scoring.Healthy.evaluate(int):complexity": 1,
-      "method:java:scoring.Healthy.evaluate(int):coverage": 1,
-      "method:java:scoring.Healthy.evaluate(int):crap": 1
+      "method:java:java/pom.xml#main::scoring.Healthy.evaluate(int):complexity": 1,
+      "method:java:java/pom.xml#main::scoring.Healthy.evaluate(int):coverage": 1,
+      "method:java:java/pom.xml#main::scoring.Healthy.evaluate(int):crap": 1
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.AtComplexity8",
+    "entity": "java:java/pom.xml#main::scoring.AtComplexity8",
     "file": "java/src/main/java/scoring/AtComplexity8.java",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:java:scoring.AtComplexity8.evaluate(int):complexity": 8,
-      "method:java:scoring.AtComplexity8.evaluate(int):coverage": 1,
-      "method:java:scoring.AtComplexity8.evaluate(int):crap": 8
+      "method:java:java/pom.xml#main::scoring.AtComplexity8.evaluate(int):complexity": 8,
+      "method:java:java/pom.xml#main::scoring.AtComplexity8.evaluate(int):coverage": 1,
+      "method:java:java/pom.xml#main::scoring.AtComplexity8.evaluate(int):crap": 8
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.OverComplexity9",
+    "entity": "java:java/pom.xml#main::scoring.OverComplexity9",
     "file": "java/src/main/java/scoring/OverComplexity9.java",
     "score": 9,
     "rules": [
@@ -41,14 +41,14 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.OverComplexity9.evaluate(int):complexity": 9,
-      "method:java:scoring.OverComplexity9.evaluate(int):coverage": 1,
-      "method:java:scoring.OverComplexity9.evaluate(int):crap": 9
+      "method:java:java/pom.xml#main::scoring.OverComplexity9.evaluate(int):complexity": 9,
+      "method:java:java/pom.xml#main::scoring.OverComplexity9.evaluate(int):coverage": 1,
+      "method:java:java/pom.xml#main::scoring.OverComplexity9.evaluate(int):crap": 9
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.AtComplexity10",
+    "entity": "java:java/pom.xml#main::scoring.AtComplexity10",
     "file": "java/src/main/java/scoring/AtComplexity10.java",
     "score": 9,
     "rules": [
@@ -62,14 +62,14 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.AtComplexity10.evaluate(int):complexity": 10,
-      "method:java:scoring.AtComplexity10.evaluate(int):coverage": 1,
-      "method:java:scoring.AtComplexity10.evaluate(int):crap": 10
+      "method:java:java/pom.xml#main::scoring.AtComplexity10.evaluate(int):complexity": 10,
+      "method:java:java/pom.xml#main::scoring.AtComplexity10.evaluate(int):coverage": 1,
+      "method:java:java/pom.xml#main::scoring.AtComplexity10.evaluate(int):crap": 10
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.OverComplexity11",
+    "entity": "java:java/pom.xml#main::scoring.OverComplexity11",
     "file": "java/src/main/java/scoring/OverComplexity11.java",
     "score": 9,
     "rules": [
@@ -83,27 +83,27 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.OverComplexity11.evaluate(int):complexity": 11,
-      "method:java:scoring.OverComplexity11.evaluate(int):coverage": 1,
-      "method:java:scoring.OverComplexity11.evaluate(int):crap": 11
+      "method:java:java/pom.xml#main::scoring.OverComplexity11.evaluate(int):complexity": 11,
+      "method:java:java/pom.xml#main::scoring.OverComplexity11.evaluate(int):coverage": 1,
+      "method:java:java/pom.xml#main::scoring.OverComplexity11.evaluate(int):crap": 11
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.AtRisk30",
+    "entity": "java:java/pom.xml#main::scoring.AtRisk30",
     "file": "java/src/main/java/scoring/AtRisk30.java",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:java:scoring.AtRisk30.evaluate(int):complexity": 5,
-      "method:java:scoring.AtRisk30.evaluate(int):coverage": 0,
-      "method:java:scoring.AtRisk30.evaluate(int):crap": 30
+      "method:java:java/pom.xml#main::scoring.AtRisk30.evaluate(int):complexity": 5,
+      "method:java:java/pom.xml#main::scoring.AtRisk30.evaluate(int):coverage": 0,
+      "method:java:java/pom.xml#main::scoring.AtRisk30.evaluate(int):crap": 30
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.OverRisk42",
+    "entity": "java:java/pom.xml#main::scoring.OverRisk42",
     "file": "java/src/main/java/scoring/OverRisk42.java",
     "score": 9,
     "rules": [
@@ -117,14 +117,14 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.OverRisk42.evaluate(int):complexity": 6,
-      "method:java:scoring.OverRisk42.evaluate(int):coverage": 0,
-      "method:java:scoring.OverRisk42.evaluate(int):crap": 42
+      "method:java:java/pom.xml#main::scoring.OverRisk42.evaluate(int):complexity": 6,
+      "method:java:java/pom.xml#main::scoring.OverRisk42.evaluate(int):coverage": 0,
+      "method:java:java/pom.xml#main::scoring.OverRisk42.evaluate(int):crap": 42
     }
   },
   {
     "family": "code",
-    "entity": "java:scoring.HighRisk156",
+    "entity": "java:java/pom.xml#main::scoring.HighRisk156",
     "file": "java/src/main/java/scoring/HighRisk156.java",
     "score": 8,
     "rules": [
@@ -139,27 +139,27 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.HighRisk156.evaluate(int):complexity": 12,
-      "method:java:scoring.HighRisk156.evaluate(int):coverage": 0,
-      "method:java:scoring.HighRisk156.evaluate(int):crap": 156
+      "method:java:java/pom.xml#main::scoring.HighRisk156.evaluate(int):complexity": 12,
+      "method:java:java/pom.xml#main::scoring.HighRisk156.evaluate(int):coverage": 0,
+      "method:java:java/pom.xml#main::scoring.HighRisk156.evaluate(int):crap": 156
     }
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.AtSize50Tests",
+    "entity": "java:java/pom.xml#test::scoring.tests.AtSize50Tests",
     "file": "java/src/test/java/scoring/tests/AtSize50Tests.java",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():executableLinesWithHelpers": 50,
-      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():assertionsWithHelpers": 1,
-      "method:java:scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():branchCountWithHelpers": 0
+      "method:java:java/pom.xml#test::scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():executableLinesWithHelpers": 50,
+      "method:java:java/pom.xml#test::scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():assertionsWithHelpers": 1,
+      "method:java:java/pom.xml#test::scoring.tests.AtSize50Tests.hasExactly50ExecutableLines():branchCountWithHelpers": 0
     }
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.OverSize51Tests",
+    "entity": "java:java/pom.xml#test::scoring.tests.OverSize51Tests",
     "file": "java/src/test/java/scoring/tests/OverSize51Tests.java",
     "score": 9,
     "rules": [
@@ -173,14 +173,14 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():executableLinesWithHelpers": 51,
-      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():assertionsWithHelpers": 1,
-      "method:java:scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():branchCountWithHelpers": 0
+      "method:java:java/pom.xml#test::scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():executableLinesWithHelpers": 51,
+      "method:java:java/pom.xml#test::scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():assertionsWithHelpers": 1,
+      "method:java:java/pom.xml#test::scoring.tests.OverSize51Tests.hasExactly51ExecutableLines():branchCountWithHelpers": 0
     }
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.BranchingTests",
+    "entity": "java:java/pom.xml#test::scoring.tests.BranchingTests",
     "file": "java/src/test/java/scoring/tests/BranchingTests.java",
     "score": 9,
     "rules": [
@@ -194,14 +194,14 @@
       }
     ],
     "metrics": {
-      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():executableLinesWithHelpers": 5,
-      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():assertionsWithHelpers": 1,
-      "method:java:scoring.tests.BranchingTests.branchesOnTrueVariable():branchCountWithHelpers": 1
+      "method:java:java/pom.xml#test::scoring.tests.BranchingTests.branchesOnTrueVariable():executableLinesWithHelpers": 5,
+      "method:java:java/pom.xml#test::scoring.tests.BranchingTests.branchesOnTrueVariable():assertionsWithHelpers": 1,
+      "method:java:java/pom.xml#test::scoring.tests.BranchingTests.branchesOnTrueVariable():branchCountWithHelpers": 1
     }
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.WeakTests",
+    "entity": "java:java/pom.xml#test::scoring.tests.WeakTests",
     "file": "java/src/test/java/scoring/tests/WeakTests.java",
     "score": 0,
     "rules": [
@@ -283,7 +283,7 @@
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.RollupTests",
+    "entity": "java:java/pom.xml#test::scoring.tests.RollupTests",
     "file": "java/src/test/java/scoring/tests/RollupTests.java",
     "score": 9,
     "rules": [
@@ -304,7 +304,7 @@
   },
   {
     "family": "tests",
-    "entity": "java:scoring.tests.ExtraRollupTests",
+    "entity": "java:java/pom.xml#test::scoring.tests.ExtraRollupTests",
     "file": "java/src/test/java/scoring/tests/RollupTests.java",
     "score": 9,
     "rules": [
@@ -325,7 +325,7 @@
   },
   {
     "family": "duplication",
-    "entity": "java:scoring.CloneLeft",
+    "entity": "java:java/pom.xml#main::scoring.CloneLeft",
     "file": "java/src/main/java/scoring/CloneLeft.java",
     "score": 9,
     "rules": [
@@ -339,8 +339,8 @@
       }
     ],
     "groupMembers": [
-      "java:scoring.CloneLeft",
-      "java:scoring.CloneRight"
+      "java:java/pom.xml#main::scoring.CloneLeft",
+      "java:java/pom.xml#main::scoring.CloneRight"
     ],
     "metrics": {
       "eligibleMethods": 1,
@@ -349,7 +349,7 @@
   },
   {
     "family": "duplication",
-    "entity": "java:scoring.CloneRight",
+    "entity": "java:java/pom.xml#main::scoring.CloneRight",
     "file": "java/src/main/java/scoring/CloneRight.java",
     "score": 9,
     "rules": [
@@ -363,8 +363,8 @@
       }
     ],
     "groupMembers": [
-      "java:scoring.CloneLeft",
-      "java:scoring.CloneRight"
+      "java:java/pom.xml#main::scoring.CloneLeft",
+      "java:java/pom.xml#main::scoring.CloneRight"
     ],
     "metrics": {
       "eligibleMethods": 1,
@@ -373,7 +373,7 @@
   },
   {
     "family": "dependencies",
-    "entity": "java:scoring.CycleLeft",
+    "entity": "java:java/pom.xml#main::scoring.CycleLeft",
     "file": "java/src/main/java/scoring/CycleLeft.java",
     "score": 8,
     "rules": [
@@ -397,7 +397,7 @@
   },
   {
     "family": "dependencies",
-    "entity": "java:scoring.CycleRight",
+    "entity": "java:java/pom.xml#main::scoring.CycleRight",
     "file": "java/src/main/java/scoring/CycleRight.java",
     "score": 9,
     "rules": [

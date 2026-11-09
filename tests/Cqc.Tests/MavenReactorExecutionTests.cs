@@ -65,14 +65,16 @@ public sealed class MavenReactorExecutionTests
         var code = Assert.Single(result.Results);
         foreach (var name in new[] { "example.api.Value", "example.service.Service", "independent.Other" })
         {
-            var entity = Assert.Single(code.Entities, item => item.EntityId == "java:" + name);
+            var entity = Assert.Single(code.Entities, item => item.EntityId.EndsWith("::" + name, StringComparison.Ordinal));
             Assert.True(entity.Score.HasValue, details);
-            Assert.Equal(1, entity.Metrics["method:java:" + name + ".number():coverage"]);
+            Assert.Equal(1, entity.Metrics["method:" + entity.EntityId + ".number():coverage"]);
         }
         Assert.Equal(before, workspace.SourceContents());
-        var classpath = await File.ReadAllLinesAsync(Path.Combine(workspace.Root, ".cqc", "java-classpath.txt"));
-        Assert.Contains(classpath, path => path.Contains("junit", StringComparison.OrdinalIgnoreCase));
-        Assert.All(classpath.Where(path => !string.IsNullOrWhiteSpace(path)), path => Assert.True(File.Exists(path), path));
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        var classpath = manifest.RootElement.GetProperty("contexts").EnumerateArray()
+            .SelectMany(context => context.GetProperty("classpath").EnumerateArray()).Select(entry => entry.GetProperty("path").GetString()!).ToArray();
+        Assert.NotEmpty(classpath);
+        Assert.All(classpath, path => Assert.True(File.Exists(path), path));
         var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
         if (!OperatingSystem.IsWindows())
         {

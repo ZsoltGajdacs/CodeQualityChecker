@@ -1,6 +1,6 @@
 # macOS arm64 distribution
 
-The initial distribution is a directory/tarball, not a global installer. Keep `cqc`, managed libraries, `java-worker.jar`, `runtime/`, and legal notices together. The host is published self-contained for `osx-arm64`; the Java runtime is a trimmed `jlink` image. Source-only analysis therefore needs neither a host .NET runtime nor host Java. Explicit execution still needs the target project's toolchains.
+The initial distribution is a directory/tarball, not a global installer. Keep `cqc`, managed libraries, `java-worker.jar`, `maven-metadata.jar`, `runtime/`, and legal notices together. The host is published self-contained for `osx-arm64`; the Java runtime is a trimmed `jlink` image. Source-only analysis therefore needs neither a host .NET runtime nor host Java. Explicit execution still needs the target project's toolchains.
 
 ## Build prerequisites and pins
 
@@ -18,7 +18,7 @@ export JAVA_HOME=/absolute/path/to/pinned/jbr-sdk/Contents/Home
 ./scripts/package-macos.sh
 ```
 
-The script builds the Java worker, publishes the self-contained server, links the pinned Java modules, gathers notices, records build/file hashes, and starts a real MCP client smoke test. Tool dependency builds use dedicated public Maven Central settings without changing host settings or target-project execution policy. The smoke process removes Java/.NET discovery environment variables and restricts `PATH` to a temporary directory containing only Git. It discovers all seven tools, invokes the six inspection/check tools against a mixed Java/C# source fixture, and reconstructs reports through `get_report_page` raw pages. It verifies bounded messages, both language analyzers, and unchanged input bytes.
+The script builds the Java worker and Maven metadata extension, publishes the self-contained server, links the pinned Java modules, gathers notices, records build/file hashes, and starts a real MCP client smoke test. Tool dependency builds use dedicated public Maven Central settings without changing host settings or target-project execution policy. The smoke process removes Java/.NET discovery environment variables and restricts `PATH` to a temporary directory containing only Git. It discovers all seven tools, invokes the six inspection/check tools against a mixed Java/C# source fixture, and reconstructs reports through `get_report_page` raw pages. It verifies bounded messages, both language analyzers, and unchanged input bytes.
 
 Outputs:
 

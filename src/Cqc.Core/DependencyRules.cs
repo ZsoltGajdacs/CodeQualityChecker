@@ -19,14 +19,7 @@ internal static class DependencyRules
         var diagnostics = context.Facts.SemanticComplete ? Array.Empty<Diagnostic>() :
             [new Diagnostic("dependencies.incomplete", "Symbol resolution is incomplete. Resolve language diagnostics or execute a supported build before architecture scoring.")];
         return context.Finish(new() { Family = "dependencies", Types = context.Facts.Types, Findings = findings,
-            Complete = id => SemanticComplete(context.Facts, types[id].Language), Metrics = id => metrics[components[id]], Diagnostics = diagnostics });
-    }
-
-    private static bool SemanticComplete(AnalysisFacts facts, string language)
-    {
-        if (facts.SemanticComplete) return true;
-        if (facts.Diagnostics.Length == 0) return false;
-        return facts.Diagnostics.All(d => d.Language is not null && d.Language != language);
+            Blockers = id => DependencyEvidence.Blockers(context.Facts, types[id]), Metrics = id => metrics[components[id]], Diagnostics = diagnostics });
     }
 
     private static IEnumerable<Finding> ComponentCycles(DependencyFact[] edges, Dictionary<string, string> components, List<Finding> existing)
@@ -58,14 +51,16 @@ internal static class DependencyRules
     private static string Component(TypeFact type, QualityConfig config)
     {
         foreach (var component in config.Components)
-            if (component.Value.Any(pattern => Matches(QualifiedName(type.Id, pattern), pattern))) return component.Key;
-        var name = QualifiedName(type.Id, "");
+            if (component.Value.Any(pattern => Matches(QualifiedName(type, pattern), pattern))) return component.Key;
+        var name = QualifiedName(type, "");
         var separator = name.LastIndexOf('.');
         return type.Language + ":" + (separator < 0 ? "<global>" : name[..separator]);
     }
 
-    private static string QualifiedName(string id, string pattern)
+    private static string QualifiedName(TypeFact type, string pattern)
     {
+        var id = type.Id;
+        if (type.QualifiedName is { } name) return pattern.Contains(':') ? type.Language + ":" + name : name;
         if (pattern.Contains(':')) return id;
         var separator = id.IndexOf(':');
         return separator < 0 ? id : id[(separator + 1)..];

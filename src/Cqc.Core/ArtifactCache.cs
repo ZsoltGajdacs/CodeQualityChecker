@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 
 namespace Cqc.Core;
 
@@ -28,21 +27,8 @@ public sealed class ArtifactCache(ProjectSnapshot snapshot)
     public string PersistFile(string source)
     {
         EvidenceStore.EnsureArtifactDirectory(snapshot.Root);
-        using var stream = File.OpenRead(source);
-        var directory = Path.Combine(snapshot.Root, ".cqc", "references");
-        RejectLink(directory);
-        Directory.CreateDirectory(directory);
-        var target = Path.Combine(directory, Convert.ToHexStringLower(SHA256.HashData(stream)) + Path.GetExtension(source));
-        RejectLink(target);
-        if (!File.Exists(target)) File.Copy(source, target);
-        return target;
-    }
-
-    private static void RejectLink(string path)
-    {
-        if (File.Exists(path) || Directory.Exists(path))
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new ArgumentException("Artifact cache paths must not be symbolic links.");
+        var directory = new DirectoryInfo(Path.Combine(snapshot.Root, ".cqc", "references"));
+        return new ReferenceBinaryCache(directory).Persist(new FileInfo(source));
     }
 
     private static async Task ReplaceText(string path, string content, CancellationToken token)

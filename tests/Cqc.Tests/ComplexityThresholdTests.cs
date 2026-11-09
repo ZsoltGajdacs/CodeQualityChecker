@@ -47,9 +47,9 @@ public sealed class ComplexityThresholdTests
     {
         var location = new Location("Boundary.cs", 2, 8);
         var method = new MethodFact("Boundary.evaluate()", "Boundary", "csharp", location, complexity, 4,
-            false, false, false, 0, [], [], 20);
-        var facts = new AnalysisFacts([new("Boundary", "csharp", location, false, false)], [method], [], [], true);
-        var evidence = new CoverageEvidence("1", "source", "config", true, new(StringComparer.Ordinal), [new(method.Id, 2, 2, 4, 4)]);
+            false, false, false, 0, [], [], 20) { Evidence = new(true, true, true, true, true, []) };
+        var facts = new AnalysisFacts([new("Boundary", "csharp", location, false) { Evidence = new(true, true, true, true, true, []) }], [method], [], [], true);
+        var evidence = new CoverageEvidence("2", "source", "config", true, new(StringComparer.Ordinal), [new(method.Id, 2, 2, 4, 4)]);
         var response = QualityEngine.Evaluate(new()
         {
             Snapshot = new("/repo", [location.File], [location.File], [], "source", []), Facts = facts,

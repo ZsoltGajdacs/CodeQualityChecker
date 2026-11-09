@@ -56,9 +56,12 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
     {
         using var wire = JsonDocument.Parse(output);
         if (!wire.RootElement.TryGetProperty("schemaVersion", out var version) || version.GetString() != Wire.SchemaVersion)
-            return Unavailable("java.worker_protocol", "Java worker schemaVersion must be 1. Install matching server and worker artifacts.");
-        return JsonSerializer.Deserialize<AnalysisFacts>(output, Wire.Json)
-            ?? Unavailable("java.worker_empty", "Java analyzer returned no facts.");
+            return Unavailable("java.worker_protocol", "Java worker schemaVersion must be 2. Install matching server and worker artifacts.");
+        var facts = JsonSerializer.Deserialize<AnalysisFacts>(output, Wire.Json);
+        if (facts is null) return Unavailable("java.worker_empty", "Java analyzer returned no facts.");
+        if (facts.Types.Any(type => type.Evidence is null) || facts.Methods.Any(method => method.Evidence is null))
+            return Unavailable("java.worker_protocol", "Schema-2 Java facts require explicit evidence. Install matching server and worker artifacts.");
+        return facts;
     }
 
     private static AnalysisFacts Unavailable(string code, string message) =>

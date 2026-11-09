@@ -1,6 +1,6 @@
 # Architecture and language extension contract
 
-The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery orchestration, scope selection, configuration, isolated-execution lifetime, normalized evidence, four check engines, scoring, and full internal reports. `Cqc.Server` owns the schema-v2 MCP summaries, report storage, pagination, and byte-budget enforcement. `Cqc.CSharp` uses Roslyn; `Cqc.Java` invokes the JavaParser worker through a private JSON protocol. Each language module owns its build commands and native coverage-report reader. The Java worker is isolated behind a process boundary; this is not a public plugin API.
+The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery orchestration, scope selection, configuration, isolated-execution lifetime, normalized evidence, four check engines, scoring, and full internal reports. `Cqc.Server` owns the schema-v3 MCP summaries, report storage, pagination, and byte-budget enforcement. `Cqc.CSharp` uses Roslyn; `Cqc.Java` invokes the JavaParser worker through a private JSON protocol. Each language module owns its build commands and native coverage-report reader. The Java worker is isolated behind a process boundary; this is not a public plugin API.
 
 The processing pipeline is:
 
@@ -19,7 +19,7 @@ Repository context remains available for cross-file dependencies, clone groups, 
 
 Tool handlers delegate to focused components for typed report projections, storage/lifetime management, cursor pagination, and bounded serialization. These components remain in the server; analysis engines and language adapters do not depend on MCP contracts or pagination. Summary projection does not alter scores, findings, diagnostic messages, or original metric values.
 
-Inspection and analysis always return schema-v2 summaries through `structuredContent`; text content is a short explanation. `get_report_page` reads indexed sections of the completed snapshot without parsing the whole report on each request or rerunning analysis. Entity lists omit full metrics, which are available separately. Raw pages reconstruct the complete canonical report JSON and provide a lossless escape hatch for oversized individual records.
+Inspection and analysis always return schema-v3 summaries through `structuredContent`; text content is a short explanation. `get_report_page` reads indexed sections of the completed snapshot without parsing the whole report on each request or rerunning analysis. Entity lists omit full metrics, which are available separately. Raw pages reconstruct the complete canonical report JSON and provide a lossless escape hatch for oversized individual records.
 
 The complete serialized tool result, including escaping and text, is limited to 512 KiB. Page boundaries follow both a record limit and the byte budget. IDs are random and cursors are opaque and bound to the report, section, and filters. Temporary reports have a 60-minute lifetime and limits of 10 reports and 512 MiB including indexes. Eviction protects active readers; cancellation removes partial artifacts. IDs become invalid after expiry, eviction, or restart. Source-only operations do not create report files in the target repository.
 
@@ -52,3 +52,9 @@ C# source options recognize static `LangVersion`/`DefineConstants` settings and 
 ## Determinism
 
 For fixed source/build inputs, configuration, evidence, and tool versions, findings and scored results are reproducible. Paths are repository-relative; output sorting is ordinal; IDs are hashes of rule and entity/group identity. Results include schema/ruleset versions and fingerprints. Deterministic heuristics remain heuristics: recommendations require agent judgment.
+
+## Evidence and responsibility boundaries (ruleset 2)
+
+Adapters extract syntax measurements independently from semantic resolution and attach explicit evidence to facts. Core family evaluators select their own requirements through assessment policies; entity reporting only aggregates those assessments into selected class/file projections. No family inherits a blanket type-completeness gate. CoverageCollection owns provenance/report conversion/publication separately from AnalysisService orchestration. Static complexity shares complexity finding IDs with the combined assessment.
+
+The Maven metadata extension observes evaluated projects inside explicitly authorized isolated Maven builds. JavaBuildRunner owns invocation; JavaContextCache preserves binary outputs and publishes ordered hashed context manifests. The worker separates manifest validation, artifact loading, fallback discovery and conflict detection from parser-context setup. Symbol ownership is canonicalized against reachable module/source-set contexts; explicit qualified names remain available for component patterns. Source-only fallback never establishes verified semantic evidence.

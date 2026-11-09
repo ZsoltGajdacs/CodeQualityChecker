@@ -1,20 +1,18 @@
 namespace Cqc.Core;
 
-/// <summary>Rolls method/component findings into deduplicated class and selected-file reports.</summary>
+/// <summary>Projects family assessments into selected classes/files; it owns no evidence policy.</summary>
 internal sealed class EntityReport
 {
     private readonly IGrouping<string, TypeFact>[] types;
     private readonly Finding[] findings;
-    private readonly Func<string, bool> complete;
-    private readonly Func<string, SortedDictionary<string, double?>> metrics;
+    private readonly FamilyAssessment assessment;
     internal sealed record Result(EntityScore[] Entities, Finding[] Findings);
 
     internal EntityReport(FamilyAssessment assessment)
     {
+        this.assessment = assessment;
         types = assessment.Types.GroupBy(t => t.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).ToArray();
         findings = assessment.Findings.DistinctBy(f => f.Id).OrderBy(f => f.Id, StringComparer.Ordinal).ToArray();
-        complete = assessment.Complete;
-        metrics = assessment.Metrics;
     }
 
     internal Result Build(string[] selectedFiles)
@@ -32,32 +30,35 @@ internal sealed class EntityReport
         return new(entities, visibleFindings);
     }
 
-    private EntityScore ClassScore(IGrouping<string, TypeFact> type)
+    private EntityScore ClassScore(IGrouping<string, TypeFact> type) => Score(new()
     {
-        var file = type.Select(t => t.Location.File).Order(StringComparer.Ordinal).First();
-        var applicable = findings.Where(f => f.EntityIds.Contains(type.Key, StringComparer.Ordinal)).ToArray();
-        return Score(new() { Id = type.Key, Kind = "class", File = file, Findings = applicable, Complete = Complete(type.Key), Metrics = metrics(type.Key) });
-    }
+        Id = type.Key, Kind = "class", File = type.Select(t => t.Location.File).Order(StringComparer.Ordinal).First(),
+        TypeIds = [type.Key], Findings = findings.Where(f => f.EntityIds.Contains(type.Key, StringComparer.Ordinal)).ToArray(),
+        Metrics = assessment.Metrics(type.Key)
+    });
 
     private EntityScore FileScore(string file)
     {
         var ids = types.Where(g => g.Any(t => t.Location.File == file)).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
         var applicable = findings.Where(f => f.Locations.Any(l => l.File == file) && f.EntityIds.Any(ids.Contains)).ToArray();
-        return Score(new() { Id = "file:" + file, Kind = "file", File = file, Findings = applicable, Complete = ids.All(Complete), Metrics = FileMetrics(ids) });
+        return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids.ToArray(), Findings = applicable, Metrics = FileMetrics(ids) });
     }
 
     private SortedDictionary<string, double?> FileMetrics(IEnumerable<string> ids)
     {
         var result = RuleContext.Metrics();
         foreach (var id in ids)
-            foreach (var metric in metrics(id)) result[$"class:{id}:{metric.Key}"] = metric.Value;
+            foreach (var metric in assessment.Metrics(id)) result[$"class:{id}:{metric.Key}"] = metric.Value;
         return result;
     }
 
-    private bool Complete(string id) => complete(id) && types.Single(g => g.Key == id).All(t => t.Complete);
-
-    private static EntityScore Score(EntityAssessment assessment) => new(assessment.Id, assessment.Kind, assessment.File,
-        assessment.Complete ? "complete" : "incomplete",
-        assessment.Complete ? Math.Max(0, 10 - assessment.Findings.Sum(f => f.Deduction)) : null,
-        assessment.Findings.Select(f => f.Id).Order(StringComparer.Ordinal).ToArray(), assessment.Metrics);
+    private EntityScore Score(EntityAssessment entity)
+    {
+        var keys = entity.TypeIds;
+        var result = AssessmentEvidence.Score(entity.Findings, keys.SelectMany(assessment.Blockers));
+        var secondary = assessment.StaticBlockers is null ? null : AssessmentEvidence.Score(
+            entity.Findings.Where(f => f.Rule == "code.complexity"), keys.SelectMany(assessment.StaticBlockers));
+        return new(entity.Id, entity.Kind, entity.File, result.Status, result.Score, result.FindingIds, entity.Metrics)
+        { Blockers = result.Blockers, StaticComplexity = secondary };
+    }
 }

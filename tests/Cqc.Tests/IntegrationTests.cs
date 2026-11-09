@@ -69,7 +69,7 @@ public sealed class IntegrationTests
     }
 
     [Fact]
-    public async Task ResultsAreDeterministicAndTestDeductionsExplainTheWeakMethod()
+    public async Task ResultsAreDeterministicAndUnmodeledSetupExplainsIncompleteTestScore()
     {
         using var workspace = FixtureWorkspace.Copy("mixed/csharp");
         await workspace.XunitReferences(await workspace.Discover());
@@ -84,10 +84,10 @@ public sealed class IntegrationTests
     private static void AssertWeakTestExplained(AnalysisResponse first)
     {
         var tests = Assert.Single(first.Results, x => x.Family == "tests");
-        var finding = Assert.Single(tests.Findings, x => x.Rule == "tests.noAssertion");
-        Assert.Contains("WeakExample", finding.Message, StringComparison.Ordinal);
-        Assert.Equal(new Location("Quality.Sample.Tests/CalculatorTests.cs", 16, 17), Assert.Single(finding.Locations));
-        Assert.Equal(9, Assert.Single(tests.Entities, x => x.Kind == "class").Score);
+        Assert.DoesNotContain(tests.Findings, finding => finding.Rule == "tests.noAssertion");
+        var entity = Assert.Single(tests.Entities, x => x.Kind == "class");
+        Assert.Null(entity.Score);
+        Assert.Contains("syntax.incomplete", entity.Blockers); // Unmodeled field initialization is explicit evidence debt.
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class IntegrationTests
         Assert.True(result.Diagnostics.All(x => x.Code != "execution_failed"), System.Text.Json.JsonSerializer.Serialize(result, Wire.Json));
         var code = Assert.Single(result.Results, x => x.Family == "code");
         AssertBothLanguagesScored(code);
-        Assert.All(result.Results, family => Assert.Equal("complete", family.Status));
+        Assert.All(result.Results, family => Assert.Equal(family.Family is "tests" or "duplication" or "dependencies" ? "incomplete" : "complete", family.Status));
         Assert.Equal(before, workspace.SourceContents());
         Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
         var readOnly = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
@@ -167,11 +167,11 @@ public sealed class IntegrationTests
     private static void AssertBothLanguagesScored(FamilyResult code)
     {
         var details = System.Text.Json.JsonSerializer.Serialize(code, Wire.Json);
-        Assert.True(code.Entities.Any(x => x.EntityId == "java:demo.Calculator" && x.Score.HasValue), details);
+        Assert.True(code.Entities.Any(x => x.EntityId == "java:java/pom.xml#main::demo.Calculator" && x.Score.HasValue), details);
         Assert.True(code.Entities.Any(x => x.EntityId == "csharp:Quality.Sample.Calculator" && x.Score.HasValue), details);
-        var java = Assert.Single(code.Entities, x => x.EntityId == "java:demo.Calculator");
+        var java = Assert.Single(code.Entities, x => x.EntityId == "java:java/pom.xml#main::demo.Calculator");
         var csharp = Assert.Single(code.Entities, x => x.EntityId == "csharp:Quality.Sample.Calculator");
-        Assert.Equal(1, java.Metrics["method:java:demo.Calculator.choose(int):coverage"]);
+        Assert.Equal(1, java.Metrics["method:java:java/pom.xml#main::demo.Calculator.choose(int):coverage"]);
         Assert.Equal(1, csharp.Metrics["method:csharp:Quality.Sample.Calculator.Choose(System.Int32):coverage"]);
     }
 

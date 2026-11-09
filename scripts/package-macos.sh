@@ -36,11 +36,13 @@ trap 'rm -rf "$task_scratch"' EXIT
 cat > "$task_scratch/settings.xml" <<'XML'
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"><mirrors><mirror><id>central</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors></settings>
 XML
+mvn -B -s "$task_scratch/settings.xml" -f maven-metadata/pom.xml clean package
 mvn -B -s "$task_scratch/settings.xml" -f java-worker/pom.xml clean package
 mvn -B -s "$task_scratch/settings.xml" -f java-worker/pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy-dependencies \
   -DincludeScope=runtime -Dmdep.copyPom=true "-DoutputDirectory=$task_root/java-worker/target/dependency"
 dotnet publish src/Cqc.Server/Cqc.Server.csproj -c Release -r osx-arm64 --self-contained true -o "$task_output" -p:PublishSingleFile=false
 cp java-worker/target/java-worker.jar "$task_output/java-worker.jar"
+cp maven-metadata/target/maven-metadata.jar "$task_output/maven-metadata.jar"
 "$JAVA_HOME/bin/jlink" --module-path "$JAVA_HOME/jmods" \
   --add-modules java.se,jdk.compiler,jdk.unsupported \
   --strip-debug --no-header-files --no-man-pages --output "$task_output/runtime"

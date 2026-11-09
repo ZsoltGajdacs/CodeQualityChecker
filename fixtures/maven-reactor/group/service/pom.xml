@@ -1,4 +1,4 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion><parent><groupId>cqc.fixtures.reactor</groupId><artifactId>group</artifactId><version>1.0</version></parent><artifactId>service</artifactId>
-  <dependencies><dependency><groupId>cqc.fixtures.reactor</groupId><artifactId>api</artifactId><version>1.0</version></dependency></dependencies>
+  <dependencies><dependency><groupId>cqc.fixtures.reactor</groupId><artifactId>api</artifactId><version>1.0</version></dependency><dependency><groupId>cqc.fixtures.reactor</groupId><artifactId>api</artifactId><version>1.0</version><type>test-jar</type><classifier>tests</classifier></dependency></dependencies>
 </project>
