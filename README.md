@@ -17,6 +17,8 @@ command = "/absolute/path/cqc-osx-arm64/cqc"
 
 The executable speaks MCP over stdio; logs go to stderr. Do not launch it through a shell that writes greetings to stdout. No HTTP service or account is needed.
 
+For a bundled review-and-improve skill and local plugin installation in Claude Code or Codex, see [local plugins](docs/plugins.md). The installer scripts build the MCP and use `dist/cqc-osx-arm64` as its directory by default; prebuilt installations can also be selected.
+
 ## Tools
 
 | Tool | Result |

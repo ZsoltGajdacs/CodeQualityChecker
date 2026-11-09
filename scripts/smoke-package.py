@@ -12,14 +12,15 @@ import threading
 
 
 class McpSession:
-    def __init__(self, package):
+    def __init__(self, package, server=None):
         environment = {key: value for key, value in os.environ.items()
                        if not key.startswith(('JAVA_', 'JDK_', 'DOTNET_', 'CQC_'))}
         self.command_path = tempfile.TemporaryDirectory(prefix='cqc-smoke-path-')
         (Path(self.command_path.name) / 'git').symlink_to('/usr/bin/git')
         environment['PATH'] = self.command_path.name
         environment['DOTNET_MULTILEVEL_LOOKUP'] = '0'
-        self.process = subprocess.Popen([str(package / 'cqc')], stdin=subprocess.PIPE,
+        command = [server['command'], *server.get('args', [])] if server else [str(package / 'cqc')]
+        self.process = subprocess.Popen(command, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         text=True, env=environment, cwd=package)
         self.responses = queue.Queue()
@@ -79,7 +80,8 @@ def initialize(session):
 
 def invoke(session, tool, root):
     assert '10 is the desired score.' in tool['description']
-    response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {'projectRoot': str(root)}}})
+    response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
+        'projectRoot': str(root), 'execute': False}}})
     assert not response.get('isError'), response
     text = ''.join(block['text'] for block in response['content'] if block['type'] == 'text')
     result = json.loads(text)
