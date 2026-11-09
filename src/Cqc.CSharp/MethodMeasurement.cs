@@ -9,7 +9,6 @@ internal sealed record MethodMeasurement
 {
     public int Complexity { get; init; }
     public int Lines { get; init; }
-    public required string[] Fingerprints { get; init; }
     public int NodeCount { get; init; }
 
     public static MethodMeasurement Read(SyntaxNode[] nodes)
@@ -18,8 +17,7 @@ internal sealed record MethodMeasurement
             .SelectMany(x => x.DescendantTokens().Where(t => !t.IsKind(SyntaxKind.OpenBraceToken) && !t.IsKind(SyntaxKind.CloseBraceToken))
                 .Select(t => t.GetLocation().GetLineSpan().StartLinePosition.Line)).Distinct().Count();
         if (lines == 0 && nodes.OfType<ArrowExpressionClauseSyntax>().Any()) lines = 1;
-        return new() { Complexity = 1 + nodes.Count(IsDecision), Lines = lines,
-            Fingerprints = StructuralFingerprint.Create(nodes), NodeCount = nodes.Length };
+        return new() { Complexity = 1 + nodes.Count(IsDecision), Lines = lines, NodeCount = nodes.Length };
     }
 
     private static bool IsDecision(SyntaxNode node) => node is IfStatementSyntax or ForStatementSyntax or ForEachStatementSyntax or

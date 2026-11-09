@@ -84,6 +84,71 @@ class Example {
         self.assertEqual(facts["methods"][0]["fingerprints"], facts["methods"][1]["fingerprints"])
         self.assertGreaterEqual(facts["methods"][0]["nodeCount"], 20)
 
+    def test_wiring_constructors_ignore_names_and_unresolved_dependency_types(self):
+        facts = self.analyze({"Wiring.java": """class Wiring {
+  Missing first;
+  Missing second;
+  Missing third;
+  Missing fourth;
+  Wiring(Missing renamed, Missing b, Missing c, Missing d) {
+    // Wiring has no shared behavior to extract.
+    this.first = renamed;
+    second = b;
+    third = c;
+    fourth = d;
+  }
+  void wire(Missing renamed, Missing b, Missing c, Missing d) {
+    this.first = renamed;
+    second = b;
+    third = c;
+    fourth = d;
+  }
+}"""})
+        constructor = next(m for m in facts["methods"] if "..ctor(" in m["qualifiedName"])
+        method = next(m for m in facts["methods"] if ".wire(" in m["qualifiedName"])
+        self.assertEqual([], constructor["fingerprints"])
+        self.assertGreaterEqual(constructor["nodeCount"], 20)
+        self.assertEqual(1, constructor["complexity"])
+        self.assertEqual(4, constructor["executableLines"])
+        self.assertTrue(constructor["evidence"]["syntax"])
+        self.assertTrue(method["fingerprints"])
+
+    def test_explicit_fields_allow_parameter_shadowing_but_empty_constructors_are_unchanged(self):
+        facts = self.analyze({"Example.java": """class Example {
+  int value;
+  Example() {}
+  Example(int value) { this.value = value; }
+}"""})
+        constructors = {m["qualifiedName"]: m for m in facts["methods"]}
+        self.assertEqual([], constructors["Example..ctor(int)"]["fingerprints"])
+        self.assertEqual(["BlockStmt()"], constructors["Example..ctor()"]["fingerprints"])
+
+    def test_substantive_or_ambiguous_constructors_keep_fingerprints(self):
+        bodies = ["this.value = input + 1;", "this.value = Math.abs(input);",
+                  "if (input < 0) throw new IllegalArgumentException(); this.value = input;",
+                  "this.value += input;", "this.value = 1;", "this.value = (input);",
+                  "super(); this.value = input;", "this(); this.value = input;",
+                  "{ this.value = input; }", "; this.value = input;",
+                  "input = input;", "other.value = input;"]
+        for body in bodies:
+            with self.subTest(body=body):
+                facts = self.analyze({"Example.java": "class Example { int value; Example other; "
+                                      "Example() {} Example(int input) { " + body + " } }"})
+                constructor = next(m for m in facts["methods"] if "..ctor(int)" in m["qualifiedName"])
+                self.assertTrue(constructor["fingerprints"])
+
+    def test_static_inherited_duplicate_and_outer_fields_are_not_direct_wiring(self):
+        sources = ["class Example { static int value; Example(int input) { this.value = input; } }",
+                   "class Base { int value; } class Example extends Base { Example(int input) { value = input; } }",
+                   "class Example { int value; int value; Example(int input) { this.value = input; } }",
+                   "class Example { int value; class Inner { Inner(int input) { Example.this.value = input; } } }",
+                   "class Example { int value; Example(int value) { value = value; } }"]
+        for source in sources:
+            with self.subTest(source=source):
+                facts = self.analyze({"Example.java": source})
+                constructor = next(m for m in facts["methods"] if "..ctor(int)" in m["qualifiedName"])
+                self.assertTrue(constructor["fingerprints"])
+
     def test_deterministic_facts(self):
         source = {"Example.java": "class Example { int value(int x) { return x + 1; } }"}
         self.assertEqual(self.analyze(source), self.analyze(source))

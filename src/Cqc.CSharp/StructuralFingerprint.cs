@@ -7,7 +7,10 @@ namespace Cqc.CSharp;
 
 internal static class StructuralFingerprint
 {
-    public static string[] Create(SyntaxNode[] nodes) => nodes.Where(x => x is ExpressionSyntax or StatementSyntax)
+    public static string[] Create(SyntaxNode declaration, IMethodSymbol symbol, SyntaxNode[] nodes) =>
+        ConstructorWiring.IsOnlyWiring(declaration, symbol) ? [] : Create(nodes);
+
+    private static string[] Create(SyntaxNode[] nodes) => nodes.Where(x => x is ExpressionSyntax or StatementSyntax)
         .Select(x => Wire.Hash(string.Join(" ", x.DescendantTokens().Select(Normalize))))
         .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
 

@@ -16,14 +16,16 @@ final class MethodAnalyzer {
         String typeName = owner(declaration).map(AstIdentity::typeName).orElseThrow();
         var identity = resolution.identity(source.file(), typeName, declaration);
         var calls = resolution.calls(source, declaration, body);
-        var metrics = MethodMeasurement.inspect(declaration, body);
+        var nodes = MethodMeasurement.nodes(declaration, body);
+        var metrics = MethodMeasurement.inspect(nodes);
+        var fingerprints = StructuralFingerprint.create(declaration, nodes);
         var context = source.context();
         var evidence = new Worker.EvidenceState(syntax, identity.complete(), calls.complete(), true, context.verified(), context.blockers());
         boolean parameterized = TestRecognition.annotation(declaration, "ParameterizedTest");
         boolean fixture = FIXTURES.stream().anyMatch(name -> TestRecognition.annotation(declaration, name));
         return new Worker.MethodFact(SymbolContexts.qualify(context.id(), identity.name()), SymbolContexts.qualify(context.id(), typeName),
             "java", location(source.file(), declaration), metrics.complexity(), metrics.lines(), TestRecognition.testAnnotation(declaration), fixture, parameterized,
-            calls.assertions(), calls.ids(), metrics.fingerprints(), metrics.nodes(), syntax && identity.complete() && calls.complete() && context.verified(),
+            calls.assertions(), calls.ids(), fingerprints, metrics.nodes(), syntax && identity.complete() && calls.complete() && context.verified(),
             MethodResolution.coverageSignature(declaration), context.id(), identity.name(), evidence);
     }
 }

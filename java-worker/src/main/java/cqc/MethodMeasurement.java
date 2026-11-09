@@ -12,16 +12,17 @@ final class MethodMeasurement {
         WhileStmt.class, DoStmt.class, CatchClause.class, ConditionalExpr.class);
     private static final Set<BinaryExpr.Operator> LOGICAL = Set.of(BinaryExpr.Operator.AND, BinaryExpr.Operator.OR);
     private static final Set<Class<?>> NON_EXECUTABLE = Set.of(BlockStmt.class, EmptyStmt.class);
-    record Metrics(int complexity, int lines, String[] fingerprints, int nodes) { }
+    record Metrics(int complexity, int lines, int nodes) { }
 
-    static Metrics inspect(CallableDeclaration<?> declaration, BlockStmt body) {
-        var nodes = body.stream().filter(n -> belongs(n, declaration, body))
+    static List<Node> nodes(CallableDeclaration<?> declaration, BlockStmt body) {
+        return body.stream().filter(n -> belongs(n, declaration, body))
             .filter(n -> !(n instanceof com.github.javaparser.ast.comments.Comment)).toList();
+    }
+
+    static Metrics inspect(List<Node> nodes) {
         int complexity = 1 + nodes.stream().mapToInt(MethodMeasurement::decisions).sum();
         int lines = (int)nodes.stream().filter(MethodMeasurement::executable).map(AstIdentity::line).distinct().count();
-        var fingerprints = nodes.stream().filter(MethodMeasurement::structural)
-            .map(n -> fingerprint(n, 3)).distinct().sorted().toArray(String[]::new);
-        return new Metrics(complexity, lines, fingerprints, nodes.size());
+        return new Metrics(complexity, lines, nodes.size());
     }
 
     private static boolean belongs(Node node, CallableDeclaration<?> declaration, BlockStmt body) {
@@ -36,5 +37,4 @@ final class MethodMeasurement {
     }
 
     private static boolean executable(Node node) { return node instanceof Statement && !NON_EXECUTABLE.contains(node.getClass()); }
-    private static boolean structural(Node node) { return node instanceof Statement || node instanceof Expression; }
 }
