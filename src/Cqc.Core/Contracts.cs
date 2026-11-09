@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -55,8 +56,11 @@ public sealed record ProjectSnapshot(
 public sealed record AnalysisRequest
 {
     public required string ProjectRoot { get; init; }
+    [Description("Selection scope: repository (default) checks all source files; paths checks the supplied paths; changed without gitBase checks staged, unstaged, and untracked source files. Checks assess whole selected files using current working-tree content and repository context, so findings may reference unselected counterpart files.")]
     public string Scope { get; init; } = "repository";
+    [Description("Project-relative files or directories to select when scope is paths.")]
     public string[] Paths { get; init; } = [];
+    [Description("Optional Git commit or branch to compare against when scope is changed. Omit for uncommitted changes only. An explicit base also includes untracked source files. Checks always read current working-tree content, including unstaged edits to staged files.")]
     public string? GitBase { get; init; }
     public bool Execute { get; init; }
     public string? ConfigPath { get; init; }

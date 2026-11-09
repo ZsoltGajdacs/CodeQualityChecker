@@ -11,18 +11,17 @@ Use the plugin's CQC MCP tools. Tool prefixes vary by client; identify the serve
 
 Establish the absolute repository root and the user's intended scope. Call `inspect_project` for supported languages, modules, integrations, and prerequisites. Report unsupported languages as unanalyzed. Distinguish source-only analysis support from unsupported build/test execution integrations; for example, Gradle Java source can be reviewed even though Gradle execution is outside the MVP.
 
-Use `scope: "changed"` for a change review, `scope: "paths"` with repository-relative `paths` for a targeted request, and `scope: "repository"` for a repository review. Set `gitBase` only when a comparison base is requested or established. Changed scope without a base includes staged, unstaged, and untracked source files. If Git scope fails, explain it and use explicit paths only when they represent the user's intended selection.
+Use `scope: "changed"` for a change review, `scope: "paths"` with repository-relative `paths` for a targeted request, and `scope: "repository"` for a repository review. Set `gitBase` only when a comparison base is requested or established. For requests such as “check my uncommitted changes”, use `scope: "changed"` and omit `gitBase`. This includes staged, unstaged, and new untracked source files after normal ignores and generated-file exclusions. Check each selected file using its current working-tree content, including unstaged edits to staged files. Deleted files are excluded; a clean repository selects no files. Do not broaden an empty selection to the repository. If Git scope fails, explain it and use explicit paths only when they represent the user's intended selection.
 
-Choose `check_code_quality` for production complexity and coverage-based CRAP, `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries. Use `check_all` for a broad review. Checks assess whole selected files with repository context, so a finding may reference an unselected counterpart file.
+Choose `check_code_quality` for production complexity and coverage-based CRAP, `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries. Use `check_all` for a broad review. Checks assess whole selected files with repository context, so a finding may reference an unselected counterpart file. Changed scope limits the reported files; parsing and explicit builds/tests may still use the whole repository.
 
-Inspection/check tools require a nested `request`, for example:
+Inspection/check tools require a nested `request`. For an uncommitted-change review, pass this request to inspection and the chosen checks:
 
 ```json
 {
   "request": {
     "projectRoot": "/absolute/path/to/repository",
-    "scope": "paths",
-    "paths": ["src/Feature.cs"],
+    "scope": "changed",
     "execute": false,
     "timeoutSeconds": 300
   }

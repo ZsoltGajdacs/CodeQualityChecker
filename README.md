@@ -44,7 +44,25 @@ Inspection and check tools take a nested `request` object:
 }
 ```
 
-Use `scope: "paths"` with `paths: ["src/Feature.cs", "module/src"]`, or `scope: "changed"` with optional `gitBase: "main"`. Default changed scope includes staged, unstaged, and untracked source files. Checks assess complete selected files against the whole repository, so findings can point to unselected counterpart files.
+### Check uncommitted changes
+
+To check only files with uncommitted changes, pass `scope: "changed"` and omit `gitBase` to any inspection/check tool, such as `check_all`:
+
+```json
+{
+  "request": {
+    "projectRoot": "/absolute/path/to/repository",
+    "scope": "changed",
+    "execute": false
+  }
+}
+```
+
+This selects staged, unstaged, and new untracked source files, respecting normal ignores and generated-file exclusions. Each file is checked once using its current working-tree content, including unstaged edits to a staged file. Deleted files are excluded; a clean repository selects no files. Git must be available and the project root must be inside a Git repository.
+
+Checks assess complete selected files using the whole repository for context, so findings can point to unselected counterpart files. Changed scope limits the reported files; parsing and explicit builds/tests may still use the whole repository.
+
+Use `scope: "paths"` with `paths: ["src/Feature.cs", "module/src"]` for explicit selection. To include changes relative to a commit or branch, use `scope: "changed"` with `gitBase`, such as `"main"`; untracked source files are also included. Omit `gitBase` for an uncommitted-only review. The default scope remains `"repository"`.
 
 Source-only analysis never invokes project builds, tests, restores, or MSBuild evaluation. Set `execute: true` explicitly to allow project-controlled Maven/.NET restores, builds, and tests. Execution uses an isolated copy and writes reusable evidence under the original root's `.cqc/` directory. Maven execution uses a project wrapper when available, otherwise host Maven; the project's Java/.NET SDKs are also needed. Initial execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest; Gradle and Microsoft.Testing.Platform execution are outside the MVP.
 
