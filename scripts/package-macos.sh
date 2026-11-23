@@ -11,6 +11,10 @@ if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/jlink" ]]; then
   echo 'Set JAVA_HOME to the pinned JBR 25.0.2+10-b300.57 JDK; see docs/distribution.md.' >&2
   exit 1
 fi
+if ! task_dotnet_sdk="$(cd "$task_root/scripts" && dotnet --version)"; then
+  echo 'Packaging requires .NET SDK 11.0.100 or a later patch in that feature band. See scripts/global.json.' >&2
+  exit 1
+fi
 python3 - "$JAVA_HOME" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
@@ -40,7 +44,8 @@ mvn -B -s "$task_scratch/settings.xml" -f maven-metadata/pom.xml clean package
 mvn -B -s "$task_scratch/settings.xml" -f java-worker/pom.xml clean package
 mvn -B -s "$task_scratch/settings.xml" -f java-worker/pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy-dependencies \
   -DincludeScope=runtime -Dmdep.copyPom=true "-DoutputDirectory=$task_root/java-worker/target/dependency"
-dotnet publish src/Cqc.Server/Cqc.Server.csproj -c Release -r osx-arm64 --self-contained true -o "$task_output" -p:PublishSingleFile=false
+(cd "$task_root/scripts" && dotnet publish "$task_root/src/Cqc.Server/Cqc.Server.csproj" \
+  -c Release -r osx-arm64 --self-contained true -o "$task_output" -p:PublishSingleFile=false)
 cp java-worker/target/java-worker.jar "$task_output/java-worker.jar"
 cp maven-metadata/target/maven-metadata.jar "$task_output/maven-metadata.jar"
 "$JAVA_HOME/bin/jlink" --module-path "$JAVA_HOME/jmods" \
@@ -48,8 +53,8 @@ cp maven-metadata/target/maven-metadata.jar "$task_output/maven-metadata.jar"
   --strip-debug --no-header-files --no-man-pages --output "$task_output/runtime"
 cp README.md THIRD_PARTY.md upstream.lock.json "$task_output/"
 cp -R docs "$task_output/docs"
-python3 - "$task_output" <<'PY'
-import hashlib, json, shutil, subprocess, sys, zipfile
+python3 - "$task_output" "$task_dotnet_sdk" <<'PY'
+import hashlib, json, shutil, sys, zipfile
 from pathlib import Path
 output = Path(sys.argv[1])
 assets = json.loads(Path('src/Cqc.Server/obj/project.assets.json').read_text())
@@ -103,7 +108,7 @@ for pom in sorted(Path('java-worker/target/dependency').glob('*.pom')):
 manifest = {
     'schemaVersion': '1',
     'architecture': 'osx-arm64',
-    'dotnetSdk': subprocess.check_output(['dotnet', '--version'], text=True).strip(),
+    'dotnetSdk': sys.argv[2],
     'javaRuntime': (output / 'runtime/release').read_text(),
     'files': {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(output.rglob('*')) if p.is_file()}

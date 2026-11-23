@@ -4,7 +4,7 @@ The initial distribution is a directory/tarball, not a global installer. Keep `c
 
 ## Build prerequisites and pins
 
-- .NET SDK 10.0.403 (`global.json`); NuGet versions and transitive dependencies are recorded in project lock files.
+- .NET SDK 11.0.100 (`scripts/global.json`) for packaging. The development SDK is pinned separately in the root `global.json`. NuGet versions and transitive dependencies are recorded in project lock files.
 - Maven, with Java worker dependencies/plugins pinned in its POM.
 - `JAVA_HOME` pointing to JetBrains Runtime SDK `25.0.2+10-b300.57`, macOS aarch64, JBRSDK/JCEF edition.
 - Python 3 for packaging metadata and MCP smoke testing.
