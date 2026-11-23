@@ -12,7 +12,7 @@ Project execution can perform any actions authorized by the project's build/test
 
 Generated evidence is `.cqc/coverage.json`, a JSON `CoverageEvidence` object with:
 
-- Schema version `"1"`.
+- Schema version `"2"`.
 - Source fingerprint covering source files and recognized build inputs.
 - Effective configuration fingerprint.
 - Successful execution status and collected tool versions.
@@ -20,7 +20,9 @@ Generated evidence is `.cqc/coverage.json`, a JSON `CoverageEvidence` object wit
 
 The counters must have valid nonnegative bounds and unique, exact method identities. The production scorer requires evidence for every analyzed production method and returns covered/total branch and line counters alongside the derived coverage fraction. Source/configuration mismatches, failed execution, missing methods, invalid counters, and unsupported schema versions prevent affected scores. Branchless methods require executable-line evidence.
 
-Coverage mapping preserves overload identities. Java generic signatures use erased coverage aliases; C# generic signatures can use exact source-location fallback when needed. Complementary OpenCover branch/line points from multiple test-project reports are unioned before calculating counters. Ambiguous duplicate JaCoCo aggregate entries are withheld rather than selecting whichever report looks best.
+Coverage mapping preserves overload identities. Java generic signatures use erased coverage aliases. C# matches OpenCover modules to production outputs, then matches methods within the owning project using their native signature or unambiguous source points. Complementary OpenCover branch and line points from multiple test-project reports are unioned before calculating counters. Ambiguous entries leave coverage unavailable.
+
+C# evidence records the method identity version alongside tool versions. Older C# counters require explicit execution to refresh them. Current Java counters in the same evidence file can still be reused. The C# adapter also checks the source fingerprint of the per-project reference manifest at `.cqc/csharp-references.json`. Legacy flat or stale manifests produce a refresh diagnostic. Source-only requests can read each project's local NuGet asset metadata where available. Projects targeting a different framework from the CQC host need captured references for verified semantic assessments.
 
 `reportPath` optionally reads an existing CQC evidence file. It is an input path, not a generated-output destination. Directly supplying a raw coverage XML file does not establish its source provenance. Keep CQC artifacts together with their original source/configuration; changes require recollection.
 

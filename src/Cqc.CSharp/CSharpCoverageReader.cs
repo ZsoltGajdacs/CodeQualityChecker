@@ -10,10 +10,19 @@ public static class CSharpCoverageReader
         => ReadReports([report], methods);
 
     public static MethodCoverage[] ReadReports(IEnumerable<string> reports, IEnumerable<MethodFact> methods)
+        => ReadReports(reports, new OpenCoverMethodMatcher(methods, null), null, _ => null);
+
+    internal static MethodCoverage[] ReadReports(LanguageBuildResult build, IEnumerable<MethodFact> methods) =>
+        ReadReports(build.Reports, new OpenCoverMethodMatcher(methods, build.SourceRoot), new OpenCoverModuleOwners(build.ProjectOutputs),
+            report => TestOutputDirectory(build, report));
+
+    private static MethodCoverage[] ReadReports(IEnumerable<string> reports, OpenCoverMethodMatcher matcher,
+        OpenCoverModuleOwners? owners, Func<string, string?> testOutputDirectory)
     {
-        var facts = methods.ToArray();
-        return reports.Order(StringComparer.Ordinal).SelectMany(report => XDocument.Load(report).Descendants("Module"))
-            .SelectMany(module => OpenCoverModule(module, facts)).GroupBy(p => p.MethodId, StringComparer.Ordinal)
+        return reports.Order(StringComparer.Ordinal)
+            .SelectMany(report => XDocument.Load(report).Descendants("Module")
+                .SelectMany(module => OpenCoverModule(module, matcher, owners, testOutputDirectory(report))))
+            .GroupBy(p => p.MethodId, StringComparer.Ordinal)
             .Select(MergePoints).OrderBy(p => p.MethodId, StringComparer.Ordinal).ToArray();
     }
 
@@ -26,45 +35,67 @@ public static class CSharpCoverageReader
         return new(group.Key, branches.Count(x => x), branches.Length, lines.Count(x => x), lines.Length);
     }
 
-    private static IEnumerable<PointCoverage> OpenCoverModule(XElement module, MethodFact[] facts)
+    private static string? TestOutputDirectory(LanguageBuildResult build, string report) =>
+        build.ReportModules.TryGetValue(report, out var project) && build.ProjectOutputs.TryGetValue(project, out var target)
+            ? Path.GetDirectoryName(target) : null;
+
+    private static IEnumerable<PointCoverage> OpenCoverModule(XElement module, OpenCoverMethodMatcher matcher,
+        OpenCoverModuleOwners? owners, string? outputDirectory)
     {
+        var project = owners?.Find(module.Element("ModulePath")?.Value, outputDirectory);
+        if (owners is not null && project is null) return [];
         var files = module.Descendants("File").ToDictionary(x => (string)x.Attribute("uid")!, x => (string)x.Attribute("fullPath")!);
-        return module.Descendants("Class").SelectMany(type => type.Descendants("Method")
-            .Select(method => OpenCoverEntry(type, method, files, facts))).OfType<PointCoverage>();
+        return module.Descendants("Class").SelectMany(type => OpenCoverClass(type, files, matcher, project));
     }
 
-    private static PointCoverage? OpenCoverEntry(XElement type, XElement method, Dictionary<string, string> files, MethodFact[] facts)
+    private static IEnumerable<PointCoverage> OpenCoverClass(XElement type, Dictionary<string, string> files,
+        OpenCoverMethodMatcher matcher, string? project)
     {
         var typeName = type.Element("FullName")?.Value.Replace('/', '.').Replace('+', '.');
+        var members = type.Descendants("Method").Select(method => (Entry: method, Member: MemberName(method)))
+            .Where(item => item.Member is not null).ToArray();
+        var signatures = members.Select(item => OpenCoverMethodIdentity.NormalizeArity(typeName + "." + item.Member)).ToHashSet(StringComparer.Ordinal);
+        var context = new OpenCoverClassContext(project, signatures);
+        return members.SelectMany(item => OpenCoverEntry(item.Entry,
+            new(typeName + "." + item.Member, FileFor(item.Entry, files), context), matcher));
+    }
+
+    private static string? MemberName(XElement method)
+    {
         var fullName = method.Element("Name")?.Value ?? "";
         var separator = fullName.IndexOf("::", StringComparison.Ordinal);
-        if (separator < 0) return null;
-        var member = fullName[(separator + 2)..];
-        var signature = typeName + "." + member;
-        var exact = facts.Where(m => m.Id == signature || m.Id == "csharp:" + signature).ToArray();
-        var points = method.Descendants("SequencePoint").ToArray();
-        var fact = exact.Length == 1 ? exact[0] : SourceMatch(method, files, points, facts);
-        if (fact is null) return null;
-        var lines = points.Select(p => (fact.Location.File + ":" + (string?)p.Attribute("sl"), Visited(p))).ToArray();
-        var branches = method.Descendants("BranchPoint").Select(p =>
-            (signature + ":" + p.Attribute("offset")?.Value + ":" + p.Attribute("path")?.Value + ":" + p.Attribute("ordinal")?.Value, Visited(p))).ToArray();
-        return new(fact.Id, lines, branches);
+        return separator < 0 ? null : fullName[(separator + 2)..];
     }
 
-    // Source points preserve identity for generic and compiler-transformed methods.
-    // Ambiguous same-line declarations deliberately remain unavailable.
-    private static MethodFact? SourceMatch(XElement method, Dictionary<string, string> files, XElement[] points, MethodFact[] facts)
+    private static string? FileFor(XElement method, Dictionary<string, string> files) =>
+        (string?)method.Element("FileRef")?.Attribute("uid") is { } reference ? files.GetValueOrDefault(reference) : null;
+
+    private static IEnumerable<PointCoverage> OpenCoverEntry(XElement method, OpenCoverMethodIdentity identity, OpenCoverMethodMatcher matcher)
     {
-        var reference = (string?)method.Element("FileRef")?.Attribute("uid");
-        if (reference is null || !files.TryGetValue(reference, out var file)) return null;
-        var line = points.Select(p => (int?)p.Attribute("sl")).OfType<int>().DefaultIfEmpty(-1).Min();
-        var candidates = facts.Where(m => MatchesFile(file, m.Location.File) && m.Location.StartLine <= line && m.Location.EndLine >= line)
-            .OrderBy(m => m.Location.EndLine - m.Location.StartLine).ToArray();
-        if (candidates.Length == 0) return null;
-        if (candidates.Length > 1 && candidates[0].Location == candidates[1].Location) return null;
-        return candidates[0];
+        var sequence = method.Descendants("SequencePoint").ToArray();
+        var branches = method.Descendants("BranchPoint").ToArray();
+        var linesInReport = sequence.Concat(branches).Select(p => (int?)p.Attribute("sl")).OfType<int>().Distinct().ToArray();
+        var fact = matcher.Find(identity, linesInReport);
+        if (fact is not null) return [ReadPoints(fact, identity.NativeSignature, sequence, branches)];
+
+        var factsByLine = linesInReport.ToDictionary(line => line,
+            line => matcher.Find(identity, [line], allowSourceFallback: false));
+        if (factsByLine.Values.Any(owner => owner is null) || sequence.Concat(branches).Any(point => point.Attribute("sl") is null))
+            return [];
+        return factsByLine.Values.OfType<MethodFact>().DistinctBy(owner => owner.Id).Select(owner => ReadPoints(owner, identity.NativeSignature,
+            PointsFor(owner, sequence, factsByLine), PointsFor(owner, branches, factsByLine)));
     }
 
-    private static bool MatchesFile(string absolute, string relative) => absolute.Replace('\\', '/').EndsWith("/" + relative, StringComparison.Ordinal) || absolute == relative;
+    private static IEnumerable<XElement> PointsFor(MethodFact method, XElement[] points, Dictionary<int, MethodFact?> factsByLine) =>
+        points.Where(point => factsByLine[(int)point.Attribute("sl")!]?.Id == method.Id);
+
+    private static PointCoverage ReadPoints(MethodFact fact, string signature, IEnumerable<XElement> sequence, IEnumerable<XElement> branches)
+    {
+        var lines = sequence.Select(p => (fact.Location.File + ":" + (string?)p.Attribute("sl"), Visited(p))).ToArray();
+        var branchPoints = branches.Select(p =>
+            (signature + ":" + p.Attribute("offset")?.Value + ":" + p.Attribute("path")?.Value + ":" + p.Attribute("ordinal")?.Value, Visited(p))).ToArray();
+        return new(fact.Id, lines, branchPoints);
+    }
+
     private static bool Visited(XElement point) => long.TryParse((string?)point.Attribute("vc"), CultureInfo.InvariantCulture, out var visits) && visits > 0;
 }

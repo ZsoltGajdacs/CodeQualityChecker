@@ -7,17 +7,17 @@ namespace Cqc.CSharp;
 internal static class TypeDependencies
 {
     public static IEnumerable<DependencyFact> Read(BaseTypeDeclarationSyntax declaration, INamedTypeSymbol owner,
-        SemanticModel model, CancellationToken token)
+        SourceAnalysisContext context)
     {
-        var from = SymbolNames.Type(owner);
+        var from = context.Identity.OwnType(owner);
         foreach (var node in declaration.DescendantNodes().Where(x =>
                      ReferenceEquals(x.Ancestors().OfType<BaseTypeDeclarationSyntax>().FirstOrDefault(), declaration)))
         {
-            token.ThrowIfCancellationRequested();
-            foreach (var target in ReferencedTypes(node, model, token).Where(x => x.TypeKind != TypeKind.Error))
+            context.Token.ThrowIfCancellationRequested();
+            foreach (var target in ReferencedTypes(node, context.Model, context.Token).Where(x => x.TypeKind != TypeKind.Error))
             {
-                var to = SymbolNames.Type(target);
-                if (from != to) yield return new(from, to, SourceLocation.Of(node));
+                var to = context.Identity.ReferencedType(target);
+                if (to is not null && from != to) yield return new(from, to, SourceLocation.Of(node));
             }
         }
     }

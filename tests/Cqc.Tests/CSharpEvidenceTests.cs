@@ -114,10 +114,10 @@ public sealed class CSharpEvidenceTests
         await workspace.XunitReferences(snapshot);
         var analyzer = new CSharpAnalyzer();
         var facts = await analyzer.AnalyzeAsync(snapshot, CancellationToken.None);
-        var helper = Assert.Single(facts.Methods, method => method.Id == "Quality.Sample.Tests.DelegateCases.Branching()");
-        var indirect = Assert.Single(facts.Methods, method => method.Id == "Quality.Sample.Tests.DelegateCases.Indirect()");
-        var passed = Assert.Single(facts.Methods, method => method.Id == "Quality.Sample.Tests.DelegateCases.PassedToAssertion()");
-        var named = Assert.Single(facts.Methods, method => method.Id == "Quality.Sample.Tests.DelegateCases.NameOnly()");
+        var helper = Assert.Single(facts.Methods, method => method.QualifiedName == "Quality.Sample.Tests.DelegateCases.Branching()");
+        var indirect = Assert.Single(facts.Methods, method => method.QualifiedName == "Quality.Sample.Tests.DelegateCases.Indirect()");
+        var passed = Assert.Single(facts.Methods, method => method.QualifiedName == "Quality.Sample.Tests.DelegateCases.PassedToAssertion()");
+        var named = Assert.Single(facts.Methods, method => method.QualifiedName == "Quality.Sample.Tests.DelegateCases.NameOnly()");
         Assert.Contains(helper.Id, indirect.Calls);
         Assert.False(indirect.Evidence?.Calls);
         Assert.Contains(helper.Id, passed.Calls);
@@ -126,7 +126,7 @@ public sealed class CSharpEvidenceTests
         var result = await new AnalysisService([analyzer]).AnalyzeAsync(new() { ProjectRoot = workspace.Root },
             ["tests"], CancellationToken.None);
         var family = Assert.Single(result.Results);
-        var entity = Assert.Single(family.Entities, item => item.EntityId == "csharp:Quality.Sample.Tests.DelegateCases");
+        var entity = Assert.Single(family.Entities, item => item.EntityId == "csharp:" + indirect.TypeId);
         Assert.Null(entity.Score);
         Assert.Contains("tests.unresolvedCalls", entity.Blockers);
         Assert.Contains(family.Findings, finding => finding.Rule == "tests.branching"

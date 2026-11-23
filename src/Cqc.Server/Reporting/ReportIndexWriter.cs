@@ -3,7 +3,7 @@ using Cqc.Core;
 
 namespace Cqc.Server.Reporting;
 
-internal sealed class ReportIndexWriter(Stream stream, long maximumBytes, long rawBytes, CancellationToken token)
+internal sealed class ReportIndexWriter(Stream stream, CancellationToken token)
 {
     private readonly List<IndexedRow> rows = [];
     public async Task<IndexedRow[]> WriteAsync(object report)
@@ -44,8 +44,8 @@ internal sealed class ReportIndexWriter(Stream stream, long maximumBytes, long r
     {
         token.ThrowIfCancellationRequested();
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value, CompactJson.Options);
-        if (rawBytes + stream.Position + bytes.Length > maximumBytes) throw new InvalidOperationException("Report exceeds temporary storage capacity; reduce analysis scope.");
-        rows.Add(new(section, family, entities, stream.Position, bytes.Length));
+        var offset = stream.Position;
         await stream.WriteAsync(bytes, token);
+        rows.Add(new(section, family, entities, offset, bytes.Length));
     }
 }

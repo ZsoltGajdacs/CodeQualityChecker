@@ -38,19 +38,21 @@ public sealed class AdapterTests
         await workspace.XunitReferences(snapshot);
         var facts = await new CSharpAnalyzer().AnalyzeAsync(snapshot, CancellationToken.None);
         Assert.True(facts.SemanticComplete, string.Join("\n", facts.Diagnostics.Select(x => x.Code + ": " + x.Message)));
-        Assert.Equal(2, facts.Types.Count(x => x.Id == "Quality.Sample.Calculator"));
-        Assert.Contains(facts.Types, x => x.Id == "Quality.Sample.Calculator.Nested");
-        Assert.Contains(facts.Methods, x => x.Id == "Quality.Sample.Calculator.Choose(System.Int32)" && x.Complexity == 2);
-        Assert.Contains(facts.Methods, x => x.Id == "Quality.Sample.Calculator.Choose(System.String)");
-        Assert.Contains(facts.Methods, x => x.Id == "Quality.Sample.Calculator.get_Answer()");
+        Assert.Equal(2, facts.Types.Count(x => x.Id == "Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator"));
+        Assert.Contains(facts.Types, x => x.QualifiedName == "Quality.Sample.Calculator.Nested");
+        Assert.Contains(facts.Methods, x => x.QualifiedName == "Quality.Sample.Calculator.Choose(System.Int32)" && x.Complexity == 2);
+        Assert.Contains(facts.Methods, x => x.QualifiedName == "Quality.Sample.Calculator.Choose(System.String)");
+        Assert.Contains(facts.Methods, x => x.QualifiedName == "Quality.Sample.Calculator.get_Answer()");
         var test = Assert.Single(facts.Methods, x => x.IsParameterized);
         Assert.True(test.IsTest);
         var helper = Assert.Single(facts.Methods, x => x.Id.EndsWith(".Check(System.Int32)", StringComparison.Ordinal));
         Assert.Equal(1, helper.Assertions);
         Assert.Contains(helper.Id, test.Calls);
         Assert.DoesNotContain(facts.Types, x => x.Id.Contains("Generated", StringComparison.Ordinal));
-        Assert.Contains(facts.Dependencies, x => x.From == "Quality.Sample.Left" && x.To == "Quality.Sample.Right");
-        Assert.Contains(facts.Dependencies, x => x.From == "Quality.Sample.Right" && x.To == "Quality.Sample.Left");
+        var left = Assert.Single(facts.Types, x => x.QualifiedName == "Quality.Sample.Left").Id;
+        var right = Assert.Single(facts.Types, x => x.QualifiedName == "Quality.Sample.Right").Id;
+        Assert.Contains(facts.Dependencies, x => x.From == left && x.To == right);
+        Assert.Contains(facts.Dependencies, x => x.From == right && x.To == left);
     }
 
     [Fact]

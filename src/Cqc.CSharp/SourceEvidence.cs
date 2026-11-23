@@ -5,11 +5,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Cqc.CSharp;
 
-/// <summary>The current C# adapter has one compilation context; it does not evaluate MSBuild.</summary>
+/// <summary>Tracks syntax separately from each project's semantic context.</summary>
 internal static class SourceEvidence
 {
-    internal const string ContextId = "csharp:compilation";
-
     internal static EvidenceState Type(BaseTypeDeclarationSyntax declaration, SourceAnalysisContext context)
     {
         var syntax = context.Options.Complete && !Unmodeled(declaration)
@@ -18,25 +16,25 @@ internal static class SourceEvidence
         return new(syntax, true, semantic, semantic, context.VerifiedContext, []);
     }
 
-    internal static SyntaxGap[] Gaps(ParsedSources sources, CancellationToken token)
+    internal static IEnumerable<SyntaxGap> Gaps(ParsedProject project, CancellationToken token)
     {
-        return sources.Trees.SelectMany((tree, index) => Gaps(tree, sources.Consistent && sources.Options[index].Complete, token))
-            .Distinct().ToArray();
+        return project.Trees.SelectMany(tree => Gaps(tree, project, token));
     }
 
-    private static IEnumerable<SyntaxGap> Gaps(SyntaxTree tree, bool configuration, CancellationToken token)
+    private static IEnumerable<SyntaxGap> Gaps(SyntaxTree tree, ParsedProject project, CancellationToken token)
     {
-        if (!configuration) yield return Gap(tree.FilePath, "csharp.compile_configuration");
+        if (!project.Options.Complete) yield return Gap(tree.FilePath, "csharp.compile_configuration", project.ContextId);
         if (tree.GetDiagnostics(token).Any(x => x.Severity == DiagnosticSeverity.Error))
-            yield return Gap(tree.FilePath, "csharp.parse");
+            yield return Gap(tree.FilePath, "csharp.parse", project.ContextId);
         var root = tree.GetRoot(token);
         if (root.DescendantNodes().OfType<GlobalStatementSyntax>().Any())
-            yield return Gap(tree.FilePath, "csharp.unmodeled_executable");
+            yield return Gap(tree.FilePath, "csharp.unmodeled_executable", project.ContextId);
         if (root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().Any(Unmodeled))
-            yield return Gap(tree.FilePath, "csharp.unmodeled_executable", false);
+            yield return Gap(tree.FilePath, "csharp.unmodeled_executable", project.ContextId, false);
     }
 
-    private static SyntaxGap Gap(string file, string code, bool unknownEntities = true) => new(file, "csharp", ContextId, code) { UnknownEntities = unknownEntities };
+    private static SyntaxGap Gap(string file, string code, string context, bool unknownEntities = true) =>
+        new(file, "csharp", context, code) { UnknownEntities = unknownEntities };
 
     private static bool Unmodeled(BaseTypeDeclarationSyntax declaration)
     {

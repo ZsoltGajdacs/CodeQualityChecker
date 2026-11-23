@@ -31,6 +31,14 @@ public sealed class ArtifactCache(ProjectSnapshot snapshot)
         return new ReferenceBinaryCache(directory).Persist(new FileInfo(source));
     }
 
+    public Task ReplaceJsonAsync<T>(string name, T value, CancellationToken token)
+    {
+        if (Path.GetFileName(name) != name) throw new ArgumentException("Artifact name must be a simple filename.");
+        EvidenceStore.EnsureArtifactDirectory(snapshot.Root);
+        var path = Path.Combine(snapshot.Root, ".cqc", name);
+        return ReplaceText(path, System.Text.Json.JsonSerializer.Serialize(value, Wire.Json), token);
+    }
+
     private static async Task ReplaceText(string path, string content, CancellationToken token)
     {
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";

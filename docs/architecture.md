@@ -13,7 +13,9 @@ The processing pipeline is:
 7. Filter reported entities to selected files and return deterministic ordered data.
 8. Store the immutable report and its detail indexes outside the target repository, then return a bounded MCP summary.
 
-Repository context remains available for cross-file dependencies, clone groups, helpers, and partial classes when only one file is selected. Stable method identities include the declaring type and parameter signature, preserving overloads. Class identities merge partial declarations; facts retain individual declaration locations.
+Repository context remains available for cross-file dependencies, clone groups, helpers, and partial classes when only one file is selected. Method identities include the declaring type and parameter signature. C# identities also include generic method arity and the owning project path when a project owns the source. Partial declarations merge within their owning project and retain their separate source locations.
+
+The C# adapter groups files by project and builds a Roslyn compilation for each group. Supported project references link the compilations in dependency order. The symbol identity component maps resolved symbols back to their owning projects so helpers and type edges can cross project boundaries. Loose files use their own context. External reference metadata and incomplete analysis diagnostics are scoped by project.
 
 ## MCP report delivery
 
@@ -21,7 +23,7 @@ Tool handlers delegate to focused components for typed report projections, stora
 
 Inspection and analysis always return schema-v3 summaries through `structuredContent`; text content is a short explanation. `get_report_page` reads indexed sections of the completed snapshot without parsing the whole report on each request or rerunning analysis. Entity lists omit full metrics, which are available separately. Raw pages reconstruct the complete canonical report JSON and provide a lossless escape hatch for oversized individual records.
 
-The complete serialized tool result, including escaping and text, is limited to 512 KiB. Page boundaries follow both a record limit and the byte budget. IDs are random and cursors are opaque and bound to the report, section, and filters. Temporary reports have a 60-minute lifetime and limits of 10 reports and 512 MiB including indexes. Eviction protects active readers; cancellation removes partial artifacts. IDs become invalid after expiry, eviction, or restart. Source-only operations do not create report files in the target repository.
+The complete serialized tool result, including escaping and text, is limited to 512 KiB. Page boundaries follow both a record limit and the byte budget. IDs are random and cursors are opaque and bound to the report, section, and filters. Published reports have a 60-minute lifetime and limits of 10 reports and 512 MiB including indexes. The store can stage one additional report up to 512 MiB before replacing older reports. A failed or canceled staging operation preserves existing unexpired reports. IDs become invalid after expiry, eviction, or restart. Source-only operations do not create report files in the target repository.
 
 ## Add a language module
 

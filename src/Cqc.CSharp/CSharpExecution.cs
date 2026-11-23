@@ -6,11 +6,14 @@ namespace Cqc.CSharp;
 public sealed class CSharpExecution : ILanguageExecution
 {
     public const string CoverletVersion = "6.0.4";
+    internal const string MethodIdentityVersion = "2";
     public string Language => "csharp";
+    public string? CoverageIdentityVersion => MethodIdentityVersion;
 
     public async Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string scratchDirectory, CancellationToken cancellationToken)
     {
-        var references = new List<string>();
+        scratchDirectory = CSharpPaths.ResolveDirectory(new DirectoryInfo(scratchDirectory));
+        var projects = new List<BuiltProject>();
         var versions = new SortedDictionary<string, string>(StringComparer.Ordinal);
         var results = Path.Combine(scratchDirectory, ".cqc-dotnet-results-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(results);
@@ -19,16 +22,28 @@ public sealed class CSharpExecution : ILanguageExecution
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!module.Supported) throw new InvalidOperationException("C# execution requires SDK-style .NET projects.");
-            references.AddRange(await BuildModuleAsync(environment, module, cancellationToken));
+            projects.Add(await BuildModuleAsync(environment, module, cancellationToken));
         }
-        await CSharpReferenceMetadata.WriteAsync(snapshot, scratchDirectory, references, cancellationToken);
-        return new(Language, Directory.GetFiles(results, "coverage.opencover.xml", SearchOption.AllDirectories), versions);
+        await CSharpReferenceMetadata.WriteAsync(snapshot, scratchDirectory, projects.Select(project => project.References), cancellationToken);
+        var reports = ReportOwners(projects);
+        return new(Language, reports.Keys.ToArray(), versions)
+        {
+            SourceRoot = scratchDirectory,
+            ReportModules = reports,
+            ProjectOutputs = projects.ToDictionary(project => project.References.ProjectPath, project => project.TargetPath, StringComparer.Ordinal)
+        };
     }
 
     public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods) =>
-        CSharpCoverageReader.ReadReports(build.Reports, methods.Where(method => method.Language == Language));
+        CSharpCoverageReader.ReadReports(build, methods.Where(method => method.Language == Language));
 
-    private static async Task<string[]> BuildModuleAsync(ExecutionEnvironment environment, ProjectModule module, CancellationToken token)
+    private sealed record BuiltProject(CSharpProjectReferences References, string TargetPath, string[] Reports);
+
+    private static SortedDictionary<string, string> ReportOwners(IEnumerable<BuiltProject> projects) => new(
+        projects.SelectMany(project => project.Reports.Select(report => (Report: report, Owner: project.References.ProjectPath)))
+            .ToDictionary(item => item.Report, item => item.Owner, StringComparer.Ordinal), StringComparer.Ordinal);
+
+    private static async Task<BuiltProject> BuildModuleAsync(ExecutionEnvironment environment, ProjectModule module, CancellationToken token)
     {
         var scratch = environment.Scratch;
         var project = Path.Combine(scratch, module.Path);
@@ -39,13 +54,22 @@ public sealed class CSharpExecution : ILanguageExecution
             environment.Collector = await CollectorPath(scratch, token);
         }
         var collector = environment.Collector;
+        var results = Path.Combine(environment.Results, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(results);
         await Required("dotnet", ["test", project, "--test-adapter-path", collector, "--collect",
-            "XPlat Code Coverage;Format=opencover", "--results-directory", environment.Results], scratch, token);
-        var references = await Required("dotnet", ["msbuild", project, "-target:ResolveReferences", "-getItem:ReferencePath", "-nologo"], scratch, token);
+            "XPlat Code Coverage;Format=opencover", "--results-directory", results], scratch, token);
+        var references = await Required("dotnet", ["msbuild", project, "-target:ResolveReferences", "-getItem:ReferencePath",
+            "-getProperty:TargetPath", "-nologo"], scratch, token);
         using var json = JsonDocument.Parse(references.Output);
-        return json.RootElement.GetProperty("Items").GetProperty("ReferencePath").EnumerateArray()
-            .Select(item => item.GetProperty("Identity").GetString()!).Where(File.Exists).ToArray();
+        var paths = json.RootElement.GetProperty("Items").GetProperty("ReferencePath").EnumerateArray()
+            .Where(item => !ProjectOutput(item)).Select(item => item.GetProperty("FullPath").GetString()!)
+            .Where(File.Exists).ToArray();
+        var target = json.RootElement.GetProperty("Properties").GetProperty("TargetPath").GetString() ?? "";
+        return new(new(module.Path, paths), target, Directory.GetFiles(results, "coverage.opencover.xml", SearchOption.AllDirectories));
     }
+
+    private static bool ProjectOutput(JsonElement item) =>
+        item.TryGetProperty("ReferenceSourceTarget", out var source) && source.GetString() == "ProjectReference";
 
     private sealed record ExecutionEnvironment(string Scratch, string Results, SortedDictionary<string, string> Versions)
     {

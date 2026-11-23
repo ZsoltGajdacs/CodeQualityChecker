@@ -87,7 +87,7 @@ Retrieve details without rerunning analysis:
 
 All tool results are bounded to 512 KiB, including JSON escaping and text content; a byte budget may reduce the record count. Exceptionally large records explicitly direct you to `section: "raw"`. Raw pages contain `rawChunk` strings: concatenate them in cursor order to reconstruct the complete original report JSON without loss. A partial page does not mean analysis is incomplete; use family statuses to assess analysis completeness.
 
-Reports live in private server temporary storage for 60 minutes, with at most 10 reports and 512 MiB total storage. Old reports can be evicted before expiry, and restarting the server removes access. Expired, evicted, or unknown IDs return explicit errors; rerun the appropriate check only when a fresh report is needed. Storage and page retrieval do not write into the analyzed repository. This release replaces the previous full-report MCP response format.
+Reports live in private server temporary storage for 60 minutes, with at most 10 published reports and 512 MiB of published data. A replacement can use up to another 512 MiB while it is staged. Old reports can be evicted after successful publication, and restarting the server removes access. Expired, evicted, or unknown IDs return explicit errors. Storage and page retrieval do not write into the analyzed repository.
 
 ## Build and verify
 

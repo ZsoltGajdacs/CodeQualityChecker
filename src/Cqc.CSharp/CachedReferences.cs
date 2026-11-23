@@ -1,85 +1,72 @@
-using System.Text.Json;
 using Cqc.Core;
 using Microsoft.CodeAnalysis;
 using Diagnostic = Cqc.Core.Diagnostic;
 
 namespace Cqc.CSharp;
 
-internal static class CachedReferences
+/// <summary>Creates project-scoped Roslyn references and shares identical files within one request.</summary>
+internal sealed class CachedReferences
 {
-    public static MetadataReference[] Read(ProjectSnapshot snapshot, List<Diagnostic> diagnostics)
+    private readonly ProjectSnapshot snapshot;
+    private readonly List<Diagnostic> manifestDiagnostics = [];
+    private readonly Dictionary<string, CSharpProjectReferences> projects;
+    private readonly Dictionary<string, PortableExecutableReference> references = new(StringComparer.Ordinal);
+    private readonly Lazy<(string[] Paths, Diagnostic[] Diagnostics)> platform = new(ReadPlatform);
+
+    internal CachedReferences(ProjectSnapshot snapshot)
     {
-        var root = snapshot.Root;
-        var paths = new HashSet<string>(StringComparer.Ordinal);
-        paths.UnionWith(PlatformReferences.Read(diagnostics));
-        foreach (var assets in Directory.EnumerateFiles(root, "project.assets.json", SearchOption.AllDirectories)
-                     .Where(x => Path.GetFileName(Path.GetDirectoryName(x)) == "obj"))
-        {
-            try { AddAssets(assets, paths); }
-            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
-            {
-                diagnostics.Add(new("metadata-unreadable", exception.Message, Path.GetRelativePath(root, assets), "csharp"));
-            }
-        }
-        AddManifest(snapshot, paths, diagnostics);
-        var result = new List<MetadataReference>();
-        foreach (var path in paths.Order(StringComparer.Ordinal))
-        {
-            try { result.Add(MetadataReference.CreateFromFile(path)); }
-            catch (Exception exception) when (exception is IOException or BadImageFormatException)
-            {
-                diagnostics.Add(new("metadata-invalid", exception.Message, null, "csharp"));
-            }
-        }
-        return result.ToArray();
+        this.snapshot = snapshot;
+        var manifest = CSharpReferenceMetadata.Read(snapshot, manifestDiagnostics);
+        projects = (manifest?.Projects ?? []).ToDictionary(project => project.ProjectPath, StringComparer.Ordinal);
     }
 
-    private static void AddManifest(ProjectSnapshot snapshot, HashSet<string> paths, List<Diagnostic> diagnostics)
+    internal MetadataReference[] Read(ParsedProject source, List<Diagnostic> diagnostics)
     {
-        var manifest = Path.Combine(snapshot.Root, ".cqc", "csharp-references.txt");
-        if (!File.Exists(manifest)) return;
-        var source = manifest + ".source";
-        if (!File.Exists(source) || File.ReadAllText(source).Trim() != snapshot.SourceFingerprint)
+        diagnostics.AddRange(manifestDiagnostics);
+        var manifest = projects.GetValueOrDefault(source.Path);
+        var paths = manifest is { Paths.Length: > 0 } ? manifest.Paths : Fallback(source, diagnostics);
+        return paths.Select(path => GetReference(path, source, diagnostics)).OfType<MetadataReference>().ToArray();
+    }
+
+    private PortableExecutableReference? GetReference(string path, ParsedProject source, List<Diagnostic> diagnostics)
+    {
+        if (references.TryGetValue(path, out var reference)) return reference;
+        try
         {
-            diagnostics.Add(new("metadata-stale", "C# reference evidence does not match the source fingerprint. Run explicit execution to refresh it.", null, "csharp"));
-            return;
+            reference = MetadataReference.CreateFromFile(path);
+            references.Add(path, reference);
+            return reference;
         }
-        foreach (var path in File.ReadAllLines(manifest).Where(x => !string.IsNullOrWhiteSpace(x)))
+        catch (Exception exception) when (exception is IOException or BadImageFormatException or UnauthorizedAccessException)
         {
-            if (Path.IsPathFullyQualified(path) && File.Exists(path)) paths.Add(path);
-            else diagnostics.Add(new("metadata-missing", "A collected C# reference is missing. Run explicit execution to refresh it.", null, "csharp"));
+            diagnostics.Add(new("metadata-invalid", exception.Message, source.Path, "csharp"));
+            return null;
         }
     }
 
-    private static void AddAssets(string path, HashSet<string> references)
+    private string[] Fallback(ParsedProject source, List<Diagnostic> diagnostics)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        if (!root.TryGetProperty("targets", out var targets) || !root.TryGetProperty("packageFolders", out var folders)) return;
-        var packages = targets.EnumerateObject().SelectMany(x => x.Value.EnumerateObject());
-        foreach (var package in packages)
-            AddPackage(package, root, folders, references);
+        diagnostics.AddRange(platform.Value.Diagnostics);
+        if (source.Path == ".") return platform.Value.Paths;
+        WarnForDifferentFramework(source, diagnostics);
+        var assets = new NuGetProjectAssets(snapshot.Root, source);
+        return platform.Value.Paths.Concat(assets.Read(diagnostics)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
 
-    private static void AddPackage(JsonProperty package, JsonElement root, JsonElement folders, HashSet<string> references)
+    private static void WarnForDifferentFramework(ParsedProject source, List<Diagnostic> diagnostics)
     {
-        if (!package.Value.TryGetProperty("compile", out var compile)) return;
-        var packagePath = PackagePath(package.Name, root);
-        var entries = compile.EnumerateObject().Where(x => x.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase));
-        foreach (var entry in entries)
-        {
-            foreach (var folder in folders.EnumerateObject())
-            {
-                var candidate = Path.Combine(folder.Name, packagePath, entry.Name);
-                if (File.Exists(candidate)) references.Add(Path.GetFullPath(candidate));
-            }
-        }
+        if (source.Options.TargetFramework is not { } framework) return;
+        var host = $"net{Environment.Version.Major}.{Environment.Version.Minor}";
+        if (string.Equals(framework, host, StringComparison.OrdinalIgnoreCase)) return;
+        diagnostics.Add(new("csharp.framework_reference_unverified",
+            $"Host framework metadata is used for target {framework}. Run explicit execution to collect matching references.",
+            source.Path, "csharp"));
     }
 
-    private static string PackagePath(string name, JsonElement root)
+    private static (string[] Paths, Diagnostic[] Diagnostics) ReadPlatform()
     {
-        if (!root.TryGetProperty("libraries", out var libraries)) return name.ToLowerInvariant();
-        if (!libraries.TryGetProperty(name, out var library)) return name.ToLowerInvariant();
-        return library.TryGetProperty("path", out var path) ? path.GetString() ?? name.ToLowerInvariant() : name.ToLowerInvariant();
+        var diagnostics = new List<Diagnostic>();
+        var paths = PlatformReferences.Read(diagnostics);
+        return (paths, diagnostics.ToArray());
     }
 }

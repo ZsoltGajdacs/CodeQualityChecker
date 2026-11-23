@@ -8,7 +8,7 @@ internal static class PreprocessorSymbols
     public static string DefaultLanguage(Dictionary<string, string> properties) =>
         TryMajor(properties.GetValueOrDefault("TargetFramework", "net10.0"), out var major) ? (major + 4).ToString(System.Globalization.CultureInfo.InvariantCulture) : "latest";
 
-    public static string[] Read(Dictionary<string, string> properties, List<Diagnostic> diagnostics, string file)
+    public static string[] Read(Dictionary<string, string> properties, List<Diagnostic> diagnostics, string? file)
     {
         var constants = properties.GetValueOrDefault("DefineConstants", "DEBUG;TRACE").Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var valid = constants.Where(SyntaxFacts.IsValidIdentifier).ToHashSet(StringComparer.Ordinal);

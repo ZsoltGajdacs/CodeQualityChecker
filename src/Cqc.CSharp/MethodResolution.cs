@@ -11,11 +11,11 @@ internal sealed record MethodResolution
     public bool CallsComplete { get; init; }
 
     public static MethodResolution Read(SyntaxNode declaration, SyntaxNode[] nodes, IMethodSymbol symbol,
-        MethodAnalysisContext context)
+        SourceAnalysisContext context)
     {
         var invocations = nodes.OfType<InvocationExpressionSyntax>().ToArray();
         var resolved = invocations.Select(x => context.Model.GetSymbolInfo(x, context.Token).Symbol as IMethodSymbol).ToArray();
-        var calls = resolved.OfType<IMethodSymbol>().Concat(MethodGroups(nodes, context)).Select(SymbolNames.Method)
+        var calls = resolved.OfType<IMethodSymbol>().Concat(MethodGroups(nodes, context)).Select(context.Identity.ReferencedMethod).OfType<string>()
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         // Resolving Delegate.Invoke identifies the signature, not the runtime target or helper closure.
         var callsComplete = resolved.All(KnownTarget)
@@ -27,7 +27,7 @@ internal sealed record MethodResolution
 
     private static bool KnownTarget(IMethodSymbol? method) => method is not null && method.MethodKind != MethodKind.DelegateInvoke;
 
-    private static IEnumerable<IMethodSymbol> MethodGroups(SyntaxNode[] nodes, MethodAnalysisContext context)
+    private static IEnumerable<IMethodSymbol> MethodGroups(SyntaxNode[] nodes, SourceAnalysisContext context)
     {
         foreach (var expression in nodes.OfType<ExpressionSyntax>().Where(node => node is SimpleNameSyntax or MemberAccessExpressionSyntax))
         {

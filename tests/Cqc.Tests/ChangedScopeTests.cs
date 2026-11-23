@@ -76,6 +76,27 @@ public sealed class ChangedScopeTests
         Assert.Equal(["Visible.cs"], snapshot.SelectedFiles);
     }
 
+    [Theory]
+    [InlineData("repository", null)]
+    [InlineData("changed", null)]
+    [InlineData("changed", "HEAD")]
+    public async Task IgnorePatternsExcludeUntrackedNeighborsButKeepTrackedSources(string scope, string? gitBase)
+    {
+        using var workspace = FixtureWorkspace.Empty();
+        var module = Directory.CreateDirectory(Path.Combine(workspace.Root, "module")).FullName;
+        await Write(workspace, "module/Tracked.cs", "class Tracked {}");
+        await Initialize(workspace);
+        await Write(workspace, ".gitignore", "/module/\n");
+        await Write(workspace, "module/Tracked.cs", "class Tracked { int Value() => 1; }");
+        await Write(workspace, "module/Ignored.cs", "class Ignored {}");
+
+        var snapshot = await ProjectDiscovery.DiscoverAsync(new() { ProjectRoot = module, Scope = scope, GitBase = gitBase },
+            new(), CancellationToken.None, FixtureWorkspace.Definitions);
+
+        Assert.Equal(["Tracked.cs"], snapshot.Files);
+        Assert.Equal(["Tracked.cs"], snapshot.SelectedFiles);
+    }
+
     [Fact]
     public async Task NestedProjectUsesProjectRelativePathsAndExcludesOutsideChanges()
     {

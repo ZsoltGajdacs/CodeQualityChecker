@@ -23,7 +23,7 @@ public sealed class StaleReportExecutionTests
         var result = await new AnalysisService([new CSharpAnalyzer()]).AnalyzeAsync(new()
             { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 120 }, ["code"], CancellationToken.None);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
-        var type = Assert.Single(Assert.Single(result.Results).Entities, entity => entity.EntityId == "csharp:Quality.Sample.Calculator");
-        Assert.Equal(0, type.Metrics["method:csharp:Quality.Sample.Calculator.Choose(System.String):coverage"]);
+        var type = Assert.Single(Assert.Single(result.Results).Entities, entity => entity.EntityId == "csharp:Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator");
+        Assert.Equal(0, type.Metrics["method:csharp:Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator.Choose(System.String):coverage"]);
     }
 }

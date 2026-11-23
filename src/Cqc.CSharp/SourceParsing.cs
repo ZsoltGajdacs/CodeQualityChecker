@@ -1,40 +1,44 @@
 using Cqc.Core;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Diagnostic = Cqc.Core.Diagnostic;
 
 namespace Cqc.CSharp;
 
-internal sealed record ParsedSources(SyntaxTree[] Trees, SourceFileOptions[] Options, bool Consistent, SyntaxTree? Imports, Diagnostic[] Diagnostics);
+internal sealed record ParsedProject(string Path, SourceOptions Options, SyntaxTree[] Trees, SyntaxTree? Imports)
+{
+    public string ContextId => "csharp:" + Path;
+}
 
 internal static class SourceParsing
 {
-    public static async Task<ParsedSources> ReadAsync(ProjectSnapshot snapshot, CancellationToken token)
+    public static async Task<ParsedProject[]> ReadAsync(ProjectSnapshot snapshot, CancellationToken token)
     {
-        var options = new SourceOptions(snapshot);
-        var files = snapshot.Files.Where(x => x.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)).ToArray();
-        var settings = files.Select(options.ForFile).ToArray();
-        var diagnostics = settings.SelectMany(x => x.Diagnostics).Distinct().ToList();
-        var consistent = Consistent(settings, diagnostics);
-        var trees = new List<SyntaxTree>();
-        for (var index = 0; index < files.Length; index++)
+        var modules = snapshot.Modules.Where(module => CSharpDiscovery.Definition.IsManifest(module.Path) && module.Language == "csharp")
+            .ToDictionary(module => module.Path, StringComparer.Ordinal);
+        var ownership = new ProjectOwnership(modules.Values);
+        var files = snapshot.Files.Where(CSharpDiscovery.Definition.IsSource)
+            .ToLookup(file => ownership.ForFile(file)?.Path ?? ".", StringComparer.Ordinal);
+        var paths = modules.Keys.Concat(files.Select(group => group.Key)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        var projects = new List<ParsedProject>();
+        foreach (var path in paths)
         {
             token.ThrowIfCancellationRequested();
-            var text = await File.ReadAllTextAsync(Path.Combine(snapshot.Root, files[index]), token);
-            var parse = consistent ? settings[index].ParseOptions : settings[index].ParseOptions.WithLanguageVersion(LanguageVersion.Latest);
-            trees.Add(CSharpSyntaxTree.ParseText(text, parse, files[index], cancellationToken: token));
+            var options = SourceOptions.Read(snapshot, modules.GetValueOrDefault(path), ownership);
+            var trees = await ReadTrees(snapshot.Root, files[path], options.ParseOptions, token);
+            var imports = options.ImplicitUsings ? ImplicitImports.Create(options.ParseOptions) : null;
+            projects.Add(new(path, options, trees, imports));
         }
-        var version = trees.FirstOrDefault()?.Options as CSharpParseOptions ?? CSharpParseOptions.Default;
-        var imports = settings.Any(x => x.ImplicitUsings) ? ImplicitImports.Create(version) : null;
-        return new(trees.ToArray(), settings, consistent, imports, diagnostics.ToArray());
+        return projects.ToArray();
     }
 
-    private static bool Consistent(SourceFileOptions[] settings, List<Diagnostic> diagnostics)
+    private static async Task<SyntaxTree[]> ReadTrees(string root, IEnumerable<string> files, CSharpParseOptions options, CancellationToken token)
     {
-        var sameImports = settings.Select(x => x.ImplicitUsings).Distinct().Count() <= 1;
-        var sameVersion = settings.Select(x => x.ParseOptions.LanguageVersion).Distinct().Count() <= 1;
-        if (sameImports && sameVersion) return true;
-        diagnostics.Add(new("csharp.compile_configuration", "Projects have differing language versions or implicit imports. Analyze module roots separately for verified scores.", null, "csharp"));
-        return false;
+        var trees = new List<SyntaxTree>();
+        foreach (var file in files)
+        {
+            var text = await File.ReadAllTextAsync(Path.Combine(root, file), token);
+            trees.Add(CSharpSyntaxTree.ParseText(text, options, file, cancellationToken: token));
+        }
+        return trees.ToArray();
     }
 }

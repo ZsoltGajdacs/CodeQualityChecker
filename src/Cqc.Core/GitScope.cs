@@ -9,7 +9,7 @@ internal static class GitScope
             var probe = await ProcessRunner.RunAsync("git", ["-C", root, "rev-parse", "--show-toplevel"], root, token);
             if (probe.ExitCode != 0) return files;
             if (files.Length == 0) return files;
-            var command = new ProcessCommand { Executable = "git", Arguments = ["check-ignore", "--no-index", "-z", "--stdin"], Directory = root, Input = string.Join('\0', files) + '\0' };
+            var command = new ProcessCommand { Executable = "git", Arguments = ["check-ignore", "-z", "--stdin"], Directory = root, Input = string.Join('\0', files) + '\0' };
             var result = await ProcessRunner.RunAsync(command, token);
             if (result.ExitCode > 1) throw new IOException("git check-ignore failed: " + result.Error);
             var ignored = result.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);

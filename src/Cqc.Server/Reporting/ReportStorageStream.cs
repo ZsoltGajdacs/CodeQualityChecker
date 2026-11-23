@@ -1,6 +1,6 @@
 namespace Cqc.Server.Reporting;
 
-/// <summary>Counts bytes before publication and enforces the same reservation during disk writes.</summary>
+/// <summary>Counts staged report bytes and enforces their limit during disk writes.</summary>
 internal sealed class ReportStorageStream(Stream destination, long maximumBytes) : Stream
 {
     private long position;

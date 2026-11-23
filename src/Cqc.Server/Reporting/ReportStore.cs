@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Cqc.Core;
 
 namespace Cqc.Server.Reporting;
@@ -10,10 +9,10 @@ public sealed class ReportStore : IDisposable
     private readonly string directory;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly List<StoredReport> reports = [];
+    private readonly Queue<string> pendingCleanup = new();
     private readonly ReportPager pager = new(new ReportCursor());
     private readonly ITimer timer;
     private bool disposed;
-    private string? pendingCleanup;
 
     public ReportStore(TimeProvider clock, ReportStoreOptions? options = null)
     {
@@ -37,28 +36,30 @@ public sealed class ReportStore : IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             RetryPendingCleanup();
-            var bytes = await ReportStorageWriter.MeasureAsync(report, options.MaximumBytes, token);
             token.ThrowIfCancellationRequested();
-            SweepLocked();
-            while (reports.Count >= options.MaximumReports || reports.Sum(r => r.Bytes) + bytes > options.MaximumBytes) Remove(reports[0]);
             var id = Guid.NewGuid().ToString("N");
             pending = Path.Combine(directory, id);
             Directory.CreateDirectory(pending);
-            var rows = await ReportStorageWriter.WriteAsync(report, pending, bytes, token);
-            token.ThrowIfCancellationRequested();
-            var expires = clock.GetUtcNow() + options.Retention;
+            var (bytes, rows) = await ReportStorageWriter.WriteAsync(report, pending, options.MaximumBytes, token);
+            var now = clock.GetUtcNow();
+            var expires = now + options.Retention;
             var families = report is AnalysisResponse analysis ? analysis.Results.Select(f => f.Family).ToArray() : [];
             var summary = ReportProjection.Summary(report, id, expires, scope);
-            reports.Add(new(id, pending, expires, bytes, rows, families, report is InspectionResponse));
+            token.ThrowIfCancellationRequested();
+            Commit(new(id, pending, expires, bytes, rows, families, report is InspectionResponse), now);
             pending = null;
+            TryPendingCleanup();
             return summary;
         }
         finally
         {
             try
             {
-                if (pending is not null) pendingCleanup = pending;
-                RetryPendingCleanup();
+                if (pending is not null)
+                {
+                    pendingCleanup.Enqueue(pending);
+                    TryPendingCleanup();
+                }
             }
             finally { gate.Release(); }
         }
@@ -69,7 +70,7 @@ public sealed class ReportStore : IDisposable
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            SweepLocked();
+            RetireExpired(clock.GetUtcNow());
             var report = reports.Find(r => r.Id == request.ReportId)
                 ?? throw new ArgumentException("Report is unavailable, expired, or evicted; run inspection or analysis again.");
             return await pager.ReadAsync(report, request, token);
@@ -79,26 +80,53 @@ public sealed class ReportStore : IDisposable
     private void Sweep()
     {
         if (!gate.Wait(0)) return;
-        try { if (!disposed) { RetryPendingCleanup(); SweepLocked(); } }
-        catch (IOException) { /* Retry temporary cleanup failures on the next sweep. */ }
-        catch (UnauthorizedAccessException) { /* Cleanup must never terminate the MCP host. */ }
+        try
+        {
+            if (disposed) return;
+            RetireExpired(clock.GetUtcNow());
+            TryPendingCleanup();
+        }
         finally { gate.Release(); }
     }
+
+    private void Commit(StoredReport replacement, DateTimeOffset now)
+    {
+        RetireExpired(now);
+        var remainingBytes = reports.Sum(report => report.Bytes);
+        while (reports.Count >= options.MaximumReports || remainingBytes > options.MaximumBytes - replacement.Bytes)
+        {
+            var oldest = reports[0];
+            remainingBytes -= oldest.Bytes;
+            Retire(oldest);
+        }
+        reports.Add(replacement);
+    }
+
+    private void TryPendingCleanup()
+    {
+        try { RetryPendingCleanup(); }
+        catch (IOException) { /* Retry on the next sweep or publication. */ }
+        catch (UnauthorizedAccessException) { /* Retry on the next sweep or publication. */ }
+    }
+
     private void RetryPendingCleanup()
     {
-        // Failed pending writes still consume disk space. Block publication until their cleanup succeeds.
-        if (pendingCleanup is null) return;
-        Directory.Delete(pendingCleanup, true);
-        pendingCleanup = null;
+        // Retired and partial reports still use disk space until deletion succeeds.
+        while (pendingCleanup.TryPeek(out var path))
+        {
+            try { Directory.Delete(path, true); }
+            catch (DirectoryNotFoundException) { }
+            pendingCleanup.Dequeue();
+        }
     }
-    private void SweepLocked()
+    private void RetireExpired(DateTimeOffset now)
     {
-        foreach (var report in reports.Where(r => r.ExpiresAt <= clock.GetUtcNow()).ToArray()) Remove(report);
+        foreach (var report in reports.Where(r => r.ExpiresAt <= now).ToArray()) Retire(report);
     }
-    private void Remove(StoredReport report)
+    private void Retire(StoredReport report)
     {
-        Directory.Delete(report.Directory, true);
         reports.Remove(report);
+        pendingCleanup.Enqueue(report.Directory);
     }
     public void Dispose()
     {
@@ -110,6 +138,7 @@ public sealed class ReportStore : IDisposable
             disposed = true;
             Directory.Delete(directory, true);
             reports.Clear();
+            pendingCleanup.Clear();
         }
         finally { gate.Release(); }
     }

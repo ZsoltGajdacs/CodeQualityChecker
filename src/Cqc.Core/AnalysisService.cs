@@ -59,7 +59,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
                 {
                     Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
                     Facts = facts, Artifacts = artifacts
-                }, timeout.Token);
+                }, diagnostics, timeout.Token);
             }
             catch (Exception ex) when (ex is JsonException or ArgumentException or System.Xml.XmlException)
             { diagnostics.Add(new("coverage_invalid", "Coverage evidence is invalid: " + ex.Message)); }

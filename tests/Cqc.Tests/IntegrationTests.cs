@@ -149,6 +149,20 @@ public sealed class IntegrationTests
         var readOnly = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(code, Wire.Json),
             System.Text.Json.JsonSerializer.Serialize(Assert.Single(readOnly.Results), Wire.Json));
+        await LegacyCSharpCoverageRequiresRefresh(workspace);
+    }
+
+    private static async Task LegacyCSharpCoverageRequiresRefresh(FixtureWorkspace workspace)
+    {
+        var path = Path.Combine(workspace.Root, ".cqc", "coverage.json");
+        var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(path));
+        Assert.True(evidence.ToolVersions.Remove("csharp:methodIdentity"));
+        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json));
+        var result = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
+        Assert.Contains(result.Diagnostics, item => item.Code == "coverage.identity_stale" && item.Language == "csharp");
+        var entities = Assert.Single(result.Results).Entities;
+        Assert.NotNull(Assert.Single(entities, item => item.EntityId == "java:java/pom.xml#main::demo.Calculator").Score);
+        Assert.Null(Assert.Single(entities, item => item.EntityId.EndsWith("#Quality.Sample.Calculator", StringComparison.Ordinal)).Score);
     }
 
     private static void AssertMixedModules(ProjectSnapshot snapshot)
@@ -168,62 +182,12 @@ public sealed class IntegrationTests
     {
         var details = System.Text.Json.JsonSerializer.Serialize(code, Wire.Json);
         Assert.True(code.Entities.Any(x => x.EntityId == "java:java/pom.xml#main::demo.Calculator" && x.Score.HasValue), details);
-        Assert.True(code.Entities.Any(x => x.EntityId == "csharp:Quality.Sample.Calculator" && x.Score.HasValue), details);
+        Assert.True(code.Entities.Any(x => x.EntityId == "csharp:csharp/Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator" && x.Score.HasValue), details);
         var java = Assert.Single(code.Entities, x => x.EntityId == "java:java/pom.xml#main::demo.Calculator");
-        var csharp = Assert.Single(code.Entities, x => x.EntityId == "csharp:Quality.Sample.Calculator");
+        var csharp = Assert.Single(code.Entities, x => x.EntityId == "csharp:csharp/Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator");
         Assert.Equal(1, java.Metrics["method:java:java/pom.xml#main::demo.Calculator.choose(int):coverage"]);
-        Assert.Equal(1, csharp.Metrics["method:csharp:Quality.Sample.Calculator.Choose(System.Int32):coverage"]);
+        Assert.Equal(1, csharp.Metrics["method:csharp:csharp/Quality.Sample/Quality.Sample.csproj#Quality.Sample.Calculator.Choose(System.Int32):coverage"]);
     }
 
     private static AnalysisService Service() => new([new CSharpAnalyzer(), new JavaAnalyzer()]);
-}
-
-internal sealed class FixtureWorkspace : IDisposable
-{
-    public static LanguageDefinition[] Definitions => [new CSharpAnalyzer().Definition, new JavaAnalyzer().Definition];
-    public string Root { get; } = Path.Combine(Path.GetTempPath(), "cqc-test-" + Guid.NewGuid().ToString("N"));
-    private FixtureWorkspace() => Directory.CreateDirectory(Root);
-    public static FixtureWorkspace Empty() => new();
-    public static FixtureWorkspace Copy(string relative)
-    {
-        var workspace = new FixtureWorkspace();
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "fixtures"))) directory = directory.Parent;
-        if (directory is null) throw new DirectoryNotFoundException("Cannot locate CQC test fixtures.");
-        CopyFiles(Path.Combine(directory.FullName, "fixtures", relative), workspace.Root);
-        return workspace;
-    }
-
-    private static void CopyFiles(string source, string destination)
-    {
-        foreach (var directory in Directory.EnumerateDirectories(source).Where(x => Path.GetFileName(x) is not ("bin" or "obj" or "target" or ".cqc")))
-        {
-            var target = Path.Combine(destination, Path.GetFileName(directory));
-            Directory.CreateDirectory(target);
-            CopyFiles(directory, target);
-        }
-        foreach (var file in Directory.EnumerateFiles(source)) File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
-    }
-
-    public Task<ProjectSnapshot> Discover(string scope = "repository") => ProjectDiscovery.DiscoverAsync(new()
-        { ProjectRoot = Root, Scope = scope }, new(), CancellationToken.None, Definitions);
-
-    public async Task XunitReferences(ProjectSnapshot snapshot)
-    {
-        var path = Path.Combine(Root, ".cqc", "csharp-references.txt");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllLinesAsync(path, new[] { typeof(FactAttribute).Assembly.Location, typeof(Assert).Assembly.Location });
-        await File.WriteAllTextAsync(path + ".source", snapshot.SourceFingerprint);
-    }
-
-    public async Task Git(params string[] arguments)
-    {
-        var result = await ProcessRunner.RunAsync("git", arguments, Root, CancellationToken.None);
-        Assert.True(result.ExitCode == 0, result.Error);
-    }
-
-    public string SourceContents() => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
-        .Where(x => !Path.GetRelativePath(Root, x).Split(Path.DirectorySeparatorChar).Any(p => p is ".cqc" or "obj" or "bin" or "target" or "TestResults" or ".git"))
-        .Order(StringComparer.Ordinal).Select(x => Path.GetRelativePath(Root, x) + "\0" + File.ReadAllText(x)));
-    public void Dispose() => Directory.Delete(Root, true);
 }

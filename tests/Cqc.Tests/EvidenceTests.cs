@@ -80,6 +80,32 @@ public sealed class EvidenceTests
         finally { File.Delete(first); File.Delete(second); }
     }
 
+    [Fact]
+    public void OpenCoverMapsGenericArityEvenWhenOverloadsShareASourceLine()
+    {
+        using var fixture = FixtureWorkspace.Empty();
+        var report = Path.Combine(fixture.Root, "opencover.xml");
+        File.WriteAllText(report, """
+            <CoverageSession><Modules><Module>
+              <Files><File uid="1" fullPath="/scratch/Example.cs" /></Files>
+              <Classes><Class><FullName>Demo.Example</FullName><Methods>
+                <Method><Name>System.Int32 Demo.Example::Run()</Name><FileRef uid="1" />
+                  <SequencePoints><SequencePoint sl="3" vc="1" /></SequencePoints></Method>
+                <Method><Name>System.Int32 Demo.Example::Run&lt;T&gt;()</Name><FileRef uid="1" />
+                  <SequencePoints><SequencePoint sl="3" vc="0" /></SequencePoints></Method>
+              </Methods></Class></Classes>
+            </Module></Modules></CoverageSession>
+            """);
+        var facts = new[] { "Demo.Example.Run()", "Demo.Example.Run``1()" }.Select(signature =>
+            new MethodFact("csharp:Demo.csproj#" + signature, "csharp:Demo.csproj#Demo.Example", "csharp",
+                new("Example.cs", 3, 3), 1, 1, false, false, false, 0, [], [], 10) { CoverageSignature = signature });
+
+        var coverage = CSharpCoverageReader.ReadReport(report, facts);
+        Assert.Equal(2, coverage.Length);
+        Assert.Equal(1, Assert.Single(coverage, method => method.MethodId.EndsWith("#Demo.Example.Run()", StringComparison.Ordinal)).CoveredLines);
+        Assert.Equal(0, Assert.Single(coverage, method => method.MethodId.EndsWith("#Demo.Example.Run``1()", StringComparison.Ordinal)).CoveredLines);
+    }
+
     private static string OpenCoverReport(int left, int right) => $$"""
         <CoverageSession><Modules><Module><Files><File uid="1" fullPath="/scratch/Example.cs" /></Files><Classes><Class>
         <FullName>Demo.Example</FullName><Methods><Method><Name>System.Void Demo.Example::Run(System.Collections.Generic.List`1&lt;System.String&gt;)</Name><FileRef uid="1" />

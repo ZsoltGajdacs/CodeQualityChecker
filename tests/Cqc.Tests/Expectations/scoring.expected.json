@@ -420,33 +420,33 @@
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.Healthy",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.Healthy",
     "file": "csharp/Scoring.Cases/Healthy.cs",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):complexity": 1,
-      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):coverage": 1,
-      "method:csharp:Scoring.Healthy.Evaluate(System.Int32):crap": 1
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.Healthy.Evaluate(System.Int32):complexity": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.Healthy.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.Healthy.Evaluate(System.Int32):crap": 1
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.AtComplexity8",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity8",
     "file": "csharp/Scoring.Cases/AtComplexity8.cs",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):complexity": 8,
-      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):coverage": 1,
-      "method:csharp:Scoring.AtComplexity8.Evaluate(System.Int32):crap": 8
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity8.Evaluate(System.Int32):complexity": 8,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity8.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity8.Evaluate(System.Int32):crap": 8
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.OverComplexity9",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity9",
     "file": "csharp/Scoring.Cases/OverComplexity9.cs",
     "score": 9,
     "rules": [
@@ -460,14 +460,14 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):complexity": 9,
-      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):coverage": 1,
-      "method:csharp:Scoring.OverComplexity9.Evaluate(System.Int32):crap": 9
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity9.Evaluate(System.Int32):complexity": 9,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity9.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity9.Evaluate(System.Int32):crap": 9
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.AtComplexity10",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity10",
     "file": "csharp/Scoring.Cases/AtComplexity10.cs",
     "score": 9,
     "rules": [
@@ -481,14 +481,14 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):complexity": 10,
-      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):coverage": 1,
-      "method:csharp:Scoring.AtComplexity10.Evaluate(System.Int32):crap": 10
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity10.Evaluate(System.Int32):complexity": 10,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity10.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtComplexity10.Evaluate(System.Int32):crap": 10
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.OverComplexity11",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity11",
     "file": "csharp/Scoring.Cases/OverComplexity11.cs",
     "score": 9,
     "rules": [
@@ -502,27 +502,27 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):complexity": 11,
-      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):coverage": 1,
-      "method:csharp:Scoring.OverComplexity11.Evaluate(System.Int32):crap": 11
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity11.Evaluate(System.Int32):complexity": 11,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity11.Evaluate(System.Int32):coverage": 1,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverComplexity11.Evaluate(System.Int32):crap": 11
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.AtRisk30",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtRisk30",
     "file": "csharp/Scoring.Cases/AtRisk30.cs",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):complexity": 5,
-      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):coverage": 0,
-      "method:csharp:Scoring.AtRisk30.Evaluate(System.Int32):crap": 30
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtRisk30.Evaluate(System.Int32):complexity": 5,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtRisk30.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.AtRisk30.Evaluate(System.Int32):crap": 30
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.OverRisk42",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverRisk42",
     "file": "csharp/Scoring.Cases/OverRisk42.cs",
     "score": 9,
     "rules": [
@@ -536,14 +536,14 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):complexity": 6,
-      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):coverage": 0,
-      "method:csharp:Scoring.OverRisk42.Evaluate(System.Int32):crap": 42
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverRisk42.Evaluate(System.Int32):complexity": 6,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverRisk42.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.OverRisk42.Evaluate(System.Int32):crap": 42
     }
   },
   {
     "family": "code",
-    "entity": "csharp:Scoring.HighRisk156",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.HighRisk156",
     "file": "csharp/Scoring.Cases/HighRisk156.cs",
     "score": 8,
     "rules": [
@@ -558,27 +558,27 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):complexity": 12,
-      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):coverage": 0,
-      "method:csharp:Scoring.HighRisk156.Evaluate(System.Int32):crap": 156
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.HighRisk156.Evaluate(System.Int32):complexity": 12,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.HighRisk156.Evaluate(System.Int32):coverage": 0,
+      "method:csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.HighRisk156.Evaluate(System.Int32):crap": 156
     }
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.AtSize50Tests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.AtSize50Tests",
     "file": "csharp/Scoring.Tests/AtSize50Tests.cs",
     "score": 10,
     "rules": [],
     "locations": [],
     "metrics": {
-      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():executableLinesWithHelpers": 50,
-      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():assertionsWithHelpers": 1,
-      "method:csharp:Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():branchCountWithHelpers": 0
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():executableLinesWithHelpers": 50,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():assertionsWithHelpers": 1,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.AtSize50Tests.HasExactly50ExecutableLines():branchCountWithHelpers": 0
     }
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.OverSize51Tests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.OverSize51Tests",
     "file": "csharp/Scoring.Tests/OverSize51Tests.cs",
     "score": 9,
     "rules": [
@@ -592,14 +592,14 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():executableLinesWithHelpers": 51,
-      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():assertionsWithHelpers": 1,
-      "method:csharp:Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():branchCountWithHelpers": 0
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():executableLinesWithHelpers": 51,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():assertionsWithHelpers": 1,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.OverSize51Tests.HasExactly51ExecutableLines():branchCountWithHelpers": 0
     }
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.BranchingTests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.BranchingTests",
     "file": "csharp/Scoring.Tests/BranchingTests.cs",
     "score": 9,
     "rules": [
@@ -613,14 +613,14 @@
       }
     ],
     "metrics": {
-      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():executableLinesWithHelpers": 5,
-      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():assertionsWithHelpers": 1,
-      "method:csharp:Scoring.Tests.BranchingTests.BranchesOnTrueVariable():branchCountWithHelpers": 1
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.BranchingTests.BranchesOnTrueVariable():executableLinesWithHelpers": 5,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.BranchingTests.BranchesOnTrueVariable():assertionsWithHelpers": 1,
+      "method:csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.BranchingTests.BranchesOnTrueVariable():branchCountWithHelpers": 1
     }
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.WeakTests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.WeakTests",
     "file": "csharp/Scoring.Tests/WeakTests.cs",
     "score": 0,
     "rules": [
@@ -702,7 +702,7 @@
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.RollupTests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.RollupTests",
     "file": "csharp/Scoring.Tests/RollupTests.cs",
     "score": 9,
     "rules": [
@@ -723,7 +723,7 @@
   },
   {
     "family": "tests",
-    "entity": "csharp:Scoring.Tests.ExtraRollupTests",
+    "entity": "csharp:csharp/Scoring.Tests/Scoring.Tests.csproj#Scoring.Tests.ExtraRollupTests",
     "file": "csharp/Scoring.Tests/RollupTests.cs",
     "score": 9,
     "rules": [
@@ -744,7 +744,7 @@
   },
   {
     "family": "duplication",
-    "entity": "csharp:Scoring.CloneLeft",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneLeft",
     "file": "csharp/Scoring.Cases/CloneLeft.cs",
     "score": 9,
     "rules": [
@@ -758,8 +758,8 @@
       }
     ],
     "groupMembers": [
-      "csharp:Scoring.CloneLeft",
-      "csharp:Scoring.CloneRight"
+      "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneLeft",
+      "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneRight"
     ],
     "metrics": {
       "eligibleMethods": 1,
@@ -768,7 +768,7 @@
   },
   {
     "family": "duplication",
-    "entity": "csharp:Scoring.CloneRight",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneRight",
     "file": "csharp/Scoring.Cases/CloneRight.cs",
     "score": 9,
     "rules": [
@@ -782,8 +782,8 @@
       }
     ],
     "groupMembers": [
-      "csharp:Scoring.CloneLeft",
-      "csharp:Scoring.CloneRight"
+      "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneLeft",
+      "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CloneRight"
     ],
     "metrics": {
       "eligibleMethods": 1,
@@ -792,7 +792,7 @@
   },
   {
     "family": "dependencies",
-    "entity": "csharp:Scoring.CycleLeft",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CycleLeft",
     "file": "csharp/Scoring.Cases/CycleLeft.cs",
     "score": 8,
     "rules": [
@@ -816,7 +816,7 @@
   },
   {
     "family": "dependencies",
-    "entity": "csharp:Scoring.CycleRight",
+    "entity": "csharp:csharp/Scoring.Cases/Scoring.Cases.csproj#Scoring.CycleRight",
     "file": "csharp/Scoring.Cases/CycleRight.cs",
     "score": 9,
     "rules": [

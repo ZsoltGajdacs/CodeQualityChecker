@@ -7,8 +7,9 @@ internal sealed record StaticProjectSettings(Dictionary<string, string> Properti
 {
     private bool hasXunitPackage;
     public bool IsTestProject => XunitProject.IsTestProject(hasXunitPackage, Properties.GetValueOrDefault("IsTestProject"));
+    public StaticProjectReferences ProjectReferences { get; } = new();
     private static readonly HashSet<string> Relevant = new(StringComparer.OrdinalIgnoreCase)
-        { "LangVersion", "DefineConstants", "TargetFramework", "TargetFrameworks", "ImplicitUsings", "IsTestProject", "Configuration", "DisableImplicitFrameworkDefines", "DisableImplicitConfigurationDefines", "EnableDefaultCompileItems", "EnableDefaultItems", "DefaultItemExcludes", "DefaultExcludesInProjectFolder" };
+        { "LangVersion", "DefineConstants", "TargetFramework", "TargetFrameworks", "ImplicitUsings", "IsTestProject", "Configuration", "DisableImplicitFrameworkDefines", "DisableImplicitConfigurationDefines", "EnableDefaultCompileItems", "EnableDefaultItems", "DefaultItemExcludes", "DefaultExcludesInProjectFolder", "AssemblyName" };
 
     public static StaticProjectSettings Read(ProjectSnapshot snapshot, ProjectModule? project)
     {
@@ -50,6 +51,7 @@ internal sealed record StaticProjectSettings(Dictionary<string, string> Properti
             Problems.AddRange(StaticCompileRules.Problems(xml));
             hasXunitPackage |= XunitProject.HasPackage(xml);
             foreach (var property in xml.Descendants().Where(x => Relevant.Contains(x.Name.LocalName))) Apply(property);
+            ProjectReferences.Read(xml);
         }
         catch (System.Xml.XmlException) { Problems.Add("Invalid project/property XML: " + file.Name); }
     }
