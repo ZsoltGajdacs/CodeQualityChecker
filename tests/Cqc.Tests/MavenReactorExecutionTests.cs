@@ -76,6 +76,9 @@ public sealed class MavenReactorExecutionTests
         Assert.NotEmpty(classpath);
         Assert.All(classpath, path => Assert.True(File.Exists(path), path));
         var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/api/pom.xml"]);
+        Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/service/pom.xml"]);
+        Assert.Equal(JavaExecution.JacocoVersion, evidence.ToolVersions["java:jacoco:independent/pom.xml"]);
         if (!OperatingSystem.IsWindows())
         {
             Assert.Contains("CQC_WRAPPER_SELECTED", evidence.ToolVersions["java:maven:pom.xml"], StringComparison.Ordinal);
@@ -86,5 +89,27 @@ public sealed class MavenReactorExecutionTests
         Assert.Equal(JsonSerializer.Serialize(code, Wire.Json), JsonSerializer.Serialize(Assert.Single(replay.Results), Wire.Json));
         Assert.DoesNotContain(replay.Diagnostics, diagnostic => diagnostic.Code is "java.stale_classpath" or "java.classpath");
         Assert.Equal(before, workspace.SourceContents());
+    }
+
+    [Fact]
+    [Trait("Category", "Execution")]
+    public async Task SkippedProjectAgentProducesModuleDiagnosticWithoutFallback()
+    {
+        using var workspace = FixtureWorkspace.Copy("maven-reactor");
+        var pom = Path.Combine(workspace.Root, "group", "pom.xml");
+        var xml = await File.ReadAllTextAsync(pom);
+        await File.WriteAllTextAsync(pom, xml.Replace("<configuration><destFile>",
+            "<configuration><skip>true</skip><destFile>", StringComparison.Ordinal));
+
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 },
+            ["code"], CancellationToken.None);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "java.coverage_missing"
+            && diagnostic.File == "group/api/pom.xml" && diagnostic.Message.Contains("skip", StringComparison.OrdinalIgnoreCase));
+        var entities = Assert.Single(result.Results).Entities;
+        Assert.Null(Assert.Single(entities, item => item.EntityId.EndsWith("::example.api.Value", StringComparison.Ordinal)).Score);
+        Assert.NotNull(Assert.Single(entities, item => item.EntityId.EndsWith("::example.service.Service", StringComparison.Ordinal)).Score);
+        Assert.NotNull(Assert.Single(entities, item => item.EntityId.EndsWith("::independent.Other", StringComparison.Ordinal)).Score);
     }
 }

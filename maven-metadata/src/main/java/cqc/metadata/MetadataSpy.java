@@ -28,6 +28,7 @@ public final class MetadataSpy extends AbstractEventSpy {
             element(xml, "buildDirectory", project.getBuild().getDirectory());
             element(xml, "mainOutput", project.getBuild().getOutputDirectory());
             element(xml, "testOutput", project.getBuild().getTestOutputDirectory());
+            coverage(xml, CoverageResult.from(project));
             artifact(xml, project.getArtifact(), "main");
             for (var attached : project.getAttachedArtifacts())
                 artifact(xml, attached, attached.getType().equals("test-jar") || "tests".equals(attached.getClassifier()) ? "test" : "main");
@@ -36,6 +37,17 @@ public final class MetadataSpy extends AbstractEventSpy {
             xml.writeEndElement();
             xml.writeEndDocument();
             xml.close();
+        }
+    }
+
+    private static void coverage(XMLStreamWriter xml, CoverageResult coverage) throws XMLStreamException {
+        if (coverage == null) return;
+        xml.writeEmptyElement("coverage");
+        if (coverage.version() != null) xml.writeAttribute("version", coverage.version());
+        if (coverage.reason() != null) xml.writeAttribute("reason", coverage.reason());
+        if (coverage.report() != null) {
+            if (Files.isRegularFile(coverage.report())) xml.writeAttribute("report", coverage.report().toString());
+            else xml.writeAttribute("reason", "JaCoCo produced no module report from this test run.");
         }
     }
 

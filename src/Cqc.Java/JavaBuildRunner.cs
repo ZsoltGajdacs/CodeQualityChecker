@@ -16,8 +16,8 @@ internal sealed class JavaBuildRunner(ProjectSnapshot snapshot, string scratch, 
         versions["maven:" + module.Path] = (await MavenTool.RunRequired(tool, ["--version"], directory, token)).Output.Trim();
         await MavenTool.RunRequired(tool, ["-B", "-f", project,
             "-Dmaven.ext.class.path=" + MavenCollector.Find(),
-            $"org.jacoco:jacoco-maven-plugin:{JavaExecution.JacocoVersion}:prepare-agent", "test",
-            $"org.jacoco:jacoco-maven-plugin:{JavaExecution.JacocoVersion}:report",
+            "-Dcqc.jacoco.fallbackVersion=" + JavaExecution.JacocoVersion,
+            "-Dcqc.scratchDirectory=" + scratch, "test",
             "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:build-classpath",
             "-Dmdep.outputFile=target/cqc-classpath.txt", "-DincludeScope=test"], directory, token);
     }

@@ -15,4 +15,11 @@ internal static class MavenPaths
     }
 
     internal static string Relative(string root, string path) => Path.GetRelativePath(Canonical(root), Canonical(path)).Replace('\\', '/');
+
+    internal static bool IsDescendant(string root, string path)
+    {
+        var relative = Relative(root, path);
+        return relative is not "." and not ".." && !relative.StartsWith("../", StringComparison.Ordinal)
+            && !Path.IsPathRooted(relative);
+    }
 }

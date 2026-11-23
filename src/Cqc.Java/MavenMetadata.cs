@@ -11,11 +11,16 @@ internal sealed record MavenMetadata
     public required string TestOutput { get; init; }
     public required MavenSourceSet[] SourceSets { get; init; }
     public MavenArtifact[] Artifacts { get; init; } = [];
+    public MavenCoverage? Coverage { get; init; }
+
     internal static MavenMetadata Read(string file)
     {
         var project = XDocument.Load(file).Root ?? throw new InvalidOperationException("Empty Maven metadata.");
+        var coverage = project.Element("coverage");
         return new() { Pom = Required(project, "pom"), BuildDirectory = Required(project, "buildDirectory"),
             MainOutput = Required(project, "mainOutput"), TestOutput = Required(project, "testOutput"),
+            Coverage = coverage is null ? null : new(
+                (string?)coverage.Attribute("version"), (string?)coverage.Attribute("report"), (string?)coverage.Attribute("reason")),
             Artifacts = project.Elements("artifact").Select(artifact => new MavenArtifact(artifact.Value, artifact.Attribute("sourceSet")?.Value
                 ?? throw new InvalidOperationException("Missing artifact source set."))).ToArray(),
             SourceSets = project.Elements("context").Select(context => new MavenSourceSet(
@@ -30,6 +35,7 @@ internal sealed record MavenMetadata
 
 internal sealed record MavenArtifact(string Path, string SourceSet);
 internal sealed record MavenSourceSet(string Name, string[] SourceRoots, string[] Classpath);
+internal sealed record MavenCoverage(string? Version, string? Report, string? Reason);
 
 internal static class MavenCollector
 {

@@ -129,6 +129,7 @@ public sealed class BuildMetadataTests
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("pom.xml")], "fingerprint", []);
         var build = await new JavaExecution().ExecuteAsync(snapshot, scratch.Root, CancellationToken.None);
         Assert.Equal("wrapper-version", build.ToolVersions["maven:pom.xml"]);
+        Assert.Empty(build.Reports);
         Assert.True(File.Exists(Path.Combine(scratch.Root, "wrapper-ran")));
         Assert.False(File.Exists(Path.Combine(fixture.Root, "wrapper-ran")));
     }
@@ -161,12 +162,13 @@ public sealed class BuildMetadataTests
         fixture.Write("one/pom.xml", "<project />");
         fixture.Write("one/mvnw", "#!/bin/sh\necho ok\n");
         fixture.Write("two/pom.xml", "<project />");
-        fixture.Write("two/mvnw", "#!/bin/sh\nmkdir -p target/site/jacoco\ntouch target/site/jacoco/jacoco.xml\n" + MetadataScript());
+        fixture.Write("two/mvnw", "#!/bin/sh\nmkdir -p target/cqc-coverage\ntouch target/cqc-coverage/jacoco.xml\n" + MetadataScript(coverage: true));
         foreach (var path in new[] { "one/mvnw", "two/mvnw" }) File.SetUnixFileMode(Path.Combine(fixture.Root, path), UnixFileMode.UserRead | UnixFileMode.UserExecute);
         fixture.Write(".cqc/java-classpath.txt.source", "fingerprint");
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("one/pom.xml"), Maven("two/pom.xml")], "fingerprint", []);
         var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
         Assert.Single(build.Reports);
+        Assert.Equal("two/pom.xml", Assert.Single(build.ReportModules).Value);
         Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing" && d.File == "one/pom.xml");
         Assert.DoesNotContain(build.Diagnostics, d => d.Code == "java.coverage_missing");
         Assert.True(File.Exists(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
@@ -281,10 +283,11 @@ public sealed class BuildMetadataTests
         Assert.Empty(execution.ReadCoverage(single with { Reports = [report, report] }, [method]));
     }
 
-    private static string MetadataScript(string? missingJar = null) =>
+    private static string MetadataScript(string? missingJar = null, bool coverage = false) =>
         "mkdir -p target\ncat > target/cqc-metadata.xml <<EOF\n" +
         "<project><pom>$PWD/pom.xml</pom><buildDirectory>$PWD/target</buildDirectory>" +
         "<mainOutput>$PWD/target/classes</mainOutput><testOutput>$PWD/target/test-classes</testOutput>" +
+        (coverage ? "<coverage version='0.8.15' report='$PWD/target/cqc-coverage/jacoco.xml'/>" : "") +
         "<context sourceSet='main'>" + (missingJar is null ? "" : "<classpath>" + missingJar + "</classpath>") +
         "</context><context sourceSet='test'/></project>\nEOF\n";
 

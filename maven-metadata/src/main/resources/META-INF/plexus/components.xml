@@ -1,4 +1,11 @@
 <component-set><components><component>
   <role>org.apache.maven.eventspy.EventSpy</role><role-hint>cqc-metadata</role-hint>
   <implementation>cqc.metadata.MetadataSpy</implementation>
+</component><component>
+  <role>org.apache.maven.AbstractMavenLifecycleParticipant</role><role-hint>cqc-coverage</role-hint>
+  <implementation>cqc.metadata.CoverageLifecycle</implementation>
+  <requirements><requirement>
+    <role>org.apache.maven.lifecycle.internal.LifecycleExecutionPlanCalculator</role>
+    <field-name>calculator</field-name>
+  </requirement></requirements>
 </component></components></component-set>
