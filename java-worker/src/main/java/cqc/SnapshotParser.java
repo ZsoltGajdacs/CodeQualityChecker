@@ -23,10 +23,12 @@ final class SnapshotParser {
     }
 
     Context load() throws IOException {
-        var definitions = new SourceContexts(root, new ContextManifest(root, reporter).read(input.sourceFingerprint()), input.modules(), reporter);
+        var manifest = input.sourceOnly() ? List.<ContextManifest.Context>of()
+            : new ContextManifest(root, reporter).read(input.sourceFingerprint());
+        var definitions = new SourceContexts(root, manifest, input.modules(), reporter, input.sourceOnly());
         var sources = new ArrayList<Worker.Source>();
         var parser = new JavaParser(configuration());
-        for (String file : Arrays.stream(input.files()).filter(f -> f.endsWith(".java")).sorted().toList()) {
+        for (String file : Arrays.stream(input.files()).filter(SnapshotParser::javaSource).sorted().toList()) {
             var source = parseFile(parser, file, definitions.contextId(file));
             if (source.isPresent()) {
                 var parsed = source.get();
@@ -35,12 +37,17 @@ final class SnapshotParser {
         }
         var contexts = new ArrayList<>(definitions.contexts());
         var symbols = new SymbolContexts(sources, contexts);
+        if (input.sourceOnly()) return new Context(sources, contexts, List.copyOf(gaps), symbols);
         var index = new ResolutionSources(contexts, sources);
         for (int position = 0; position < contexts.size(); position++)
             contexts.set(position, inject(contexts.get(position), index, symbols));
         var effective = contexts.stream().collect(java.util.stream.Collectors.toMap(ContextManifest.Context::id, context -> context));
         var configuredSources = sources.stream().map(source -> new Worker.Source(source.file(), source.unit(), effective.get(source.context().id()))).toList();
         return new Context(configuredSources, contexts, List.copyOf(gaps), symbols);
+    }
+
+    private static boolean javaSource(String file) {
+        return file.toLowerCase(Locale.ROOT).endsWith(".java");
     }
 
     private ContextManifest.Context inject(ContextManifest.Context context, ResolutionSources sources, SymbolContexts symbols) {

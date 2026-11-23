@@ -11,6 +11,9 @@ import tempfile
 import threading
 
 
+FIXED_REVIEW_TOOLS = {'check_code_quality', 'check_uncommitted_changes_quality'}
+
+
 class McpSession:
     def __init__(self, package, server=None):
         environment = {key: value for key, value in os.environ.items()
@@ -74,8 +77,8 @@ def initialize(session):
                                   'clientInfo': {'name': 'cqc-package-smoke', 'version': '1'}})
     session.send({'jsonrpc': '2.0', 'method': 'notifications/initialized'})
     tools = session.request('tools/list', {})['tools']
-    expected = {'inspect_project', 'check_code_quality', 'check_test_quality',
-                'check_duplication', 'check_dependencies', 'check_all', 'get_report_page'}
+    expected = FIXED_REVIEW_TOOLS | {'inspect_project', 'check_test_quality',
+                                    'check_duplication', 'check_dependencies', 'check_all', 'get_report_page'}
     assert {tool['name'] for tool in tools} == expected
     return [tool for tool in tools if tool['name'] != 'get_report_page']
 
@@ -107,9 +110,29 @@ def invoke(session, tool, root):
     assert '10 is the desired score.' in tool['description']
     response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
         'projectRoot': str(root), 'execute': False}}})
-    result = retrieve_full(session, structured(response))
+    summary = structured(response)
+    result = retrieve_full(session, summary)
     assert result['message'] == '10 is the desired score.'
+    if tool['name'] in FIXED_REVIEW_TOOLS:
+        verify_source_review(tool['name'], summary, result)
     return result
+
+
+def verify_source_review(tool, summary, result):
+    expected_scope = 'repository' if tool == 'check_code_quality' else 'changed'
+    assert summary['scope'] == result['scope'] == expected_scope
+    assert summary['fileCount'] > 0, summary
+    assert summary['analysisNote'] == 'Running with `execute: true` may reveal additional findings.'
+    assert {family['family'] for family in result['results']} <= {'code', 'duplication'}
+    code = next(family for family in summary['families'] if family['family'] == 'code')
+    assert 'scores' not in code and code['staticComplexityScores'], code
+    verify_static_assessments(result)
+    production = next(family for family in result['results'] if family['family'] == 'code')
+    assert all('score' not in entity and 'blockers' not in entity for entity in production['entities']), production
+
+
+def initialize_git(root):
+    subprocess.run(['/usr/bin/git', 'init', '--quiet', str(root)], check=True, capture_output=True)
 
 
 def verify_languages(result):
@@ -160,6 +183,7 @@ def run(package):
         (root / 'Example.cs').write_text('using System.Data.Common; namespace Sample; public class Example { '
                                         'public DbConnection? Connection { get; set; } '
                                         'public int Add(int a, int b) { return a + b; } }\n')
+        initialize_git(root)
         original = digest_sources(root)
         session = McpSession(package)
         try:
@@ -170,7 +194,7 @@ def run(package):
             assert digest_sources(root) == original, 'Analysis-only changed fixture files'
         finally:
             session.close()
-    print('PASS: seven packaged MCP tools, bounded summaries/raw pages, Java/C# without host runtimes.')
+    print('PASS: eight packaged MCP tools, bounded summaries/raw pages, Java/C# without host runtimes.')
 
 
 if __name__ == '__main__':

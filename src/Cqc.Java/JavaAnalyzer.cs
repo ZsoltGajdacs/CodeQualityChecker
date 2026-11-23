@@ -6,6 +6,7 @@ namespace Cqc.Java;
 
 public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILanguageDiscovery
 {
+    private const string SourceOnlySchemaVersion = "3";
     public string Language => "java";
     public LanguageDefinition Definition { get; } = new()
     {
@@ -39,12 +40,14 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         };
         start.ArgumentList.Add("-jar");
         start.ArgumentList.Add(jar);
+        var version = snapshot.SourceOnly ? SourceOnlySchemaVersion : Wire.SchemaVersion;
         try
         {
-            var result = await JavaWorkerProcess.RunAsync(start, JsonSerializer.Serialize(snapshot, Wire.Json), cancellationToken);
+            var workerInput = snapshot with { SchemaVersion = version };
+            var result = await JavaWorkerProcess.RunAsync(start, JsonSerializer.Serialize(workerInput, Wire.Json), cancellationToken);
             if (result.ExitCode != 0)
                 return Unavailable("java.worker_failed", "Java analyzer failed: " + result.Error.Trim());
-            return ReadFacts(result.Output);
+            return ReadFacts(result.Output, version);
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException or JsonException)
         {
@@ -52,15 +55,15 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         }
     }
 
-    private static AnalysisFacts ReadFacts(string output)
+    private static AnalysisFacts ReadFacts(string output, string expectedVersion)
     {
         using var wire = JsonDocument.Parse(output);
-        if (!wire.RootElement.TryGetProperty("schemaVersion", out var version) || version.GetString() != Wire.SchemaVersion)
-            return Unavailable("java.worker_protocol", "Java worker schemaVersion must be 2. Install matching server and worker artifacts.");
+        if (!wire.RootElement.TryGetProperty("schemaVersion", out var version) || version.GetString() != expectedVersion)
+            return Unavailable("java.worker_protocol", $"Java worker schemaVersion must be {expectedVersion}. Install matching server and worker artifacts.");
         var facts = JsonSerializer.Deserialize<AnalysisFacts>(output, Wire.Json);
         if (facts is null) return Unavailable("java.worker_empty", "Java analyzer returned no facts.");
         if (facts.Types.Any(type => type.Evidence is null) || facts.Methods.Any(method => method.Evidence is null))
-            return Unavailable("java.worker_protocol", "Schema-2 Java facts require explicit evidence. Install matching server and worker artifacts.");
+            return Unavailable("java.worker_protocol", "Java facts require explicit evidence. Install matching server and worker artifacts.");
         return facts;
     }
 

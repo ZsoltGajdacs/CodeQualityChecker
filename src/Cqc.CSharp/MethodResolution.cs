@@ -5,6 +5,8 @@ namespace Cqc.CSharp;
 
 internal sealed record MethodResolution
 {
+    public static MethodResolution NotAttempted { get; } = new() { Calls = [] };
+
     public required string[] Calls { get; init; }
     public int Assertions { get; init; }
     public bool IdentityComplete { get; init; }

@@ -37,7 +37,7 @@ internal sealed class FactCollector
                 Methods.Add(MethodFacts.Create(method, methodSymbol, context, isTest));
             }
         }
-        Dependencies.AddRange(TypeDependencies.Read(declaration, symbol, context));
+        if (!context.SourceOnly) Dependencies.AddRange(TypeDependencies.Read(declaration, symbol, context));
     }
 
 }
@@ -48,4 +48,5 @@ internal sealed record SourceAnalysisContext(SemanticModel Model, CancellationTo
     public ProjectSymbolIdentity Identity => Project.Identity;
     public string ContextId => Project.Context.Id;
     public bool VerifiedContext => Project.Context.Verified;
+    public bool SourceOnly => Project.SourceOnly;
 }

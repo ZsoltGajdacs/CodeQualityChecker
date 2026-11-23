@@ -19,7 +19,9 @@ public sealed class ReportDeliveryTests
         original = original with { Results = [family with { Entities = [entity] }] };
         var summary = await store.PublishAsync(original, CancellationToken.None);
         Assert.Equal(9, Assert.Single(summary.Families.Single().StaticComplexityScores).Score);
-        Assert.Null(Assert.Single(summary.Families.Single().Scores).Score);
+        var scores = summary.Families.Single().Scores;
+        Assert.NotNull(scores);
+        Assert.Null(Assert.Single(scores).Score);
         var page = await store.ReadPageAsync(new() { ReportId = summary.ReportId, Section = "entities", Family = "code" }, CancellationToken.None);
         var item = Assert.Single(page.Items);
         Assert.Equal(JsonValueKind.Null, item.GetProperty("score").ValueKind);
@@ -36,7 +38,9 @@ public sealed class ReportDeliveryTests
         var summary = await store.PublishAsync(original, CancellationToken.None);
         Assert.Equal("3", summary.SchemaVersion);
         Assert.Equal(123, summary.Families.Single().EntityCount);
-        Assert.Contains(summary.Families.Single().Scores, s => s.Score is null && s.Count > 0);
+        var scores = summary.Families.Single().Scores;
+        Assert.NotNull(scores);
+        Assert.Contains(scores, s => s.Score is null && s.Count > 0);
         Assert.DoesNotContain("results", JsonSerializer.Serialize(summary, CompactJson.Options));
         var items = await All(store, new() { ReportId = summary.ReportId, Section = "entities", Family = "code", Limit = 7 });
         Assert.Equal(123, items.Count);

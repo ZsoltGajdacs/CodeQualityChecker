@@ -11,33 +11,38 @@ final class TypeAnalysis {
     private final MavenClasspath.Reporter reporter;
     private final SymbolContexts symbols;
     private final MethodAnalyzer methods;
+    private final boolean sourceOnly;
     record Result(Worker.TypeFact type, List<Worker.MethodFact> methods, List<Worker.DependencyFact> dependencies, List<Worker.SyntaxGap> gaps) { }
     record Edges(List<Worker.DependencyFact> facts, boolean complete) { }
+    private static final Edges NO_EDGES = new Edges(List.of(), false);
 
-    TypeAnalysis(MavenClasspath.Reporter reporter, SymbolContexts symbols) {
+    TypeAnalysis(MavenClasspath.Reporter reporter, SymbolContexts symbols, boolean sourceOnly) {
         this.reporter = reporter;
         this.symbols = symbols;
-        methods = new MethodAnalyzer(reporter, symbols);
+        this.sourceOnly = sourceOnly;
+        methods = new MethodAnalyzer(reporter, symbols, sourceOnly);
     }
 
     Result analyze(Worker.Source source, TypeDeclaration<?> type) {
-        var dependencies = new DependencyAnalyzer(reporter, source).analyze(type);
         String name = typeName(type);
         String id = SymbolContexts.qualify(source.context().id(), name);
-        var edges = canonicalizeEdges(source, id, dependencies.edges());
+        if (sourceOnly) id += sourceKey(source.file(), type);
+        var edges = sourceOnly ? NO_EDGES : readEdges(source, type, id);
         var gaps = syntaxGaps(source, type);
-        var fact = typeFact(source, type, dependencies.complete() && edges.complete(), gaps.isEmpty());
-        return new Result(fact, methods(source, type, gaps.isEmpty()), edges.facts(), gaps);
+        var owner = new MethodAnalyzer.Owner(source, id, gaps.isEmpty());
+        var fact = typeFact(owner, type, edges.complete());
+        return new Result(fact, methods(owner, type), edges.facts(), gaps);
     }
 
-    private Worker.TypeFact typeFact(Worker.Source source, TypeDeclaration<?> type, boolean dependencies, boolean syntax) {
+    private Worker.TypeFact typeFact(MethodAnalyzer.Owner owner, TypeDeclaration<?> type, boolean dependencies) {
+        var source = owner.source();
         var context = source.context();
         String name = typeName(type);
-        var evidence = new Worker.EvidenceState(syntax, true, true, dependencies, context.verified(), context.blockers());
+        var evidence = new Worker.EvidenceState(owner.syntax(), true, true, dependencies, context.verified(), context.blockers());
         boolean isTest = context.sourceSet().equals("test") || type.getMethods().stream().anyMatch(TestRecognition::testAnnotation);
         boolean isAbstract = abstractType(type);
-        return new Worker.TypeFact(SymbolContexts.qualify(context.id(), name), "java", location(source.file(), type), isAbstract, isTest,
-            syntax && dependencies && context.verified(), context.id(), name, evidence);
+        return new Worker.TypeFact(owner.id(), "java", location(source.file(), type), isAbstract, isTest,
+            owner.syntax() && dependencies && context.verified(), context.id(), name, evidence);
     }
 
     private static boolean abstractType(TypeDeclaration<?> type) {
@@ -45,15 +50,21 @@ final class TypeAnalysis {
         return declaration.isInterface() || declaration.isAbstract();
     }
 
-    private List<Worker.MethodFact> methods(Worker.Source source, TypeDeclaration<?> type, boolean syntax) {
+    private List<Worker.MethodFact> methods(MethodAnalyzer.Owner owner, TypeDeclaration<?> type) {
         var facts = new ArrayList<Worker.MethodFact>();
         for (var member : type.getMembers()) {
             if (member instanceof MethodDeclaration method)
-                method.getBody().ifPresent(body -> facts.add(methods.analyze(source, method, body, syntax)));
+                method.getBody().ifPresent(body -> facts.add(methods.analyze(owner, method, body)));
             if (member instanceof ConstructorDeclaration constructor)
-                facts.add(methods.analyze(source, constructor, constructor.getBody(), syntax));
+                facts.add(methods.analyze(owner, constructor, constructor.getBody()));
         }
         return facts;
+    }
+
+    private Edges readEdges(Worker.Source source, TypeDeclaration<?> type, String id) {
+        var dependencies = new DependencyAnalyzer(reporter, source).analyze(type);
+        var edges = canonicalizeEdges(source, id, dependencies.edges());
+        return new Edges(edges.facts(), dependencies.complete() && edges.complete());
     }
 
     private Edges canonicalizeEdges(Worker.Source source, String id, List<Worker.DependencyFact> edges) {

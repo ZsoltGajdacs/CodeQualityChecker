@@ -20,7 +20,7 @@ public final class Worker {
     private final List<SyntaxGap> syntaxGaps = new ArrayList<>();
 
     record Module(String language, String path) { }
-    record Snapshot(String root, String[] files, String sourceFingerprint, Module[] modules, String schemaVersion) { }
+    record Snapshot(String root, String[] files, String sourceFingerprint, Module[] modules, String schemaVersion, boolean sourceOnly) { }
     record Location(String file, int startLine, int endLine) { }
     record Diagnostic(String code, String message, String file, String language) { }
     record EvidenceState(boolean syntax, boolean identity, boolean calls, boolean dependencies, boolean verifiedContext, String[] blockers) {
@@ -53,7 +53,8 @@ public final class Worker {
             Objects.requireNonNull(input, "Expected a snapshot object.");
             Objects.requireNonNull(input.root(), "Snapshot root is required.");
             Objects.requireNonNull(input.files(), "Snapshot files are required.");
-            if (!"2".equals(input.schemaVersion())) throw new IllegalArgumentException("Unsupported snapshot schemaVersion; expected 2. Install matching server and worker.");
+            String version = input.sourceOnly() ? "3" : "2";
+            if (!version.equals(input.schemaVersion())) throw new IllegalArgumentException("Unsupported snapshot schemaVersion; expected " + version + ". Install matching server and worker.");
             System.out.print(JSON.toJson(new Worker().analyze(input)));
         } catch (Exception exception) {
             System.err.println(exception.getClass().getSimpleName() + ": " + exception.getMessage());
@@ -63,7 +64,7 @@ public final class Worker {
 
     private AnalysisFacts analyze(Snapshot input) throws IOException {
         var parsed = new SnapshotParser(input, this::diagnostic).load();
-        var analyzer = new TypeAnalysis(this::diagnostic, parsed.symbols());
+        var analyzer = new TypeAnalysis(this::diagnostic, parsed.symbols(), input.sourceOnly());
         syntaxGaps.addAll(parsed.gaps());
         for (var source : parsed.sources())
             for (var type : source.unit().findAll(TypeDeclaration.class)) {
@@ -75,7 +76,7 @@ public final class Worker {
             }
         sortResults();
         boolean complete = syntaxGaps.isEmpty() && types.stream().allMatch(TypeFact::complete) && methods.stream().allMatch(MethodFact::complete);
-        return new AnalysisFacts(types, methods, dependencies, diagnostics, complete, "2",
+        return new AnalysisFacts(types, methods, dependencies, diagnostics, complete, input.schemaVersion(),
             parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(), syntaxGaps);
     }
 

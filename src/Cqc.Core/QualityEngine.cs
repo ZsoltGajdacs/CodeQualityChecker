@@ -18,6 +18,7 @@ public static class QualityEngine
     {
         request.CancellationToken.ThrowIfCancellationRequested();
         var context = new RuleContext(request.Snapshot, request.Facts, request.CancellationToken);
+        if (request.Snapshot.SourceOnly) return StructuralReview.Evaluate(context, request.Config);
         return request.Families.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(family => family switch
         {
             "code" => ProductionRules.Evaluate(context, request.Config, request.Evidence, request.ConfigurationFingerprint),

@@ -3,7 +3,7 @@ using Cqc.Core;
 
 namespace Cqc.Server.Reporting;
 
-internal sealed class ReportIndexWriter(Stream stream, CancellationToken token)
+internal sealed class ReportIndexWriter(Stream stream, JsonSerializerOptions options, CancellationToken token)
 {
     private readonly List<IndexedRow> rows = [];
     public async Task<IndexedRow[]> WriteAsync(object report)
@@ -34,8 +34,9 @@ internal sealed class ReportIndexWriter(Stream stream, CancellationToken token)
         foreach (var finding in family.Findings) await Add("findings", family.Family, finding.EntityIds.Concat(findingEntities[finding.Id]).Distinct(StringComparer.Ordinal).ToArray(), new { family = family.Family, finding.Id, finding.Rule, finding.Message, finding.Advice, finding.EntityIds, finding.Locations, finding.Deduction });
         foreach (var entity in family.Entities)
         {
-            await Add("entities", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, entity.Kind, entity.File, entity.Status,
-                entity.Score, entity.Blockers, entity.StaticComplexity, findingCount = entity.FindingIds.Length, metricCount = entity.Metrics.Count });
+            await Add("entities", family.Family, [entity.EntityId], new EntityPageItem(family.Family, entity.EntityId,
+                entity.Kind, entity.File, entity.Status, entity.Score, entity.Blockers, entity.StaticComplexity,
+                entity.FindingIds.Length, entity.Metrics.Count));
             foreach (var metric in entity.Metrics)
                 await Add("metrics", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, name = metric.Key, value = metric.Value });
         }
@@ -43,9 +44,12 @@ internal sealed class ReportIndexWriter(Stream stream, CancellationToken token)
     private async Task Add(string section, string? family, string[] entities, object value)
     {
         token.ThrowIfCancellationRequested();
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, CompactJson.Options);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, options);
         var offset = stream.Position;
         await stream.WriteAsync(bytes, token);
         rows.Add(new(section, family, entities, offset, bytes.Length));
     }
 }
+
+internal sealed record EntityPageItem(string Family, string EntityId, string Kind, string File, string Status,
+    double? Score, string[] Blockers, AssessmentResult? StaticComplexity, int FindingCount, int MetricCount);

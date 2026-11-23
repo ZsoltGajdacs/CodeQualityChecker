@@ -4,6 +4,7 @@ namespace Cqc.Core;
 
 public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
 {
+    private static readonly string[] ReviewFamilies = ["code", "tests", "duplication", "dependencies"];
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly ILanguageAnalyzer[] adapters = analyzers.ToArray();
     private LanguageDefinition[] Definitions => adapters.OfType<ILanguageDiscovery>().Select(x => x.Definition).ToArray();
@@ -23,61 +24,89 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         return tools.Concat(definitions.SelectMany(d => d.InspectPrerequisites?.Invoke(snapshot, OnPath) ?? [])).ToArray();
     }
 
-    public async Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, string[] families, CancellationToken cancellationToken)
+    public Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, string[] families, CancellationToken cancellationToken)
+        => AnalyzeAsync(request, families, AnalysisMode.EvidenceAware, cancellationToken);
+
+    public Task<AnalysisResponse> ReviewAsync(AnalysisRequest request, CancellationToken cancellationToken)
+        => AnalyzeAsync(request, request.Execute ? ReviewFamilies : ["code", "duplication"],
+            request.Execute ? AnalysisMode.Execute : AnalysisMode.SourceOnly, cancellationToken);
+
+    private async Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, string[] families, AnalysisMode mode, CancellationToken cancellationToken)
     {
         using var timeout = Timeout(request, cancellationToken);
         var gate = Gates.GetOrAdd(Path.GetFullPath(request.ProjectRoot), _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(timeout.Token);
-        try { return await AnalyzeLockedAsync(request, families, timeout.Token); }
+        try { return await AnalyzeLockedAsync(request, families, mode, timeout.Token); }
         finally { gate.Release(); }
     }
 
-    private async Task<AnalysisResponse> AnalyzeLockedAsync(AnalysisRequest request, string[] families, CancellationToken cancellationToken)
+    private async Task<AnalysisResponse> AnalyzeLockedAsync(AnalysisRequest request, string[] families, AnalysisMode mode, CancellationToken token)
     {
-        using var timeout = Timeout(request, cancellationToken);
         var (config, configFingerprint) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
-        var snapshot = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-        var diagnostics = new List<Diagnostic>(snapshot.Diagnostics);
-        BuildArtifacts? artifacts = null;
+        var snapshot = (await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions))
+            with { SourceOnly = mode == AnalysisMode.SourceOnly };
+        var discoveryDiagnostics = snapshot.SourceOnly
+            ? snapshot.Diagnostics.Where(diagnostic => diagnostic.Code != "unsupported_integration").ToArray()
+            : snapshot.Diagnostics;
+        var diagnostics = new List<Diagnostic>(discoveryDiagnostics);
+        var report = new AnalysisResponse(Wire.SchemaVersion, "2", Wire.Target, snapshot.SourceFingerprint, configFingerprint,
+            request.Scope, snapshot.SelectedFiles, snapshot.Modules, [], discoveryDiagnostics) { SourceOnly = snapshot.SourceOnly };
+        if (mode != AnalysisMode.EvidenceAware && IsEmptyChangeSelection(request, snapshot)) return report;
+
+        using var artifacts = request.Execute ? await BuildAsync(snapshot, diagnostics, token) : null;
+        await VerifyBuildSnapshot(request, config, snapshot, token);
+        var facts = await CollectFacts(snapshot, diagnostics, token);
+        diagnostics.AddRange(snapshot.SourceOnly ? StructuralReview.Diagnostics(facts, snapshot.SelectedFiles) : facts.Diagnostics);
+        var coverage = await CollectCoverage(new CoverageInput
+        {
+            Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
+            Facts = facts, Artifacts = artifacts
+        }, diagnostics, token);
+        await VerifySnapshot(request, config, snapshot, token);
+        var results = QualityEngine.Evaluate(new EvaluationRequest
+        {
+            Snapshot = snapshot, Facts = facts, Config = config, Evidence = request.Execute && artifacts is null ? null : coverage,
+            ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = token
+        });
+        token.ThrowIfCancellationRequested();
+        return report with
+        {
+            Results = results,
+            Diagnostics = diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray()
+        };
+    }
+
+    private static bool IsEmptyChangeSelection(AnalysisRequest request, ProjectSnapshot snapshot) =>
+        request.Scope == "changed" && snapshot.SelectedFiles.Length == 0;
+
+    private async Task<BuildArtifacts?> BuildAsync(ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)
+    {
+        await EvidenceStore.EnsureWritableAsync(snapshot.Root, token);
         try
         {
-            if (request.Execute)
-            {
-                await EvidenceStore.EnsureWritableAsync(snapshot.Root, timeout.Token);
-                try { artifacts = await new BuildExecutor(adapters.OfType<ILanguageExecution>()).CollectAsync(snapshot, timeout.Token); }
-                catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
-                { diagnostics.Add(new("execution_failed", ex.Message)); }
-                AppendBuildDiagnostics(diagnostics, artifacts);
-            }
-            await VerifyBuildSnapshot(request, config, snapshot, timeout.Token);
-            var facts = await CollectFacts(snapshot, diagnostics, timeout.Token);
-            diagnostics.AddRange(facts.Diagnostics);
-            CoverageEvidence? coverage = null;
-            try
-            {
-                coverage = await new CoverageCollection(adapters).CollectAsync(new CoverageInput
-                {
-                    Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
-                    Facts = facts, Artifacts = artifacts
-                }, diagnostics, timeout.Token);
-            }
-            catch (Exception ex) when (ex is JsonException or ArgumentException or System.Xml.XmlException)
-            { diagnostics.Add(new("coverage_invalid", "Coverage evidence is invalid: " + ex.Message)); }
-            var after = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-            if (after.SourceFingerprint != snapshot.SourceFingerprint)
-                throw new InvalidOperationException("Source/build inputs changed during analysis. No scores are accepted; rerun against a stable snapshot.");
-            if (request.Execute && artifacts is null) coverage = null;
-            var results = QualityEngine.Evaluate(new EvaluationRequest
-            {
-                Snapshot = snapshot, Facts = facts, Config = config, Evidence = coverage,
-                ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = timeout.Token
-            });
-            timeout.Token.ThrowIfCancellationRequested();
-            return new(Wire.SchemaVersion, "2", Wire.Target, snapshot.SourceFingerprint, configFingerprint, request.Scope,
-                snapshot.SelectedFiles, snapshot.Modules, results, diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray());
+            var artifacts = await new BuildExecutor(adapters.OfType<ILanguageExecution>()).CollectAsync(snapshot, token);
+            diagnostics.AddRange(artifacts.Results.SelectMany(result => result.Diagnostics));
+            return artifacts;
         }
-        finally { artifacts?.Dispose(); }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
+        {
+            diagnostics.Add(new("execution_failed", ex.Message));
+            return null;
+        }
     }
+
+    private async Task<CoverageEvidence?> CollectCoverage(CoverageInput input, List<Diagnostic> diagnostics, CancellationToken token)
+    {
+        if (input.Snapshot.SourceOnly) return null;
+        try { return await new CoverageCollection(adapters).CollectAsync(input, diagnostics, token); }
+        catch (Exception ex) when (ex is JsonException or ArgumentException or System.Xml.XmlException)
+        {
+            diagnostics.Add(new("coverage_invalid", "Coverage evidence is invalid: " + ex.Message));
+            return null;
+        }
+    }
+
+    private enum AnalysisMode { EvidenceAware, SourceOnly, Execute }
 
     private async Task VerifyBuildSnapshot(AnalysisRequest request, QualityConfig config, ProjectSnapshot snapshot, CancellationToken token)
     {
@@ -87,9 +116,11 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             throw new InvalidOperationException("Source/build inputs changed during execution. Evidence is not accepted; rerun against a stable snapshot.");
     }
 
-    private static void AppendBuildDiagnostics(List<Diagnostic> diagnostics, BuildArtifacts? artifacts)
+    private async Task VerifySnapshot(AnalysisRequest request, QualityConfig config, ProjectSnapshot snapshot, CancellationToken token)
     {
-        if (artifacts is not null) diagnostics.AddRange(artifacts.Results.SelectMany(result => result.Diagnostics));
+        var after = await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions);
+        if (after.SourceFingerprint != snapshot.SourceFingerprint)
+            throw new InvalidOperationException("Source/build inputs changed during analysis. No scores are accepted; rerun against a stable snapshot.");
     }
 
     private async Task<AnalysisFacts> CollectFacts(ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)
@@ -100,13 +131,13 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             try
             {
                 var facts = await adapter.AnalyzeAsync(snapshot, token);
-                if (!facts.SemanticComplete && facts.Types.Length == 0)
+                if (!snapshot.SourceOnly && HasSemanticFailure(facts))
                     facts = facts with { Diagnostics = facts.Diagnostics.Append(new Diagnostic("analyzer_failed", "No analyzable types were produced. Check language diagnostics and installed analyzer runtimes.", Language: adapter.Language)).ToArray() };
                 results.Add(LanguageIdentity.Qualify(facts, adapter.Language));
             }
             catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or JsonException)
             {
-                diagnostics.Add(new("analyzer_failed", ex.Message, Language: adapter.Language));
+                if (!snapshot.SourceOnly) diagnostics.Add(new("analyzer_failed", ex.Message, Language: adapter.Language));
                 results.Add(new([], [], [], [new("analyzer_failed", ex.Message, Language: adapter.Language)], false));
             }
         }
@@ -117,6 +148,8 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             SyntaxGaps = results.SelectMany(r => r.SyntaxGaps).ToArray()
         };
     }
+
+    private static bool HasSemanticFailure(AnalysisFacts facts) => !facts.SemanticComplete && facts.Types.Length == 0;
 
     private static CancellationTokenSource Timeout(AnalysisRequest request, CancellationToken token)
     {

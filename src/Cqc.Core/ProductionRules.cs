@@ -12,8 +12,7 @@ internal static class ProductionRules
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config,
         CoverageEvidence? evidence, string configFingerprint)
     {
-        var testTypes = context.Facts.Types.Where(t => t.IsTest).Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
-        var methods = context.Methods.Where(m => !m.IsTest && !m.IsFixture && !testTypes.Contains(m.TypeId)).ToArray();
+        var methods = ProductionMethods(context).ToArray();
         var types = context.TypesFor(methods)
             .Concat(context.Facts.Types.Where(type => !type.IsTest && !AssessmentEvidence.Of(type).Syntax)).Distinct().ToArray();
         if (methods.Length == 0 && types.Length == 0)
@@ -40,6 +39,12 @@ internal static class ProductionRules
             Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id], Metrics = id => metrics.GetValueOrDefault(id) ?? RuleContext.Metrics(), Diagnostics = diagnostics });
     }
 
+    internal static IEnumerable<MethodFact> ProductionMethods(RuleContext context)
+    {
+        var testTypes = context.Facts.Types.Where(t => t.IsTest).Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
+        return context.Methods.Where(m => !m.IsTest && !m.IsFixture && !testTypes.Contains(m.TypeId));
+    }
+
     private static Dictionary<string, MethodCoverage> MatchingCoverage(string source, string config, CoverageEvidence? evidence)
     {
         if (evidence is not { Successful: true, SchemaVersion: "2" }) return [];
@@ -53,16 +58,19 @@ internal static class ProductionRules
         var fraction = report is null ? null : CoverageFraction(report);
         var crap = fraction is { } value ? (double)method.Complexity * method.Complexity * Math.Pow(1 - value, 3) + method.Complexity : (double?)null;
         var findings = new List<Finding>();
-        if (method.Complexity > config.ComplexityThreshold)
-            findings.Add(ForMethod("code.complexity", method,
-                $"Cyclomatic complexity {method.Complexity} exceeds {config.ComplexityThreshold}.",
-                "Simplify decisions or extract cohesive behavior, then rerun this check."));
+        if (ComplexityFinding(method, config) is { } staticFinding) findings.Add(staticFinding);
         if (crap > config.CrapThreshold)
             findings.Add(ForMethod("code.crap", method,
                 FormattableString.Invariant($"CRAP {crap:0.###} exceeds {config.CrapThreshold}."),
                 "Improve branch coverage and reduce decision complexity."));
         return new(method, fraction, crap, findings.ToArray()) { Report = report };
     }
+
+    internal static Finding? ComplexityFinding(MethodFact method, QualityConfig config) =>
+        method.Complexity > config.ComplexityThreshold
+            ? ForMethod("code.complexity", method, $"Cyclomatic complexity {method.Complexity} exceeds {config.ComplexityThreshold}.",
+                "Simplify decisions or extract cohesive behavior, then rerun this check.")
+            : null;
 
     private static SortedDictionary<string, double?> Metrics(IEnumerable<Assessment> assessments)
     {

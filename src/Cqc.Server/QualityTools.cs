@@ -10,8 +10,17 @@ public sealed class QualityTools(AnalysisService service, ReportStore reports)
     [McpServerTool(Name = "inspect_project", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Detect Java/C# modules, integrations and prerequisites without executing project code. 10 is the desired score.")]
     public Task<CallToolResult> InspectProject(AnalysisRequest request, CancellationToken cancellationToken) => McpReply.Invoke(async () => await reports.PublishAsync(await service.InspectAsync(request with { Execute = false }, cancellationToken), cancellationToken, request.Scope), cancellationToken);
 
-    [McpServerTool(Name = "check_code_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Production complexity and branch-coverage CRAP with file/class scores and method deductions. Missing evidence prevents scoring. 10 is the desired score. execute=true explicitly permits project builds/tests/restores in an isolated copy.")]
-    public Task<CallToolResult> CheckCodeQuality(AnalysisRequest request, CancellationToken cancellationToken) => McpReply.Invoke(async () => await reports.PublishAsync(await service.AnalyzeAsync(request, ["code"], cancellationToken), cancellationToken), cancellationToken);
+    [McpServerTool(Name = "check_code_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Review the whole repository. Source-only by default: static complexity and structural duplication. 10 is the desired score. execute=true permits isolated builds and tests and evaluates all quality families.")]
+    public Task<CallToolResult> CheckCodeQuality(QualityReviewRequest request, CancellationToken cancellationToken)
+        => Review(request, "repository", cancellationToken);
+
+    [McpServerTool(Name = "check_uncommitted_changes_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Review staged, unstaged, and untracked source files using their current working-tree contents and repository context. Source-only by default. 10 is the desired score. execute=true permits isolated builds and tests and evaluates all quality families.")]
+    public Task<CallToolResult> CheckUncommittedChangesQuality(QualityReviewRequest request, CancellationToken cancellationToken)
+        => Review(request, "changed", cancellationToken);
+
+    private Task<CallToolResult> Review(QualityReviewRequest request, string scope, CancellationToken token)
+        => McpReply.Invoke(async () => await reports.PublishAsync(
+            await service.ReviewAsync(request.ForScope(scope), token), token), token);
 
     [McpServerTool(Name = "check_test_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("JUnit 5/xUnit test structure, assertions and helper complexity with evidence locations. 10 is the desired score. execute=true explicitly permits project builds/tests/restores in an isolated copy.")]
     public Task<CallToolResult> CheckTestQuality(AnalysisRequest request, CancellationToken cancellationToken) => McpReply.Invoke(async () => await reports.PublishAsync(await service.AnalyzeAsync(request, ["tests"], cancellationToken), cancellationToken), cancellationToken);

@@ -8,17 +8,30 @@ namespace Cqc.CSharp;
 
 internal sealed record ProjectCompilation(
     ParsedProject Source, CSharpCompilation Compilation, ProjectSymbolIdentity Identity, AnalysisContext Context,
-    KeyValuePair<MetadataReference, string>[] ProjectReferences, Diagnostic[] Diagnostics);
+    KeyValuePair<MetadataReference, string>[] ProjectReferences, Diagnostic[] Diagnostics)
+{
+    internal bool SourceOnly { get; init; }
+}
 
 /// <summary>Builds only the project references that static configuration can establish.</summary>
 internal sealed class ProjectCompilations(ProjectSnapshot snapshot, ParsedProject[] sources, CancellationToken token)
 {
-    private readonly CachedReferences references = new(snapshot);
+    private readonly Lazy<CachedReferences> references = new(() => new(snapshot));
     private readonly Dictionary<string, ParsedProject> projects = sources.ToDictionary(source => source.Path, StringComparer.Ordinal);
     private readonly Dictionary<string, ProjectCompilation> compilations = new(StringComparer.Ordinal);
     private readonly HashSet<string> active = new(StringComparer.Ordinal);
 
-    public ProjectCompilation[] Build() => sources.Select(BuildProject).ToArray();
+    public ProjectCompilation[] Build() => snapshot.SourceOnly
+        ? sources.Select(BuildFromSource).ToArray() : sources.Select(BuildProject).ToArray();
+
+    private ProjectCompilation BuildFromSource(ParsedProject source)
+    {
+        token.ThrowIfCancellationRequested();
+        var compilation = CreateCompilation(source, []);
+        var context = new AnalysisContext(source.ContextId, source.Path, "compilation", [], false, []);
+        var identity = new ProjectSymbolIdentity(source.Path, compilation, []);
+        return new(source, compilation, identity, context, [], source.Options.Diagnostics) { SourceOnly = true };
+    }
 
     private ProjectCompilation BuildProject(ParsedProject source)
     {
@@ -31,7 +44,7 @@ internal sealed class ProjectCompilations(ProjectSnapshot snapshot, ParsedProjec
         var directReferences = source.Options.ProjectReferences.Select(path => FindProject(source, path, diagnostics))
             .OfType<ParsedProject>().DistinctBy(project => project.Path).Select(BuildProject).ToArray();
         var projectReferences = ReferenceClosure(directReferences);
-        var metadata = references.Read(source, diagnostics);
+        var metadata = references.Value.Read(source, diagnostics);
         var compilation = CreateCompilation(source, metadata.Concat(projectReferences.Select(reference => reference.Key)));
         if (directReferences.Any(project => !project.Context.Verified))
             diagnostics.Add(ProjectDiagnostic(source, "A referenced project's compilation is incomplete."));

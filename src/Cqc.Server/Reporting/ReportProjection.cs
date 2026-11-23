@@ -11,7 +11,8 @@ internal static class ReportProjection
             ReportId = id, ExpiresAt = expiry, SourceFingerprint = analysis.SourceFingerprint,
             ConfigurationFingerprint = analysis.ConfigurationFingerprint, Scope = analysis.Scope,
             FileCount = analysis.AnalyzedFiles.Length, ModuleCount = analysis.Modules.Length,
-            Families = analysis.Results.Select(Family).ToArray(), Diagnostics = Counts(AnalysisDiagnostics(analysis)),
+            Families = analysis.Results.Select(family => Family(family, analysis.SourceOnly)).ToArray(), Diagnostics = Counts(AnalysisDiagnostics(analysis)),
+            AnalysisNote = analysis.SourceOnly ? "Running with `execute: true` may reveal additional findings." : null,
             RemainingDiagnosticGroups = Remaining(AnalysisDiagnostics(analysis)), Kind = "analysis"
         },
         InspectionResponse inspection => new()
@@ -24,10 +25,12 @@ internal static class ReportProjection
         _ => throw new ArgumentException("Unsupported report type.")
     };
     private static IEnumerable<Diagnostic> AnalysisDiagnostics(AnalysisResponse report) => report.Diagnostics.Concat(report.Results.SelectMany(f => f.Diagnostics));
-    private static FamilySummary Family(FamilyResult family) => new(family.Family, family.Status, family.Entities.Length, family.Findings.Length,
-        family.Entities.GroupBy(e => e.Score).OrderBy(g => g.Key).Select(g => new ScoreCount(g.Key, g.Count())).ToArray())
+    private static FamilySummary Family(FamilyResult family, bool sourceOnly) => new(family.Family, family.Status, family.Entities.Length, family.Findings.Length,
+        sourceOnly && family.Family == "code" ? null : ScoreDistribution(family))
         { StaticComplexityScores = family.Entities.Where(e => e.StaticComplexity is not null)
             .GroupBy(e => e.StaticComplexity!.Score).OrderBy(g => g.Key).Select(g => new ScoreCount(g.Key, g.Count())).ToArray() };
+    private static ScoreCount[] ScoreDistribution(FamilyResult family) =>
+        family.Entities.GroupBy(e => e.Score).OrderBy(g => g.Key).Select(g => new ScoreCount(g.Key, g.Count())).ToArray();
     private static DiagnosticCount[] Counts(IEnumerable<Diagnostic> diagnostics) => diagnostics.GroupBy(d => d.Code)
         .OrderBy(g => g.Key, StringComparer.Ordinal).Take(20).Select(g => new DiagnosticCount(g.Key, g.Count())).ToArray();
     private static int Remaining(IEnumerable<Diagnostic> diagnostics) => Math.Max(0, diagnostics.Select(d => d.Code).Distinct().Count() - 20);

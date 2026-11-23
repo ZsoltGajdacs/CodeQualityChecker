@@ -21,6 +21,8 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
     public FamilyResult Finish(FamilyAssessment assessment)
     {
         var report = new EntityReport(assessment).Build(Snapshot.SelectedFiles);
+        if (Snapshot.SourceOnly)
+            return new(assessment.Family, Status(report.Entities, false), report.Entities, report.Findings, []);
         var failures = Facts.Diagnostics.Where(d => d.Code == "analyzer_failed").ToArray();
         var orderedDiagnostics = assessment.Diagnostics.Concat(failures).Distinct()
             .OrderBy(d => d.File, StringComparer.Ordinal).ThenBy(d => d.Code, StringComparer.Ordinal)

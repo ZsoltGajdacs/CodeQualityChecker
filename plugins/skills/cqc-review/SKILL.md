@@ -9,28 +9,28 @@ Use the plugin's CQC MCP tools. Tool prefixes vary by client; identify the serve
 
 ## Choose the scope and checks
 
-Establish the absolute repository root and the user's intended scope. Call `inspect_project` for supported languages, modules, integrations, and prerequisites. Report unsupported languages as unanalyzed. Distinguish source-only analysis support from unsupported build/test execution integrations; for example, Gradle Java source can be reviewed even though Gradle execution is outside the MVP.
+Establish the absolute repository root and the user's intended scope. Use `inspect_project` when module or language support is unclear. Report unsupported languages as unanalyzed.
 
-Use `scope: "changed"` for a change review, `scope: "paths"` with repository-relative `paths` for a targeted request, and `scope: "repository"` for a repository review. Set `gitBase` only when a comparison base is requested or established. For requests such as “check my uncommitted changes”, use `scope: "changed"` and omit `gitBase`. This includes staged, unstaged, and new untracked source files after normal ignores and generated-file exclusions. Check each selected file using its current working-tree content, including unstaged edits to staged files. Deleted files are excluded; a clean repository selects no files. Do not broaden an empty selection to the repository. If Git scope fails, explain it and use explicit paths only when they represent the user's intended selection.
+- For a repository review, use `check_code_quality`.
+- For “check my uncommitted changes”, use `check_uncommitted_changes_quality`. It selects staged, unstaged, and untracked source, applies normal exclusions, and reads the current working-tree contents. An empty selection means zero files. If Git scope fails, explain it. Use explicit paths only when they represent the requested selection.
+- For explicit paths or a Git comparison base, use `check_all` or an individual family tool. Pass `scope: "paths"` with repository-relative `paths`, or `scope: "changed"` with `gitBase`. Choose `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries.
 
-Choose `check_code_quality` for production complexity and coverage-based CRAP, `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries. Use `check_all` for a broad review. Checks assess whole selected files with repository context, so a finding may reference an unselected counterpart file. Changed scope limits the reported files; parsing and explicit builds/tests may still use the whole repository.
-
-Inspection/check tools require a nested `request`. For an uncommitted-change review, pass this request to inspection and the chosen checks:
+The two review tools take the same nested request with fixed scope.
 
 ```json
 {
   "request": {
     "projectRoot": "/absolute/path/to/repository",
-    "scope": "changed",
-    "execute": false,
-    "timeoutSeconds": 300
+    "execute": false
   }
 }
 ```
 
-Default to `execute: false`. It does not invoke project builds, tests, restores, or MSBuild evaluation. Use `execute: true` only when existing user authorization covers project-controlled restores, builds, and tests; otherwise request that authorization if execution is needed. Execution can collect evidence but does not guarantee that every semantic blocker resolves. Execution runs in an isolated copy, needs the project's toolchains, and writes reusable evidence to the original root's `.cqc/` directory. Initial execution support covers Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
+Default to `execute: false`. The review tools report supported static complexity and duplication using source and static project configuration. Present the results directly. The summary note about execution is informational and does not call for a rerun or permission request. Findings can reference unchanged counterparts because the tools use repository context.
 
-Use an existing CQC evidence file through `reportPath` when available and appropriate. Raw coverage XML alone does not establish source-matched evidence. Preserve evidence diagnostics instead of treating stale or absent evidence as success. Optional `configPath` selects CQC configuration; do not relax thresholds or exclusions merely to improve a score. `timeoutSeconds` accepts 1–3600.
+Use `execute: true` when the user requests execution and authorizes project-controlled restores, builds, and tests. Both review tools then run all four families. Execution runs in an isolated copy and writes reusable evidence to `.cqc/` in the original root. The supported integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
+
+Optional `configPath` selects CQC configuration. Preserve the user's thresholds and exclusions. `timeoutSeconds` accepts 1–3600. The individual and scoped tools also accept `reportPath` for verified CQC evidence.
 
 ## Retrieve the completed report
 
@@ -38,7 +38,7 @@ Inspection and check responses always contain schema-v3 summaries in `structured
 
 Call `get_report_page` with a nested request such as `{"reportId":"<id>","section":"findings","family":"code","limit":50}`. Available sections are `files`, `modules`, `entities`, `findings`, `diagnostics`, `metrics`, and inspection `prerequisites`. Use `family` and `entityId` only where applicable. Follow `nextCursor` until null for sections needed by the requested review, preserving the same filters. Pages default to 50 records and accept 1–200; the 512 KiB response budget can return fewer records. Entity lists show score/status and detail counts; fetch metrics separately when needed.
 
-Pagination is separate from semantic completeness: a non-null cursor means more records exist, while an incomplete family means the analysis lacks required evidence or resolution. Keep null scores and diagnostics visible. Production entities expose a separate `staticComplexity` assessment: it evaluates syntax complexity only and is not the combined complexity/CRAP score. Summaries contain separate `scores` and `staticComplexityScores` distributions; entity pages contain blockers for each assessment. Read those blockers before recommending execution. Do not describe partial retrieval as a complete review.
+A non-null cursor means more records exist. Source-only production entities expose `staticComplexity` and summaries expose `staticComplexityScores`. Use the reported assessments and diagnostics, and retrieve the remaining pages before claiming complete findings. In evidence-aware reports, describe explicit incomplete results and their blockers.
 
 For an oversized individual record or when the complete original report is needed, request `section: "raw"` without family/entity filters. Concatenate `rawChunk` strings in cursor order and parse the resulting JSON. No detail is silently discarded. Retrieval uses an immutable snapshot and does not rerun analysis or execute project code.
 
@@ -46,7 +46,7 @@ Reports are temporary: they expire after 60 minutes, can be evicted earlier when
 
 ## Explain and improve
 
-Report actionable findings with rule, file and line, consequence, and concrete improvement. Keep CQC scores separate by family and file/class: **10 is the desired score**, with no combined score. CQC scores are not CodeScene Code Health. Preserve `null` scores and incomplete statuses when evidence or semantic resolution is missing; missing coverage never establishes a perfect score. Dependency checks are not vulnerability scans. High scores do not prove functional correctness or test effectiveness.
+Report actionable findings with rule, file and line, consequence, and concrete improvement. Keep CQC scores separate by family and file/class: **10 is the desired score**, with no combined score. CQC scores are not CodeScene Code Health. For evidence-aware reports, keep incomplete assessments visible and explain any blocker that matters to the requested review. Dependency checks are not vulnerability scans. High scores do not prove functional correctness or test effectiveness.
 
 A review-only request produces findings without edits. Apply improvements when requested, preserve intended behavior, and stay within the requested scope. Run appropriate existing tests under the user's execution authorization, then repeat CQC checks for the affected files and relevant families. Stop when requested improvements are verified or a concrete blocker remains; do not introduce an automatic commit gate or keep changing code solely to reach 10.
 

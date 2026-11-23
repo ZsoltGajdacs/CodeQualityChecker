@@ -51,7 +51,11 @@ public sealed record AnalysisFacts(
 public sealed record ProjectModule(string Language, string Path, string Integration, bool Supported);
 public sealed record ProjectSnapshot(
     string Root, string[] Files, string[] SelectedFiles, ProjectModule[] Modules,
-    string SourceFingerprint, Diagnostic[] Diagnostics, string SchemaVersion = Wire.SchemaVersion);
+    string SourceFingerprint, Diagnostic[] Diagnostics, string SchemaVersion = Wire.SchemaVersion)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SourceOnly { get; init; }
+}
 
 public sealed record AnalysisRequest
 {
@@ -93,7 +97,11 @@ public sealed record EntityScore(string EntityId, string Kind, string File, stri
 public sealed record FamilyResult(string Family, string Status, EntityScore[] Entities, Finding[] Findings, Diagnostic[] Diagnostics);
 public sealed record AnalysisResponse(string SchemaVersion, string RulesetVersion, string Message,
     string SourceFingerprint, string ConfigurationFingerprint, string Scope,
-    string[] AnalyzedFiles, ProjectModule[] Modules, FamilyResult[] Results, Diagnostic[] Diagnostics);
+    string[] AnalyzedFiles, ProjectModule[] Modules, FamilyResult[] Results, Diagnostic[] Diagnostics)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SourceOnly { get; init; }
+}
 public sealed record InspectionResponse(string SchemaVersion, string Message, ProjectSnapshot Project, Diagnostic[] Prerequisites);
 
 public sealed record MethodCoverage(string MethodId, int CoveredBranches, int TotalBranches, int CoveredLines, int TotalLines);

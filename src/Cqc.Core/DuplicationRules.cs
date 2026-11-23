@@ -4,16 +4,18 @@ internal static class DuplicationRules
 {
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config)
     {
-        var eligible = context.Methods.Where(method => Eligible(method, config))
+        var incompleteLanguages = IncompleteLanguages(context.Facts, context.Snapshot.SourceOnly);
+        var types = context.Facts.Types.Where(type => !context.Snapshot.SourceOnly || !incompleteLanguages.Contains(type.Language)).ToArray();
+        var eligible = context.Methods.Where(method => Eligible(method, config)
+                && (!context.Snapshot.SourceOnly || !incompleteLanguages.Contains(method.Language)))
             .GroupBy(m => m.Id, StringComparer.Ordinal).Select(group => group.First()).ToArray();
         var matches = new DuplicateCandidates(eligible, context.CancellationToken).Matches(config.DuplicateSimilarity).ToArray();
         var findings = Findings(eligible, matches).ToArray();
-        var incompleteLanguages = IncompleteLanguages(context.Facts);
         var methodCounts = eligible.ToLookup(method => method.TypeId, StringComparer.Ordinal);
         var groupCounts = findings.SelectMany(finding => finding.EntityIds).ToLookup(id => id, StringComparer.Ordinal);
-        var types = context.Facts.Types.GroupBy(t => t.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First());
-        return context.Finish(new() { Family = "duplication", Types = context.Facts.Types, Findings = findings,
-            Blockers = id => incompleteLanguages.Contains(types[id].Language) ? ["structure.incomplete"] : [],
+        var byId = types.ToLookup(t => t.Id, StringComparer.Ordinal);
+        return context.Finish(new() { Family = "duplication", Types = types, Findings = findings,
+            Blockers = id => incompleteLanguages.Contains(byId[id].First().Language) ? ["structure.incomplete"] : [],
             Metrics = id => new(StringComparer.Ordinal)
             {
                 ["eligibleMethods"] = methodCounts[id].Count(),
@@ -25,11 +27,12 @@ internal static class DuplicationRules
         => method.Location.EndLine - method.Location.StartLine + 1 >= config.DuplicateMinLines
             && method.NodeCount >= config.DuplicateMinNodes && method.Fingerprints.Length > 0;
 
-    private static HashSet<string> IncompleteLanguages(AnalysisFacts facts)
+    private static HashSet<string> IncompleteLanguages(AnalysisFacts facts, bool sourceOnly)
         => facts.Methods.Where(m => !AssessmentEvidence.Of(m).Syntax).Select(m => m.Language)
             .Concat(facts.Types.Where(t => !AssessmentEvidence.Of(t).Syntax).Select(t => t.Language))
             .Concat(facts.SyntaxGaps.Select(g => g.Language))
-            .Concat(facts.Diagnostics.Where(d => d.Code is "analyzer_failed" or "java.parse").Select(d => d.Language).OfType<string>())
+            .Concat(facts.Diagnostics.Where(d => d.Code is "analyzer_failed" or "java.parse"
+                || (sourceOnly && StructuralReview.IsAnalyzerFailure(d))).Select(d => d.Language).OfType<string>())
             .ToHashSet(StringComparer.Ordinal);
 
     private static IEnumerable<Finding> Findings(MethodFact[] methods, DuplicateMatch[] matches)

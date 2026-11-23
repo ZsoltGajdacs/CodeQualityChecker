@@ -46,6 +46,11 @@ final class AstIdentity {
     static int line(Node node) { return node.getBegin().map(p -> p.line).orElse(1); }
     static Worker.Location location(String file, Node node) { return new Worker.Location(file.replace('\\', '/'), line(node), node.getEnd().map(p -> p.line).orElse(line(node))); }
 
+    static String sourceKey(String file, Node node) {
+        var position = node.getBegin().orElseThrow();
+        return "@" + file + ":" + position.line + ":" + position.column;
+    }
+
     /** Subtree shapes preserve operators and method names but normalize locals and literals. */
     static String fingerprint(Node node, int depth) {
         String label = node.getClass().getSimpleName();

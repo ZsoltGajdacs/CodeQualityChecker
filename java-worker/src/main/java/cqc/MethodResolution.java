@@ -10,7 +10,9 @@ import static cqc.AstIdentity.*;
 /** Semantic method facts are independent of syntax-based measurements. */
 final class MethodResolution {
     record Identity(String name, boolean complete) { }
-    record Calls(String[] ids, int assertions, boolean complete) { }
+    record Calls(String[] ids, int assertions, boolean complete) {
+        static final Calls NOT_ATTEMPTED = new Calls(new String[0], 0, false);
+    }
     private final MavenClasspath.Reporter reporter;
     private final SymbolContexts symbols;
 
@@ -19,12 +21,16 @@ final class MethodResolution {
     Identity identity(String file, String typeId, CallableDeclaration<?> declaration) {
         try { return new Identity(callableId(declaration), true); }
         catch (RuntimeException exception) {
-            String parameters = declaration.getParameters().stream().map(p -> p.getType().asString() + (p.isVarArgs() ? "[]" : "")).collect(Collectors.joining(","));
-            String name = declaration instanceof ConstructorDeclaration ? ".ctor" : declaration.getNameAsString();
-            String id = typeId + "." + name + "(" + parameters + ")";
+            String id = sourceSignature(typeId, declaration);
             reporter.report("java.unresolved_signature", "Cannot resolve signature " + id + ".", file);
             return new Identity(id, false);
         }
+    }
+
+    static String sourceSignature(String typeName, CallableDeclaration<?> declaration) {
+        String parameters = declaration.getParameters().stream().map(p -> p.getType().asString() + (p.isVarArgs() ? "[]" : "")).collect(Collectors.joining(","));
+        String name = declaration instanceof ConstructorDeclaration ? ".ctor" : declaration.getNameAsString();
+        return typeName + "." + name + "(" + parameters + ")";
     }
 
     static String coverageSignature(CallableDeclaration<?> declaration) {

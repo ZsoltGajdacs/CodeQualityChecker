@@ -12,7 +12,7 @@ internal static class SourceEvidence
     {
         var syntax = context.Options.Complete && !Unmodeled(declaration)
             && !declaration.GetDiagnostics().Any(x => x.Severity == DiagnosticSeverity.Error);
-        var semantic = !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
+        var semantic = !context.SourceOnly && !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
         return new(syntax, true, semantic, semantic, context.VerifiedContext, []);
     }
 

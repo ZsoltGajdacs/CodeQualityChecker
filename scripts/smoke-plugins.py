@@ -51,11 +51,12 @@ def run(output):
                         ignore=shutil.ignore_patterns('bin', 'obj', 'target', '.cqc'))
         (root / 'unsupported').mkdir()
         (root / 'unsupported/example.py').write_text('print("unsupported")\n')
+        SMOKE['initialize_git'](root)
         original = SMOKE['digest_sources'](root)
         for client in ('claude', 'codex'):
             verify_client(output / client, root)
             assert SMOKE['digest_sources'](root) == original, 'Source-only analysis changed fixtures'
-            print(f'PASS: {client}: seven real tools, bounded pages, Java/C#, missing coverage, unchanged inputs')
+            print(f'PASS: {client}: eight real tools, bounded pages, Java/C#, missing coverage, unchanged inputs')
 
 
 if __name__ == '__main__':

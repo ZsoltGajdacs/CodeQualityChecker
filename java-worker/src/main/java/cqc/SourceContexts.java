@@ -9,12 +9,14 @@ final class SourceContexts {
     private final MavenClasspath.Reporter reporter;
     private final List<ContextManifest.Context> contexts;
     private final Worker.Module[] modules;
+    private final boolean sourceOnly;
 
-    SourceContexts(Path root, List<ContextManifest.Context> contexts, Worker.Module[] modules, MavenClasspath.Reporter reporter) {
+    SourceContexts(Path root, List<ContextManifest.Context> contexts, Worker.Module[] modules, MavenClasspath.Reporter reporter, boolean sourceOnly) {
         this.root = root;
         this.contexts = new ArrayList<>(contexts);
         this.modules = modules == null ? new Worker.Module[0] : modules;
         this.reporter = reporter;
+        this.sourceOnly = sourceOnly;
     }
 
     ContextManifest.Context forSource(Worker.Source source) {
@@ -35,9 +37,11 @@ final class SourceContexts {
         if (existing.isPresent()) return unverified(existing.get(), source);
         var definition = new ContextManifest.Definition(id, module, set, new String[]{sourceRoot(source)}, new ContextManifest.Entry[0],
             set.equals("test") ? new String[]{module + "#main"} : new String[0]);
-        var context = new ContextManifest.Context(definition, MavenFallback.jars(root, module, reporter), false, new String[]{"context.unverified"});
+        var jars = sourceOnly ? List.<String>of() : MavenFallback.jars(root, module, reporter);
+        var context = new ContextManifest.Context(definition, jars, false, new String[]{"context.unverified"});
         contexts.add(context);
-        reporter.report("java.context_unverified", "No verified Maven metadata for " + id + "; semantic scores require explicit execution.", module);
+        if (!sourceOnly)
+            reporter.report("java.context_unverified", "No verified Maven metadata for " + id + "; semantic scores require explicit execution.", module);
         return context;
     }
 

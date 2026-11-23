@@ -11,9 +11,9 @@ public sealed class ChangedScopeMcpTests
     public async Task EveryInspectionAndCheckToolDescribesChangedScope()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var client = await Client(timeout.Token);
+        await using var client = await McpTests.Connect(timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        foreach (var tool in tools.Where(tool => tool.Name != "get_report_page"))
+        foreach (var tool in ScopedTools(tools))
         {
             var properties = tool.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties");
             var scope = properties.GetProperty("scope").GetProperty("description").GetString();
@@ -40,11 +40,11 @@ public sealed class ChangedScopeMcpTests
         await ChangedScopeTests.Write(workspace, "New.cs", "class New {}");
         var before = workspace.SourceContents();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        await using var client = await Client(timeout.Token);
+        await using var client = await McpTests.Connect(timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        foreach (var tool in tools.Where(tool => tool.Name != "get_report_page"))
+        foreach (var tool in ScopedTools(tools))
         {
-            var result = await Call(client, tool.Name, new { projectRoot = workspace.Root, scope = "changed", execute = false }, timeout.Token);
+            var result = await McpTests.Call(client, tool.Name, new { projectRoot = workspace.Root, scope = "changed", execute = false }, timeout.Token);
             Assert.NotEqual(true, result.IsError);
             var summary = JsonSerializer.SerializeToElement(result.StructuredContent);
             Assert.Equal("changed", summary.GetProperty("scope").GetString());
@@ -61,11 +61,11 @@ public sealed class ChangedScopeMcpTests
         using var workspace = FixtureWorkspace.Empty();
         await ChangedScopeTests.Write(workspace, "Example.cs", "class Example {}");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var client = await Client(timeout.Token);
+        await using var client = await McpTests.Connect(timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        foreach (var tool in tools.Where(tool => tool.Name != "get_report_page"))
+        foreach (var tool in ScopedTools(tools))
         {
-            var result = await Call(client, tool.Name, new { projectRoot = workspace.Root, scope = "changed" }, timeout.Token);
+            var result = await McpTests.Call(client, tool.Name, new { projectRoot = workspace.Root, scope = "changed" }, timeout.Token);
             Assert.True(result.IsError);
             Assert.Contains("Git scope unavailable", Assert.Single(result.Content.OfType<TextContentBlock>()).Text);
         }
@@ -85,22 +85,11 @@ public sealed class ChangedScopeMcpTests
 
     private static async Task<JsonElement> FilePage(McpClient client, string reportId, string? cursor, CancellationToken token)
     {
-        var result = await Call(client, "get_report_page", new { reportId, section = "files", limit = 1, cursor }, token);
+        var result = await McpTests.Call(client, "get_report_page", new { reportId, section = "files", limit = 1, cursor }, token);
         Assert.NotEqual(true, result.IsError);
         return JsonSerializer.SerializeToElement(result.StructuredContent);
     }
 
-    private static Task<CallToolResult> Call(McpClient client, string tool, object request, CancellationToken token) =>
-        client.CallToolAsync(tool, new Dictionary<string, object?> { ["request"] = request }, cancellationToken: token).AsTask();
-
-    private static Task<McpClient> Client(CancellationToken token)
-    {
-        var root = McpTests.RepositoryRoot();
-        var executable = Environment.GetEnvironmentVariable("CQC_TEST_SERVER");
-        return McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
-        {
-            Name = "CQC changed scope test", Command = executable ?? "dotnet", WorkingDirectory = root,
-            Arguments = executable is null ? [Path.Combine(root, "src", "Cqc.Server", "bin", "Debug", "net10.0", "cqc.dll")] : []
-        }), cancellationToken: token);
-    }
+    private static IEnumerable<McpClientTool> ScopedTools(IEnumerable<McpClientTool> tools) =>
+        tools.Where(tool => tool.Name is "inspect_project" or "check_all" or "check_dependencies" or "check_duplication" or "check_test_quality");
 }

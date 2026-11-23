@@ -24,49 +24,36 @@ For a bundled review-and-improve skill and local plugin installation in Claude C
 | Tool | Result |
 | --- | --- |
 | `inspect_project` | Languages, modules, integrations, and missing build prerequisites |
-| `check_code_quality` | Complexity and branch-coverage CRAP |
+| `check_code_quality` | Quality review of the whole repository |
+| `check_uncommitted_changes_quality` | Quality review of staged, unstaged, and untracked source |
 | `check_test_quality` | Test assertions, branching, size, and helper/fixture contributions |
 | `check_duplication` | Structural duplicate groups within each language |
 | `check_dependencies` | Semantic type/component cycles, coupling, and optional boundaries |
 | `check_all` | All four check families with shared discovery/parsing |
 | `get_report_page` | Bounded detail pages from an immutable completed report |
 
-Inspection and check tools take a nested `request` object:
+### Review the repository or uncommitted changes
+
+Use `check_code_quality` for the repository or `check_uncommitted_changes_quality` for uncommitted files. Both tools take a nested request with `projectRoot` and optional `execute`, `configPath`, and `timeoutSeconds` (1–3600).
 
 ```json
 {
   "request": {
     "projectRoot": "/absolute/path/to/repository",
-    "scope": "repository",
-    "execute": false,
-    "timeoutSeconds": 300
-  }
-}
-```
-
-### Check uncommitted changes
-
-To check only files with uncommitted changes, pass `scope: "changed"` and omit `gitBase` to any inspection/check tool, such as `check_all`:
-
-```json
-{
-  "request": {
-    "projectRoot": "/absolute/path/to/repository",
-    "scope": "changed",
     "execute": false
   }
 }
 ```
 
-This selects staged, unstaged, and new untracked source files, respecting normal ignores and generated-file exclusions. Each file is checked once using its current working-tree content, including unstaged edits to a staged file. Deleted files are excluded; a clean repository selects no files. Git must be available and the project root must be inside a Git repository.
+Both tools default to `execute: false`. They report supported static cyclomatic complexity and structural duplication using source and static project configuration. They skip saved build and coverage evidence, and omit scores and metrics that need it. A source or analyzer failure may prevent an assessment and appears in diagnostics. The summary includes a brief note that execution may reveal additional findings.
 
-Checks assess complete selected files using the whole repository for context, so findings can point to unselected counterpart files. Changed scope limits the reported files; parsing and explicit builds/tests may still use the whole repository.
+The changes tool requires Git. It reads current working-tree content, including unstaged edits to a staged file, after applying ignore and generated-file exclusions. It excludes deleted files. On a clean checkout it returns zero files without building or testing. Findings can refer to unchanged counterpart files because checks use repository context.
 
-Use `scope: "paths"` with `paths: ["src/Feature.cs", "module/src"]` for explicit selection. To include changes relative to a commit or branch, use `scope: "changed"` with `gitBase`, such as `"main"`; untracked source files are also included. Omit `gitBase` for an uncommitted-only review. The default scope remains `"repository"`.
+### Explicit scope and execution
 
-Source-only analysis never invokes project builds, tests, restores, or MSBuild evaluation. Set `execute: true` explicitly to allow project-controlled Maven/.NET restores, builds, and tests. Execution uses an isolated copy and writes reusable evidence under the original root's `.cqc/` directory. Maven execution uses a project wrapper when available, otherwise host Maven; the project's Java/.NET SDKs are also needed. Initial execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest; Gradle and Microsoft.Testing.Platform execution are outside the MVP.
+Use `check_all` or an individual family tool for explicit selection. These tools default to `scope: "repository"` and also accept `scope: "paths"` with repository-relative `paths`, or `scope: "changed"` with an optional `gitBase` commit or branch. Omit `gitBase` to select uncommitted changes only. These tools can use saved matching evidence in analysis-only mode, including evidence supplied through `reportPath`. Raw JaCoCo or OpenCover XML alone cannot establish source-matched provenance.
 
-Optional inputs are `configPath`, `reportPath`, and `timeoutSeconds` (1–3600). `reportPath` reads existing CQC coverage evidence; generated evidence is written to `.cqc/coverage.json`. Raw JaCoCo/OpenCover XML alone cannot establish source-matched provenance.
+When explicitly requested, `execute: true` makes both review tools run all four check families with evidence collected through project-controlled restores, builds, and tests. Execution uses an isolated copy and writes reusable evidence, including `.cqc/coverage.json`, under the original root. Maven uses the project wrapper when available. The supported execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
 
 Every inspection and check returns a compact schema-v3 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content is a short explanation, not a second copy of the report. Diagnostic counts show at most 20 code groups and identify remaining groups. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
 
@@ -103,6 +90,6 @@ See [ruleset and configuration](docs/ruleset.md), [architecture and extension co
 
 ## Evidence-specific assessments (ruleset 2)
 
-Production entities retain their combined complexity/CRAP score and expose a separate `staticComplexity` assessment. The static score deducts once per complexity finding and requires complete syntax, without requiring coverage or call resolution. A numeric static score never establishes a combined production score. Entity pages expose `blockers` for the primary score and status, score, finding IDs and blockers for `staticComplexity`; summaries include separate static score distributions.
+Evidence-aware production entities retain their combined complexity/CRAP score and expose a separate `staticComplexity` assessment. The static score deducts once per complexity finding and requires complete syntax, without requiring coverage or call resolution. A numeric static score never establishes a combined production score. Entity pages expose `blockers` for the primary score and status, score, finding IDs and blockers for `staticComplexity`; summaries include separate static score distributions.
 
-Java schema-2 facts identify symbols by Maven module and main/test source set. Explicit execution collects evaluated module contexts, preserves dependency order, and caches hashed resolution artifacts under `.cqc/java-contexts.json`. Source-only analysis can reuse verified matching contexts; without them semantic-dependent scores remain incomplete while valid syntax assessments remain available. Different dependency versions in unrelated modules are permitted. Legacy classpath and coverage evidence require refresh; server and worker must be upgraded together. Builds can still leave unsupported constructs or unresolved generated methods.
+Java schema-2 facts identify symbols by Maven module and main/test source set. Explicit execution collects evaluated module contexts, preserves dependency order, and caches hashed resolution artifacts under `.cqc/java-contexts.json`. Analysis-only calls to the scoped tools can reuse verified matching contexts; without them semantic-dependent scores remain incomplete while valid syntax assessments remain available. Different dependency versions in unrelated modules are permitted. Legacy classpath and coverage evidence require refresh; server and worker must be upgraded together. Builds can still leave unsupported constructs or unresolved generated methods.

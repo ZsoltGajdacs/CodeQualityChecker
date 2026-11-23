@@ -12,7 +12,8 @@ import time
 
 
 TOOLS = {'inspect_project', 'check_code_quality', 'check_test_quality',
-         'check_duplication', 'check_dependencies', 'check_all', 'get_report_page'}
+         'check_duplication', 'check_dependencies', 'check_all', 'get_report_page',
+         'check_uncommitted_changes_quality'}
 
 
 def command(arguments, environment, cwd):
@@ -77,6 +78,11 @@ def isolated_environment(variable, root):
     return environment
 
 
+def packaged_version(packages, client):
+    manifest = packages / client / 'plugins' / 'cqc' / f'.{client}-plugin' / 'plugin.json'
+    return json.loads(manifest.read_text())['version']
+
+
 def verify_codex_inventory(environment, cwd):
     server = AppServer(environment, cwd)
     try:
@@ -104,7 +110,7 @@ def verify_codex(packages, root, cwd):
     command(['codex', 'plugin', 'add', 'cqc@cqc-local-codex'], environment, cwd)
     listing = json.loads(command(['codex', 'plugin', 'list', '--json'], environment, cwd))
     installed = next(item for item in listing['installed'] if item['name'] == 'cqc')
-    assert installed['enabled'] and installed['version'] == '0.2.0', installed
+    assert installed['enabled'] and installed['version'] == packaged_version(packages, 'codex'), installed
     return {'client': version, 'pluginVersion': installed['version'],
             **verify_codex_inventory(environment, cwd)}
 
@@ -116,7 +122,7 @@ def verify_claude(packages, root, cwd):
     command(['claude', 'plugin', 'install', 'cqc@cqc-local-claude'], environment, cwd)
     listing = json.loads(command(['claude', 'plugin', 'list', '--json'], environment, cwd))
     installed = next(item for item in listing if item['id'] == 'cqc@cqc-local-claude')
-    assert installed['enabled'] and installed['version'] == '0.2.0', installed
+    assert installed['enabled'] and installed['version'] == packaged_version(packages, 'claude'), installed
     assert 'cqc' in installed['mcpServers'], installed
     details = command(['claude', 'plugin', 'details', 'cqc@cqc-local-claude'], environment, cwd)
     assert 'cqc-review' in details, details
