@@ -111,11 +111,24 @@ def invoke(session, tool, root):
     response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
         'projectRoot': str(root), 'execute': False}}})
     summary = structured(response)
+    verify_family_schema(tool, summary)
     result = retrieve_full(session, summary)
     assert result['message'] == '10 is the desired score.'
     if tool['name'] in FIXED_REVIEW_TOOLS:
         verify_source_review(tool['name'], summary, result)
+    if tool['name'] == 'check_all':
+        code = next(family for family in summary['families'] if family['family'] == 'code')
+        assert any(bucket['score'] is None for bucket in code['scores']), code
     return result
+
+
+def verify_family_schema(tool, summary):
+    family_schema = tool['outputSchema']['properties']['families']['items']
+    assert 'scores' in family_schema['properties'], family_schema
+    required = set(family_schema['required'])
+    for index, family in enumerate(summary['families']):
+        missing = required.difference(family)
+        assert not missing, f"{tool['name']} families/{index} missing required fields {sorted(missing)}"
 
 
 def verify_source_review(tool, summary, result):
@@ -126,6 +139,8 @@ def verify_source_review(tool, summary, result):
     assert {family['family'] for family in result['results']} <= {'code', 'duplication'}
     code = next(family for family in summary['families'] if family['family'] == 'code')
     assert 'scores' not in code and code['staticComplexityScores'], code
+    duplication = next(family for family in summary['families'] if family['family'] == 'duplication')
+    assert duplication['scores'], duplication
     verify_static_assessments(result)
     production = next(family for family in result['results'] if family['family'] == 'code')
     assert all('score' not in entity and 'blockers' not in entity for entity in production['entities']), production

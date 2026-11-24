@@ -19,9 +19,10 @@ public sealed record ReportPageRequest
 }
 public sealed record DiagnosticCount(string Code, int Count);
 public sealed record ScoreCount(double? Score, int Count);
-public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ScoreCount[]? Scores)
+public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ScoreCount[]? Scores { get; init; }
     public ScoreCount[] StaticComplexityScores { get; init; } = [];
 }
 public sealed record ReportSummary

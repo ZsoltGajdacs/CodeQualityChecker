@@ -40,7 +40,7 @@ Inspection and check responses always contain schema-v3 summaries in `structured
 
 Call `get_report_page` with a nested request such as `{"reportId":"<id>","section":"findings","family":"code","limit":50}`. Available sections are `files`, `modules`, `entities`, `findings`, `diagnostics`, `metrics`, and inspection `prerequisites`. Use `family` and `entityId` only where applicable. Follow `nextCursor` until null for sections needed by the requested review, preserving the same filters. Pages default to 50 records and accept 1–200; the 512 KiB response budget can return fewer records. Entity lists show score/status and detail counts; fetch metrics separately when needed.
 
-A non-null cursor means more records exist. Source-only production entities expose `staticComplexity` and summaries expose `staticComplexityScores`. Use the reported assessments and diagnostics, and retrieve the remaining pages before claiming complete findings. In evidence-aware reports, describe explicit incomplete results and their blockers.
+A non-null cursor means more records exist. Source-only production entities expose `staticComplexity`, and their family summary exposes `staticComplexityScores` with `scores` omitted. Use the reported assessments and diagnostics, and retrieve the remaining pages before claiming complete findings. In evidence-aware reports, describe explicit incomplete results and their blockers.
 
 For an oversized individual record or when the complete original report is needed, request `section: "raw"` without family/entity filters. Concatenate `rawChunk` strings in cursor order and parse the resulting JSON. No detail is silently discarded. Retrieval uses an immutable snapshot and does not rerun analysis or execute project code.
 
