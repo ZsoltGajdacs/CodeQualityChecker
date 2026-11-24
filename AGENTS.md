@@ -23,6 +23,10 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 </CRITICAL_INSTRUCTION>
 <!-- BACKLOG.MD GUIDELINES END -->
 
+## Agent skills
+
+When changing tooling, review the relevant agent skills against the updated tool behavior, inputs, outputs, and workflows. Update any affected skill in the same change so its guidance and examples stay accurate. The Claude Code and Codex plugins share the canonical skill in [`plugins/skills/cqc-review/SKILL.md`](plugins/skills/cqc-review/SKILL.md).
+
 ## CodeScene
 
 After changing code, run `code_health_review` on the changed files. If Code Health drops, fix the issues, run the review again, and use `code_health_score` to confirm the result. Before finishing, run `pre_commit_code_health_safeguard` and only stop when it passes.
