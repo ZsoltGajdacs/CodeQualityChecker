@@ -134,7 +134,7 @@ public sealed class ReportDeliveryTests
         using var store = new ReportStore(TimeProvider.System);
         var finding = new Finding("finding1", "code.complexity", "Simplify", "Extract", ["type:0"], [new("a.cs", 1, 2)]);
         var entity = new EntityScore("file:a.cs", "file", "a.cs", "complete", 9, [finding.Id], new(StringComparer.Ordinal));
-        var report = Report(0) with { Results = [new("code", "complete", [entity], [finding], [])] };
+        var report = Report(0) with { Results = [new("code", "complete") { Entities = [entity], Findings = [finding] }] };
         var summary = await store.PublishAsync(report, CancellationToken.None);
         var findings = await All(store, new() { ReportId = summary.ReportId, Section = "findings", Family = "code", EntityId = entity.EntityId });
         Assert.Single(findings);
@@ -212,8 +212,12 @@ public sealed class ReportDeliveryTests
     {
         var entities = Enumerable.Range(0, count).Select(i => new EntityScore("type:" + i, "class", "a.cs", "incomplete", i % 2 == 0 ? null : 9,
             [], new(StringComparer.Ordinal) { ["complexity"] = i })).ToArray();
-        return new("1", "1", Wire.Target, "source", "configuration", "paths", ["a.cs"], [],
-            [new("code", "incomplete", entities, [], [])], []);
+        return new()
+        {
+            SchemaVersion = "1", RulesetVersion = "1", Message = Wire.Target, SourceFingerprint = "source",
+            ConfigurationFingerprint = "configuration", Scope = "paths", AnalyzedFiles = ["a.cs"],
+            Results = [new("code", "incomplete") { Entities = entities }]
+        };
     }
 
     private sealed class TestClock : TimeProvider

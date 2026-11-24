@@ -111,7 +111,7 @@ def invoke(session, tool, root):
     response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
         'projectRoot': str(root), 'execute': False}}})
     summary = structured(response)
-    verify_family_schema(tool, summary)
+    verify_summary_schema(tool, summary)
     result = retrieve_full(session, summary)
     assert result['message'] == '10 is the desired score.'
     if tool['name'] in FIXED_REVIEW_TOOLS:
@@ -122,13 +122,22 @@ def invoke(session, tool, root):
     return result
 
 
-def verify_family_schema(tool, summary):
-    family_schema = tool['outputSchema']['properties']['families']['items']
-    assert 'scores' in family_schema['properties'], family_schema
-    required = set(family_schema['required'])
-    for index, family in enumerate(summary['families']):
-        missing = required.difference(family)
-        assert not missing, f"{tool['name']} families/{index} missing required fields {sorted(missing)}"
+def verify_summary_schema(tool, summary):
+    properties = tool['outputSchema']['properties']
+    optional_fields = {
+        'families': {'scores', 'scoredFileCount', 'unscoredFileCount'},
+        'diagnostics': {'selectedCount', 'contextCount', 'projectWideCount', 'extensions'},
+    }
+    for section, optional in optional_fields.items():
+        verify_summary_items(f"{tool['name']} {section}", properties[section]['items'], summary[section], optional)
+
+
+def verify_summary_items(label, schema, items, optional):
+    required = set(schema.get('required', []))
+    assert optional <= schema['properties'].keys() - required, schema
+    for index, item in enumerate(items):
+        missing = required.difference(item)
+        assert not missing, f"{label}/{index} missing required fields {sorted(missing)}"
 
 
 def verify_source_review(tool, summary, result):
@@ -137,12 +146,20 @@ def verify_source_review(tool, summary, result):
     assert summary['fileCount'] > 0, summary
     assert summary['analysisNote'] == 'Running with `execute: true` may reveal additional findings.'
     assert {family['family'] for family in result['results']} <= {'code', 'duplication'}
-    code = next(family for family in summary['families'] if family['family'] == 'code')
-    assert 'scores' not in code and code['staticComplexityScores'], code
-    duplication = next(family for family in summary['families'] if family['family'] == 'duplication')
+    families = {family['family']: family for family in summary['families']}
+    duplication = families['duplication']
     assert duplication['scores'], duplication
     verify_static_assessments(result)
     production = next(family for family in result['results'] if family['family'] == 'code')
+    verify_source_production(families['code'], production)
+
+
+def verify_source_production(code, production):
+    assert 'scores' not in code, code
+    assert code['staticComplexityScores'], code
+    assert code['scoredFileCount'] > 0, code
+    assert code['unscoredFileCount'] == 0, code
+    assert production['scoredFileCount'] == code['scoredFileCount'], production
     assert all('score' not in entity and 'blockers' not in entity for entity in production['entities']), production
 
 

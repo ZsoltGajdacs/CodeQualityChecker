@@ -60,6 +60,8 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         using var wire = JsonDocument.Parse(output);
         if (!wire.RootElement.TryGetProperty("schemaVersion", out var version) || version.GetString() != expectedVersion)
             return Unavailable("java.worker_protocol", $"Java worker schemaVersion must be {expectedVersion}. Install matching server and worker artifacts.");
+        if (!wire.RootElement.TryGetProperty("executables", out var executables) || executables.ValueKind != JsonValueKind.Array)
+            return Unavailable("java.worker_protocol", "Java analyzer did not return structural executable facts. Install matching server and worker artifacts.");
         var facts = JsonSerializer.Deserialize<AnalysisFacts>(output, Wire.Json);
         if (facts is null) return Unavailable("java.worker_empty", "Java analyzer returned no facts.");
         if (facts.Types.Any(type => type.Evidence is null) || facts.Methods.Any(method => method.Evidence is null))

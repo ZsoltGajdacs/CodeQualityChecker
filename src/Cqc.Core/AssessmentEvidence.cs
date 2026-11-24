@@ -8,6 +8,9 @@ public sealed record AnalysisContext(string Id, string ModulePath, string Source
 public sealed record SyntaxGap(string File, string Language, string? ContextId, string Code)
 {
     public bool UnknownEntities { get; init; } = true;
+    public Location? Location { get; init; }
+    public string? Construct { get; init; }
+    public string? TypeId { get; init; }
 }
 public sealed record AssessmentResult(string Status, double? Score, string[] FindingIds, string[] Blockers);
 

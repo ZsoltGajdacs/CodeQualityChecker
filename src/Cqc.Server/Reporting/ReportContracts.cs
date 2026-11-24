@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cqc.Core;
@@ -17,13 +18,31 @@ public sealed record ReportPageRequest
     public string? Cursor { get; init; }
     public int Limit { get; init; } = 50;
 }
-public sealed record DiagnosticCount(string Code, int Count);
+public sealed record DiagnosticCount(string Code, int Count)
+{
+    [Description("Diagnostic records in selected files.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SelectedCount { get; init; }
+    [Description("Diagnostic records in unselected repository files read for context.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ContextCount { get; init; }
+    [Description("Repository-wide diagnostic records. The unsupported_language group counts distinct extensions.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ProjectWideCount { get; init; }
+    [Description("Distinct unsupported extensions discovered across the repository.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? Extensions { get; init; }
+}
 public sealed record ScoreCount(double? Score, int Count);
 public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ScoreCount[]? Scores { get; init; }
     public ScoreCount[] StaticComplexityScores { get; init; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ScoredFileCount { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? UnscoredFileCount { get; init; }
 }
 public sealed record ReportSummary
 {

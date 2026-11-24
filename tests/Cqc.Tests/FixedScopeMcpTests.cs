@@ -78,16 +78,25 @@ public sealed class FixedScopeMcpTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var client = await McpTests.Connect(timeout.Token);
         var summary = await McpTests.Read(client, ProjectTool, new { projectRoot = workspace.Root }, timeout.Token);
-        AssertSourceSummary(summary);
+        var codeSummary = Family(summary, "families", "code");
+        Assert.Equal("incomplete", codeSummary.GetProperty("status").GetString());
+        Assert.Equal(1, codeSummary.GetProperty("unscoredFileCount").GetInt32());
+        Assert.True(codeSummary.GetProperty("scoredFileCount").GetInt32() > 0);
         var reportId = McpTests.ReportId(summary);
         var raw = await McpTests.Raw(client, reportId, timeout.Token);
         Assert.Contains(raw.GetProperty("diagnostics").EnumerateArray(), diagnostic =>
             diagnostic.TryGetProperty("file", out var file) && file.GetString() == "Broken.cs");
         var code = Family(raw, "results", "code");
         var duplication = Family(raw, "results", "duplication");
-        Assert.Equal("complete", duplication.GetProperty("status").GetString());
-        Assert.DoesNotContain(code.GetProperty("entities").EnumerateArray(), entity => EntityFile(entity) == "Broken.cs");
-        Assert.All(duplication.GetProperty("entities").EnumerateArray(), entity => Assert.EndsWith(".java", EntityFile(entity)));
+        Assert.Equal("incomplete", duplication.GetProperty("status").GetString());
+        var broken = code.GetProperty("entities").EnumerateArray().Where(entity => EntityFile(entity) == "Broken.cs").ToArray();
+        Assert.Equal(2, broken.Length);
+        Assert.All(broken, AssertIncompleteStaticEntity);
+        var entities = duplication.GetProperty("entities").EnumerateArray().ToArray();
+        Assert.Contains(entities, entity => EntityFile(entity)!.EndsWith(".java", StringComparison.Ordinal)
+            && entity.GetProperty("score").ValueKind == JsonValueKind.Number);
+        Assert.Contains(entities, entity => EntityFile(entity)!.EndsWith(".cs", StringComparison.Ordinal)
+            && entity.GetProperty("status").GetString() == "incomplete" && !entity.TryGetProperty("score", out _));
         Assert.NotEmpty(duplication.GetProperty("findings").EnumerateArray());
         await AssertSourcePages(client, reportId, code, timeout.Token);
     }
@@ -175,11 +184,24 @@ public sealed class FixedScopeMcpTests
 
     private static void AssertStaticEntity(JsonElement entity)
     {
+        if (entity.GetProperty("status").GetString() == "incomplete")
+        {
+            AssertIncompleteStaticEntity(entity);
+            return;
+        }
         Assert.False(entity.TryGetProperty("score", out _));
         Assert.False(entity.TryGetProperty("blockers", out _));
         var assessment = entity.GetProperty("staticComplexity");
         Assert.Equal(JsonValueKind.Number, assessment.GetProperty("score").ValueKind);
         Assert.False(assessment.TryGetProperty("blockers", out _));
+    }
+
+    private static void AssertIncompleteStaticEntity(JsonElement entity)
+    {
+        var assessment = entity.GetProperty("staticComplexity");
+        Assert.Equal("incomplete", assessment.GetProperty("status").GetString());
+        Assert.False(assessment.TryGetProperty("score", out _));
+        Assert.Contains(assessment.GetProperty("blockers").EnumerateArray(), blocker => blocker.GetString() == "syntax.incomplete");
     }
 
     private static string? EntityFile(JsonElement entity) => entity.GetProperty("file").GetString();

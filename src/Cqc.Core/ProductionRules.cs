@@ -13,8 +13,11 @@ internal static class ProductionRules
         CoverageEvidence? evidence, string configFingerprint)
     {
         var methods = ProductionMethods(context).ToArray();
+        var staticComplexity = new StaticComplexity(context);
         var types = context.TypesFor(methods)
-            .Concat(context.Facts.Types.Where(type => !type.IsTest && !AssessmentEvidence.Of(type).Syntax)).Distinct().ToArray();
+            .Concat(context.Facts.Types.Where(type => !type.IsTest
+                && (!AssessmentEvidence.Of(type).Syntax || staticComplexity.HasExecutables(type.Id))))
+            .Distinct().ToArray();
         if (methods.Length == 0 && types.Length == 0)
             return context.Finish(new() { Family = "code", Types = types, Findings = [] });
         var coverage = MatchingCoverage(context.Snapshot.SourceFingerprint, configFingerprint, evidence);
@@ -25,18 +28,24 @@ internal static class ProductionRules
         }).ToArray();
         var ids = types.Select(t => t.Id).Distinct(StringComparer.Ordinal).ToArray();
         var byType = assessments.ToLookup(a => a.Method.TypeId, StringComparer.Ordinal);
-        var methodsByType = methods.ToLookup(m => m.TypeId, StringComparer.Ordinal);
         var blockers = ids.ToDictionary(id => id, id => byType[id].SelectMany(a => a.Blockers)
             .Concat(context.Index.TypesById[id].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
         var staticBlockers = ids.ToDictionary(id => id,
-            id => context.Index.TypesById[id].SelectMany(t => AssessmentEvidence.Syntax(t, methodsByType[id])).Distinct().ToArray(), StringComparer.Ordinal);
+            id => context.Index.TypesById[id].SelectMany(staticComplexity.Blockers).Distinct().ToArray(), StringComparer.Ordinal);
         var missing = assessments.Where(a => !a.Complete).Select(a => a.Method.TypeId).ToHashSet(StringComparer.Ordinal);
         var metrics = assessments.GroupBy(a => a.Method.TypeId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var diagnostics = missing.Count == 0 ? Array.Empty<Diagnostic>() :
             [new Diagnostic("coverage.incomplete", "Combined scoring requires complete syntax, resolved method identities and source/configuration-matched coverage. Inspect entity blockers; execute=true can collect coverage but may not resolve every blocker.")];
-        return context.Finish(new() { Family = "code", Types = types, Findings = assessments.SelectMany(a => a.Findings),
-            Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id], Metrics = id => metrics.GetValueOrDefault(id) ?? RuleContext.Metrics(), Diagnostics = diagnostics });
+        var initializerFindings = staticComplexity.InitializerFindings(config).ToArray();
+        return context.Finish(new()
+        {
+            Family = "code", Types = types, Findings = assessments.SelectMany(a => a.Findings).Concat(initializerFindings),
+            StaticOnlyFindingIds = initializerFindings.Select(finding => finding.Id).ToHashSet(StringComparer.Ordinal),
+            PrimaryScoreApplies = id => byType.Contains(id) || !staticComplexity.HasExecutables(id),
+            Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id],
+            Metrics = id => staticComplexity.Metrics(id, metrics.GetValueOrDefault(id)), Diagnostics = diagnostics
+        });
     }
 
     internal static IEnumerable<MethodFact> ProductionMethods(RuleContext context)
@@ -67,10 +76,7 @@ internal static class ProductionRules
     }
 
     internal static Finding? ComplexityFinding(MethodFact method, QualityConfig config) =>
-        method.Complexity > config.ComplexityThreshold
-            ? ForMethod("code.complexity", method, $"Cyclomatic complexity {method.Complexity} exceeds {config.ComplexityThreshold}.",
-                "Simplify decisions or extract cohesive behavior, then rerun this check.")
-            : null;
+        StaticComplexity.Finding(StructuralExecutable.FromMethod(method), config);
 
     private static SortedDictionary<string, double?> Metrics(IEnumerable<Assessment> assessments)
     {

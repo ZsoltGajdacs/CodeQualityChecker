@@ -11,16 +11,16 @@ internal static class ReportSerialization
     private static readonly JsonSerializerOptions SourceOnly = new(CompactJson.Options)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OmitEvidenceBlockers } }
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OmitEmptyBlockers } }
     };
 
     internal static JsonSerializerOptions For(object report) =>
         report is AnalysisResponse { SourceOnly: true } ? SourceOnly : CompactJson.Options;
 
-    private static void OmitEvidenceBlockers(JsonTypeInfo type)
+    private static void OmitEmptyBlockers(JsonTypeInfo type)
     {
         if (!AssessmentTypes.Contains(type.Type)) return;
         foreach (var property in type.Properties.Where(property => property.Name == "blockers"))
-            property.ShouldSerialize = (_, _) => false;
+            property.ShouldSerialize = (_, value) => value is string[] { Length: > 0 };
     }
 }

@@ -10,6 +10,8 @@ public static class LanguageIdentity
         {
             Types = facts.Types.Select(t => t with { Id = Id(t.Id) }).ToArray(),
             Methods = facts.Methods.Select(m => m with { Id = Id(m.Id), TypeId = Id(m.TypeId), Calls = m.Calls.Select(Id).ToArray(), CoverageSignature = m.CoverageSignature }).ToArray(),
+            Executables = facts.Executables.Select(e => e with { Id = Id(e.Id), TypeId = Id(e.TypeId) }).ToArray(),
+            SyntaxGaps = facts.SyntaxGaps.Select(g => g.TypeId is null ? g : g with { TypeId = Id(g.TypeId) }).ToArray(),
             Dependencies = facts.Dependencies.Select(d => d with { From = Id(d.From), To = Id(d.To) }).ToArray()
         };
     }

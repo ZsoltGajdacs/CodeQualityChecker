@@ -77,8 +77,9 @@ public static class ProjectDiscovery
             var diagnostics = new List<Diagnostic>();
             var registered = definitions.SelectMany(definition => definition.SourceExtensions).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var extension in allFiles.Select(Path.GetExtension).OfType<string>().Where(OtherExtensions.Contains)
-                         .Where(extension => !registered.Contains(extension)).Distinct().Order(StringComparer.Ordinal))
-                diagnostics.Add(new("unsupported_language", $"Files with {extension} extension are not analyzed."));
+                         .Where(extension => !registered.Contains(extension)).Select(extension => extension.ToLowerInvariant())
+                         .Distinct().Order(StringComparer.Ordinal))
+                diagnostics.Add(new("unsupported_language", $"Files with {extension} extension are not analyzed.") { Extension = extension });
             foreach (var module in modules.Where(module => !module.Supported))
                 diagnostics.Add(new("unsupported_integration", $"{module.Integration} has source-only support.", module.Path, module.Language));
             return diagnostics.ToArray();

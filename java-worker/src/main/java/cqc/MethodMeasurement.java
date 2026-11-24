@@ -1,7 +1,6 @@
 package cqc;
 
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.*;
 import java.util.*;
@@ -14,19 +13,10 @@ final class MethodMeasurement {
     private static final Set<Class<?>> NON_EXECUTABLE = Set.of(BlockStmt.class, EmptyStmt.class);
     record Metrics(int complexity, int lines, int nodes) { }
 
-    static List<Node> nodes(CallableDeclaration<?> declaration, BlockStmt body) {
-        return body.stream().filter(n -> belongs(n, declaration, body))
-            .filter(n -> !(n instanceof com.github.javaparser.ast.comments.Comment)).toList();
-    }
-
     static Metrics inspect(List<Node> nodes) {
         int complexity = 1 + nodes.stream().mapToInt(MethodMeasurement::decisions).sum();
         int lines = (int)nodes.stream().filter(MethodMeasurement::executable).map(AstIdentity::line).distinct().count();
         return new Metrics(complexity, lines, nodes.size());
-    }
-
-    private static boolean belongs(Node node, CallableDeclaration<?> declaration, BlockStmt body) {
-        return node == body || callable(node).map(c -> c == declaration).orElse(false);
     }
 
     private static int decisions(Node node) {

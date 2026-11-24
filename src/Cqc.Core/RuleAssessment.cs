@@ -17,6 +17,9 @@ internal sealed record FamilyAssessment
     public required IEnumerable<Finding> Findings { get; init; }
     public Func<string, string[]> Blockers { get; init; } = _ => [];
     public Func<string, string[]>? StaticBlockers { get; init; }
+    public HashSet<string> StaticOnlyFindingIds { get; init; } = [];
+    public Func<string, bool> PrimaryScoreApplies { get; init; } = _ => true;
+    public bool Incomplete { get; init; }
     public Func<string, SortedDictionary<string, double?>> Metrics { get; init; } = _ => RuleContext.Metrics();
     public IEnumerable<Diagnostic> Diagnostics { get; init; } = [];
 }

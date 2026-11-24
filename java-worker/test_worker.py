@@ -13,7 +13,7 @@ JAR = Path(__file__).parent.resolve() / "target/java-worker.jar"
 
 
 class JavaWorkerTests(unittest.TestCase):
-    def analyze(self, files, evidence_directory=None):
+    def analyze(self, files, evidence_directory=None, *, source_only=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name, source in files.items():
@@ -23,13 +23,15 @@ class JavaWorkerTests(unittest.TestCase):
                     path.write_bytes(source)
                 else:
                     path.write_text(source)
-            snapshot = {"root": directory, "files": sorted(files), "sourceFingerprint": "fixture", "schemaVersion": "2"}
+            version = "3" if source_only else "2"
+            snapshot = {"root": directory, "files": sorted(files), "sourceFingerprint": "fixture",
+                        "schemaVersion": version, "sourceOnly": source_only}
             if evidence_directory is not None:
                 snapshot["referenceEvidenceDirectory"] = str(root / evidence_directory)
             process = subprocess.run(["java", "-jar", str(JAR)], input=json.dumps(snapshot),
                                      text=True, capture_output=True, timeout=30, check=True)
             self.assertEqual("", process.stderr)
-            self.assertEqual("2", json.loads(process.stdout)["schemaVersion"])
+            self.assertEqual(version, json.loads(process.stdout)["schemaVersion"])
             return json.loads(process.stdout)
 
     def test_overloads_nested_types_and_exact_complexity(self):
@@ -348,20 +350,117 @@ class Generic<T> {
         self.assertFalse(facts["semanticComplete"])
         self.assertTrue(any(edge["from"] == "pom.xml#main::demo.Client" and edge["to"] == "pom.xml#main::demo.Values" for edge in facts["dependencies"]))
 
-    def test_unmodeled_executable_bodies_make_the_owning_type_incomplete(self):
-        facts = self.analyze({"Example.java": "class Example { static { System.out.println(1); } int value() { return 1; } }"})
-        self.assertFalse(facts["types"][0]["complete"])
-        self.assertTrue(any(d["code"] == "java.unmodeled_executable" for d in facts["diagnostics"]))
+    def test_initialization_supports_fields_blocks_and_enum_bodies(self):
+        files = {"Example.java": """enum Example {
+  FIRST(flag() ? 1 : 4) {
+    int field = flag() ? 1 : 2;
+    { if (flag()) field++; }
+    @Override int value() { if (flag()) return 2; return 3; }
+  },
+  SECOND(2);
+  static int count;
+  static { if (flag() || count == 2) count = 1; }
+  { if (flag()) count++; }
+  int member = flag()
+      ? 1
+      : 2;
+  Example(int number) {}
+  int value() { return 0; }
+  static boolean flag() { return true; }
+}"""}
+        for source_only in (False, True):
+            with self.subTest(source_only=source_only):
+                facts = self.analyze(files, source_only=source_only)
+                self.assertEqual([], facts["syntaxGaps"])
+                self.assertTrue(facts["types"][0]["evidence"]["syntax"])
+                units = {unit["location"]["startLine"]: unit for unit in facts["executables"]}
+                expected = {2: ("enumArgument", 2), 3: ("fieldInitializer", 2), 4: ("instanceInitializer", 2),
+                            5: ("nestedMethod", 2), 7: ("enumArgument", 1), 9: ("staticInitializer", 3),
+                            10: ("instanceInitializer", 2), 11: ("fieldInitializer", 2)}
+                self.assertEqual(expected, {line: (unit["kind"], unit["complexity"]) for line, unit in units.items()})
+                self.assertEqual(13, units[11]["location"]["endLine"])
+                self.assertTrue(all(unit["fingerprints"] for unit in units.values()))
+                self.assertTrue(all(unit["typeId"] == facts["types"][0]["id"] for unit in units.values()))
+                self.assertEqual(3, len(facts["methods"]))
+                self.assertEqual(facts["executables"], self.analyze(files, source_only=source_only)["executables"])
 
-    def test_unmodeled_field_initializer_and_enum_body_block_syntax(self):
-        for source in ["class Example { int value = choose() ? 1 : 2; boolean choose() { return true; } }",
-                       "enum Example { A { int value(int x) { if (x > 0) return x; return 0; } }; int value(int x) { return 0; } }"]:
-            facts = self.analyze({"Example.java": source})
-            self.assertFalse(facts["types"][0]["evidence"]["syntax"])
-            self.assertTrue(any(gap["code"] == "syntax.unmodeledExecutable" for gap in facts["syntaxGaps"]))
-            self.assertFalse(facts["syntaxGaps"][0]["unknownEntities"])
-        facts = self.analyze({"Example.java": "class Example { static final String LABEL = \"label\"; int count = -2; int value() { return count; } }"})
-        self.assertTrue(facts["types"][0]["evidence"]["syntax"])
+    def test_initializer_boundaries_partition_nested_executables(self):
+        facts = self.analyze({"Example.java": """class Example {
+  Runnable callback = () -> {
+    class Local {
+      Runnable another = () -> { if (flag()) yieldResult(); };
+      void run() { if (flag()) yieldResult(); }
+    }
+    Runnable anonymous = new Runnable() {
+      { if (flag()) yieldResult(); }
+      public void run() { if (flag()) yieldResult(); }
+    };
+    if (flag()) anonymous.run();
+  };
+  static boolean flag() { return true; }
+  static void yieldResult() {}
+}"""}, source_only=True)
+        units = {unit["id"]: unit for unit in facts["executables"]}
+        self.assertEqual(7, len(units))
+        self.assertEqual([1, 1, 2, 2, 2, 2, 2], sorted(unit["complexity"] for unit in units.values()))
+        self.assertEqual(2, len(facts["types"]))
+        local_run = next(unit for unit in units.values() if ".Local@" in unit["typeId"] and unit["kind"] == "nestedMethod")
+        self.assertEqual(2, local_run["complexity"])
+        self.assertEqual({"Example.flag()", "Example.yieldResult()"}, {method["qualifiedName"] for method in facts["methods"]})
+        self.assert_field_fingerprints_exclude_nested_branches(units.values())
+
+    def assert_field_fingerprints_exclude_nested_branches(self, units):
+        for unit in units:
+            if unit["kind"] == "fieldInitializer":
+                self.assertNotIn("IfStmt", " ".join(unit["fingerprints"]))
+
+    def test_ordinary_method_excludes_local_and_anonymous_initializer_bodies(self):
+        facts = self.analyze({"Example.java": """class Example {
+  void outer() {
+    Runnable ordinaryLambda = () -> { if (flag()) work(); };
+    class Local {
+      int field = flag() ? 1 : 2;
+      { if (flag()) work(); }
+    }
+    Runnable anonymous = new Runnable() {
+      int field = flag() ? 1 : 2;
+      { if (flag()) work(); }
+      public void run() { if (flag()) work(); }
+    };
+  }
+  boolean flag() { return true; }
+  void work() {}
+}"""})
+        methods = {method["qualifiedName"]: method for method in facts["methods"]}
+        outer = methods["Example.outer()"]
+        self.assertEqual(2, outer["complexity"])
+        self.assertNotIn("ConditionalExpr", " ".join(outer["fingerprints"]))
+        self.assertEqual({"Example.outer()", "Example.flag()", "Example.work()"}, methods.keys())
+        units = {unit["location"]["startLine"]: (unit["kind"], unit["complexity"]) for unit in facts["executables"]}
+        self.assertEqual({5: ("fieldInitializer", 2), 6: ("instanceInitializer", 2),
+                          9: ("fieldInitializer", 2), 10: ("instanceInitializer", 2),
+                          11: ("nestedMethod", 2)}, units)
+
+    def test_compact_record_constructor_uses_canonical_parameter_signature(self):
+        files = {"Pair.java": """import java.util.List;
+record Pair(List<String> values, String... labels) {
+  Pair {
+    Runnable callback = () -> { if (labels.length == 0) System.out.println(values); };
+    if (values.isEmpty()) callback.run();
+  }
+  Pair(List<String> values) { this(values, ""); }
+}"""}
+        facts = self.analyze(files)
+        self.assertEqual([], facts["syntaxGaps"])
+        compact = next(method for method in facts["methods"] if method["location"]["startLine"] == 3)
+        self.assertEqual("Pair..ctor(java.util.List,java.lang.String[])", compact["coverageSignature"])
+        self.assertTrue(compact["evidence"]["identity"])
+        self.assertEqual(2, compact["complexity"])
+        self.assertEqual([("lambda", 2)], [(unit["kind"], unit["complexity"]) for unit in facts["executables"]])
+        source = self.analyze(files, source_only=True)
+        compact = next(method for method in source["methods"] if method["location"]["startLine"] == 3)
+        self.assertEqual("Pair..ctor(List<String>,String[])", compact["qualifiedName"])
+        self.assertIsNone(compact["coverageSignature"])
 
     def test_method_references_preserve_helper_identity(self):
         facts = self.analyze({"Example.java": "class Example { void helper() {} void exercise() { Runnable action = this::helper; action.run(); } }"})

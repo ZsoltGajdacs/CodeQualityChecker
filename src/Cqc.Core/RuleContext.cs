@@ -6,6 +6,8 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
     public ProjectSnapshot Snapshot { get; } = snapshot;
     public AnalysisFacts Facts { get; } = facts;
     public FactIndex Index { get; } = new(facts);
+    private StructuralEvidence? structure;
+    public StructuralEvidence Structure => structure ??= new(Snapshot, Facts);
     public MethodFact[] Methods => Index.Methods;
 
     public static SortedDictionary<string, double?> Metrics() => new(StringComparer.Ordinal);
@@ -22,7 +24,7 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
     {
         var report = new EntityReport(assessment).Build(Snapshot.SelectedFiles);
         if (Snapshot.SourceOnly)
-            return new(assessment.Family, Status(report.Entities, false), report.Entities, report.Findings, []);
+            return new(assessment.Family, Status(report.Entities, assessment.Incomplete)) { Entities = report.Entities, Findings = report.Findings };
         var failures = Facts.Diagnostics.Where(d => d.Code == "analyzer_failed").ToArray();
         var orderedDiagnostics = assessment.Diagnostics.Concat(failures).Distinct()
             .OrderBy(d => d.File, StringComparer.Ordinal).ThenBy(d => d.Code, StringComparer.Ordinal)
@@ -30,7 +32,10 @@ internal sealed class RuleContext(ProjectSnapshot snapshot, AnalysisFacts facts,
         var selected = Snapshot.SelectedFiles.ToHashSet(StringComparer.Ordinal);
         var applicable = assessment.Types.Select(type => type.Location.File).ToHashSet(StringComparer.Ordinal);
         var missingSyntax = Facts.SyntaxGaps.Any(g => selected.Contains(g.File) && (g.UnknownEntities || applicable.Contains(g.File)));
-        return new(assessment.Family, Status(report.Entities, failures.Length != 0 || missingSyntax), report.Entities, report.Findings, orderedDiagnostics);
+        return new(assessment.Family, Status(report.Entities, assessment.Incomplete || failures.Length != 0 || missingSyntax))
+        {
+            Entities = report.Entities, Findings = report.Findings, Diagnostics = orderedDiagnostics
+        };
     }
 
     private static string Status(EntityScore[] entities, bool failed)

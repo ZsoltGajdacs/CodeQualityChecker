@@ -45,7 +45,7 @@ Use `check_code_quality` for the repository or `check_uncommitted_changes_qualit
 }
 ```
 
-Both tools default to `execute: false`. They report supported static cyclomatic complexity and structural duplication using source and static project configuration. They skip saved build and coverage evidence, and omit scores and metrics that need it. A source or analyzer failure may prevent an assessment and appears in diagnostics. The summary includes a brief note that execution may reveal additional findings.
+Both tools default to `execute: false`. They report static cyclomatic complexity and structural duplication using source and static project configuration. These checks include Java field expressions, initializer blocks, compact record constructors, and enum initialization. They skip saved build and coverage evidence and omit metrics that require it. The code family summary includes `scoredFileCount` and `unscoredFileCount` for selected production files and explicit source failures. A structural gap in a language’s duplication pool can withhold its numeric scores while preserving verified matches.
 
 The changes tool requires Git. It reads current working-tree content, including unstaged edits to a staged file, after applying ignore and generated-file exclusions. It excludes deleted files. On a clean checkout it returns zero files without building or testing. Findings can refer to unchanged counterpart files because checks use repository context.
 
@@ -55,7 +55,7 @@ Use `check_all` or an individual family tool for explicit selection. These tools
 
 When explicitly requested, `execute: true` makes both review tools run all four check families with evidence collected through project-controlled restores, builds, and tests. Execution runs in the checkout, reuses normal build outputs, and writes evidence such as `.cqc/coverage.json`. Project build and test code can modify the checkout. Maven uses the project wrapper when available. The supported execution integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
 
-Every inspection and check returns a compact schema-v3 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content is a short explanation, not a second copy of the report. Diagnostic counts show at most 20 code groups and identify remaining groups. Scores remain separate by family. An incomplete family does not prevent an independent family from scoring. Recommendations are advisory; a high score does not prove functional correctness or test effectiveness.
+Every inspection and check returns a compact schema-v3 summary in MCP `structuredContent`, with a report ID, expiry, fingerprints, counts, per-family completeness and score distributions. Text content provides a short explanation. Diagnostic counts show at most 20 code groups and identify remaining groups. Scoped groups show `selectedCount`, `contextCount`, and `projectWideCount` when positive. `unsupported_language` lists the distinct extensions discovered across the repository. Independent families may still produce scores when another family is incomplete.
 
 Retrieve details without rerunning analysis:
 
@@ -70,7 +70,7 @@ Retrieve details without rerunning analysis:
 }
 ```
 
-`get_report_page` supports selected `files`, `modules`, `entities`, `findings`, `diagnostics`, `metrics`, and inspection `prerequisites`. Use optional `family` and `entityId` filters where applicable; keep them unchanged when passing a returned `nextCursor`. The default limit is 50 records, with 1–200 accepted. A null `nextCursor` means that section is exhausted. Detail retrieval does not execute project code or reread source files.
+`get_report_page` supports selected `files`, `modules`, `entities`, `findings`, `diagnostics`, `metrics`, and inspection `prerequisites`. Diagnostic pages show selected-file entries first and include the triggering construct and source range when available. Use optional `family` and `entityId` filters where applicable and keep them fixed when passing a returned `nextCursor`. The default limit is 50 records, with 1–200 accepted. A null `nextCursor` means that section is exhausted. Detail retrieval does not execute project code or reread source files.
 
 All tool results are bounded to 512 KiB, including JSON escaping and text content; a byte budget may reduce the record count. Exceptionally large records explicitly direct you to `section: "raw"`. Raw pages contain `rawChunk` strings: concatenate them in cursor order to reconstruct the complete original report JSON without loss. A partial page does not mean analysis is incomplete; use family statuses to assess analysis completeness.
 

@@ -64,7 +64,10 @@ internal sealed class EntityReport
     private EntityScore Score(EntityAssessment entity)
     {
         var keys = entity.TypeIds;
-        var result = AssessmentEvidence.Score(entity.Findings, keys.SelectMany(assessment.Blockers));
+        var primary = entity.Findings.Where(finding => !assessment.StaticOnlyFindingIds.Contains(finding.Id));
+        var applicable = keys.Where(assessment.PrimaryScoreApplies).ToArray();
+        var result = applicable.Length == 0 ? new("notApplicable", null, [], [])
+            : AssessmentEvidence.Score(primary, applicable.SelectMany(assessment.Blockers));
         var secondary = assessment.StaticBlockers is null ? null : AssessmentEvidence.Score(
             entity.Findings.Where(f => f.Rule == "code.complexity"), keys.SelectMany(assessment.StaticBlockers));
         return new(entity.Id, entity.Kind, entity.File, result.Status, result.Score, result.FindingIds, entity.Metrics)

@@ -21,7 +21,6 @@ public static class Wire
 }
 
 public sealed record Location(string File, int StartLine, int EndLine);
-public sealed record Diagnostic(string Code, string Message, string? File = null, string? Language = null);
 public sealed record MethodFact(
     string Id, string TypeId, string Language, Location Location, int Complexity,
     int ExecutableLines, bool IsTest, bool IsFixture, bool IsParameterized,
@@ -47,6 +46,7 @@ public sealed record AnalysisFacts(
 {
     public AnalysisContext[] Contexts { get; init; } = [];
     public SyntaxGap[] SyntaxGaps { get; init; } = [];
+    public ExecutableFact[] Executables { get; init; } = [];
 }
 public sealed record ProjectModule(string Language, string Path, string Integration, bool Supported);
 public sealed record ProjectSnapshot(
@@ -97,16 +97,6 @@ public sealed record EntityScore(string EntityId, string Kind, string File, stri
     public string[] Blockers { get; init; } = [];
     public AssessmentResult? StaticComplexity { get; init; }
 }
-public sealed record FamilyResult(string Family, string Status, EntityScore[] Entities, Finding[] Findings, Diagnostic[] Diagnostics);
-public sealed record AnalysisResponse(string SchemaVersion, string RulesetVersion, string Message,
-    string SourceFingerprint, string ConfigurationFingerprint, string Scope,
-    string[] AnalyzedFiles, ProjectModule[] Modules, FamilyResult[] Results, Diagnostic[] Diagnostics)
-{
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public bool SourceOnly { get; init; }
-}
-public sealed record InspectionResponse(string SchemaVersion, string Message, ProjectSnapshot Project, Diagnostic[] Prerequisites);
-
 public sealed record MethodCoverage(string MethodId, int CoveredBranches, int TotalBranches, int CoveredLines, int TotalLines);
 public sealed record CoverageEvidence(string SchemaVersion, string SourceFingerprint, string ConfigurationFingerprint,
     bool Successful, SortedDictionary<string, string> ToolVersions, MethodCoverage[] Methods);

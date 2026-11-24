@@ -4,53 +4,36 @@ internal static class StructuralReview
 {
     internal static FamilyResult[] Evaluate(RuleContext context, QualityConfig config) =>
         new[] { Complexity(context, config), DuplicationRules.Evaluate(context, config) }
-            .Where(family => family.Entities.Length != 0).ToArray();
+            .Where(family => family.Status != "notApplicable").ToArray();
 
     private static FamilyResult Complexity(RuleContext context, QualityConfig config)
     {
-        var methodsByType = ProductionRules.ProductionMethods(context).ToLookup(method => method.TypeId, StringComparer.Ordinal);
-        var unknownFiles = context.Facts.SyntaxGaps.Where(gap => gap.UnknownEntities)
-            .Select(gap => gap.File).ToHashSet(StringComparer.Ordinal);
-        var productionTypes = context.Facts.Types.Where(type => !type.IsTest).ToArray();
-        var blocked = productionTypes.Where(type => unknownFiles.Contains(type.Location.File)
-                || AssessmentEvidence.Syntax(type, methodsByType[type.Id]).Length != 0)
-            .Select(type => type.Id).ToHashSet(StringComparer.Ordinal);
-        var blockedFiles = productionTypes.Where(type => blocked.Contains(type.Id))
-            .Select(type => type.Location.File).ToHashSet(StringComparer.Ordinal);
-        var types = productionTypes.Where(type => !blocked.Contains(type.Id) && methodsByType.Contains(type.Id)).ToArray();
-        var findings = types.Select(type => type.Id).Distinct(StringComparer.Ordinal).SelectMany(id => methodsByType[id])
-            .Select(method => ProductionRules.ComplexityFinding(method, config)).OfType<Finding>();
-        var report = new EntityReport(new()
+        var complexity = new StaticComplexity(context);
+        var types = context.Facts.Types.Where(type => !type.IsTest).ToArray();
+        var blockers = types.GroupBy(type => type.Id, StringComparer.Ordinal).ToDictionary(group => group.Key,
+            group => group.SelectMany(complexity.Blockers).Distinct(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        var assessed = types.Where(type => complexity.HasExecutables(type.Id) || blockers[type.Id].Length != 0).ToArray();
+        var findings = assessed.Select(type => type.Id).Distinct(StringComparer.Ordinal).SelectMany(id => complexity.Findings(id, config));
+        var unavailable = context.Structure.UnavailableSelectedFiles;
+        var report = context.Finish(new()
         {
-            Family = "code", Types = types, Findings = findings, StaticBlockers = _ => [],
-            Metrics = id => ComplexityMetrics(methodsByType[id])
-        }).Build(context.Snapshot.SelectedFiles);
-        var entities = report.Entities.Where(entity => entity.Kind != "file" || !blockedFiles.Contains(entity.File))
-            .Select(entity => entity with { Score = null }).ToArray();
-        return new("code", "complete", entities, report.Findings, []);
+            Family = "code", Types = assessed, Findings = findings, Incomplete = unavailable.Count != 0,
+            Blockers = id => blockers[id], StaticBlockers = id => blockers[id],
+            Metrics = id => complexity.Metrics(id)
+        });
+        return WithFileCounts(report, unavailable);
     }
 
-    private static SortedDictionary<string, double?> ComplexityMetrics(IEnumerable<MethodFact> methods)
+    private static FamilyResult WithFileCounts(FamilyResult report, HashSet<string> unavailable)
     {
-        var metrics = RuleContext.Metrics();
-        foreach (var method in methods) metrics[$"method:{method.Id}:complexity"] = method.Complexity;
-        return metrics;
+        var files = report.Entities.Where(entity => entity.Kind == "file").ToArray();
+        var unscored = files.Where(entity => entity.StaticComplexity?.Score is null).Select(entity => entity.File);
+        return report with
+        {
+            Entities = report.Entities.Select(entity => entity with { Score = null }).ToArray(),
+            ScoredFileCount = files.Count(entity => entity.StaticComplexity?.Score is not null),
+            UnscoredFileCount = unscored.Union(unavailable, StringComparer.Ordinal).Count()
+        };
     }
 
-    internal static IEnumerable<Diagnostic> Diagnostics(AnalysisFacts facts, string[] selectedFiles)
-    {
-        var languages = selectedFiles.Select(file => Path.GetExtension(file).ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-        return facts.Diagnostics.Where(IsAnalyzerFailure)
-            .Concat(facts.SyntaxGaps.Select(gap => new Diagnostic(gap.Code, "Source structure could not be fully analyzed.",
-                gap.File, gap.Language)))
-            .Where(diagnostic => diagnostic.Language switch
-            {
-                "csharp" => languages.Contains(".cs"),
-                "java" => languages.Contains(".java"),
-                _ => true
-            }).Distinct();
-    }
-
-    internal static bool IsAnalyzerFailure(Diagnostic diagnostic) => diagnostic.Code is
-        "analyzer_failed" or "java.worker_missing" or "java.worker_failed" or "java.worker_protocol" or "java.worker_empty";
 }

@@ -78,10 +78,13 @@ public sealed class ReviewRegressionTests
     [Fact]
     public async Task DuplicationWorkHonorsCancellationAfterAnalysisStarts()
     {
+        var evidence = new EvidenceState(true, true, true, true, true, []);
         var methods = Enumerable.Range(0, 2000).Select(index => new MethodFact($"Type{index}.Run()", $"Type{index}", "csharp",
             new($"Part{index}.cs", 1, 10), 1, 10, false, false, false, 0, [],
-            Enumerable.Range(0, 256).Select(node => $"fingerprint-{index}-{node}").ToArray(), 300)).ToArray();
-        var types = methods.Select(method => new TypeFact(method.TypeId, "csharp", method.Location, false)).ToArray();
+            Enumerable.Range(0, 256).Select(node => $"fingerprint-{index}-{node}").ToArray(), 300)
+            { Evidence = evidence }).ToArray();
+        var types = methods.Select(method => new TypeFact(method.TypeId, "csharp", method.Location, false)
+            { Evidence = evidence }).ToArray();
         var files = types.Select(type => type.Location.File).ToArray();
         var snapshot = new ProjectSnapshot("/repo", files, files, [], "source", []);
         var facts = new AnalysisFacts(types, methods, [], [], true);

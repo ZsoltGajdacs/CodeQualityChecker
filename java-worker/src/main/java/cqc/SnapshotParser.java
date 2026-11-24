@@ -75,7 +75,10 @@ final class SnapshotParser {
         var result = parser.parse(path);
         if (!result.isSuccessful()) {
             reporter.report("java.parse", result.getProblems().toString(), file);
-            gaps.add(new Worker.SyntaxGap(file, "java", contextId, "syntax.parse", true));
+            var location = result.getProblems().stream().flatMap(problem -> problem.getLocation().stream())
+                .flatMap(tokens -> tokens.toRange().stream()).findFirst()
+                .map(range -> new Worker.Location(file, range.begin.line, range.end.line)).orElse(null);
+            gaps.add(new Worker.SyntaxGap(file, "java", contextId, "syntax.parse", true, location, null));
             return Optional.empty();
         }
         return result.getResult().map(unit -> new Worker.Source(file, unit, null));

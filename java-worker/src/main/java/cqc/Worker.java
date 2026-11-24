@@ -14,6 +14,7 @@ public final class Worker {
     private static final Gson JSON = new GsonBuilder().serializeNulls().create();
     private final List<TypeFact> types = new ArrayList<>();
     private final List<MethodFact> methods = new ArrayList<>();
+    private final List<ExecutableFact> executables = new ArrayList<>();
     private final List<DependencyFact> dependencies = new ArrayList<>();
     private final List<Diagnostic> diagnostics = new ArrayList<>();
     private final Set<String> reported = new HashSet<>();
@@ -36,7 +37,8 @@ public final class Worker {
         }
     }
     record AnalysisContext(String id, String modulePath, String sourceSet, String[] reachableContexts, boolean verified, String[] blockers) { }
-    record SyntaxGap(String file, String language, String contextId, String code, boolean unknownEntities) { }
+    record SyntaxGap(String file, String language, String contextId, String code, boolean unknownEntities,
+        Location location, String construct) { }
     record TypeFact(String id, String language, Location location, boolean isAbstract, boolean isTest, boolean complete,
         String contextId, String qualifiedName, EvidenceState evidence) { }
     record DependencyFact(String from, String to, Location location) { }
@@ -44,8 +46,11 @@ public final class Worker {
         int executableLines, boolean isTest, boolean isFixture, boolean isParameterized,
         int assertions, String[] calls, String[] fingerprints, int nodeCount, boolean complete, String coverageSignature,
         String contextId, String qualifiedName, EvidenceState evidence) { }
+    record ExecutableFact(String id, String typeId, String language, Location location, int complexity,
+        String[] fingerprints, int nodeCount, String kind) { }
     record AnalysisFacts(List<TypeFact> types, List<MethodFact> methods, List<DependencyFact> dependencies,
-        List<Diagnostic> diagnostics, boolean semanticComplete, String schemaVersion, List<AnalysisContext> contexts, List<SyntaxGap> syntaxGaps) { }
+        List<Diagnostic> diagnostics, boolean semanticComplete, String schemaVersion, List<AnalysisContext> contexts, List<SyntaxGap> syntaxGaps,
+        List<ExecutableFact> executables) { }
     record Source(String file, CompilationUnit unit, ContextManifest.Context context) { }
 
     public static void main(String[] args) {
@@ -73,17 +78,18 @@ public final class Worker {
                 types.add(result.type());
                 methods.addAll(result.methods());
                 dependencies.addAll(result.dependencies());
-                syntaxGaps.addAll(result.gaps());
+                executables.addAll(result.executables());
             }
         sortResults();
         boolean complete = syntaxGaps.isEmpty() && types.stream().allMatch(TypeFact::complete) && methods.stream().allMatch(MethodFact::complete);
         return new AnalysisFacts(types, methods, dependencies, diagnostics, complete, input.schemaVersion(),
-            parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(), syntaxGaps);
+            parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(), syntaxGaps, executables);
     }
 
     private void sortResults() {
         types.sort(Comparator.comparing(TypeFact::id).thenComparing(t -> t.location().file()).thenComparingInt(t -> t.location().startLine()));
         methods.sort(Comparator.comparing(MethodFact::id).thenComparing(m -> m.location().file()));
+        executables.sort(Comparator.comparing(ExecutableFact::id));
         dependencies.sort(Comparator.comparing(DependencyFact::from).thenComparing(DependencyFact::to).thenComparing(d -> d.location().file()).thenComparingInt(d -> d.location().startLine()));
         diagnostics.sort(Comparator.comparing((Diagnostic d) -> Objects.toString(d.file(), "")).thenComparing(Diagnostic::code).thenComparing(Diagnostic::message));
         syntaxGaps.sort(Comparator.comparing(SyntaxGap::file).thenComparing(SyntaxGap::code));

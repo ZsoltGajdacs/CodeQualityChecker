@@ -1,19 +1,19 @@
 namespace Cqc.Core;
 
-internal sealed record DuplicateMatch(MethodFact Left, MethodFact Right, double Similarity);
+internal sealed record DuplicateMatch(StructuralExecutable Left, StructuralExecutable Right, double Similarity);
 
 /// <summary>Exact Jaccard search. Postings exclude disjoint pairs; dense postings use direct comparison.</summary>
-internal sealed class DuplicateCandidates(MethodFact[] methods, CancellationToken token)
+internal sealed class DuplicateCandidates(StructuralExecutable[] executables, CancellationToken token)
 {
     internal long Comparisons { get; private set; }
 
-    internal IEnumerable<DuplicateMatch> Matches(double threshold) => methods
-        .GroupBy(method => method.Language, StringComparer.Ordinal).SelectMany(group => MatchesGroup(group.ToArray(), threshold));
+    internal IEnumerable<DuplicateMatch> Matches(double threshold) => executables
+        .GroupBy(executable => executable.Language, StringComparer.Ordinal).SelectMany(group => MatchesGroup(group.ToArray(), threshold));
 
-    private IEnumerable<DuplicateMatch> MatchesGroup(MethodFact[] members, double threshold)
+    private IEnumerable<DuplicateMatch> MatchesGroup(StructuralExecutable[] members, double threshold)
     {
         token.ThrowIfCancellationRequested();
-        var sets = members.Select(method => method.Fingerprints.ToHashSet(StringComparer.Ordinal)).ToArray();
+        var sets = members.Select(executable => executable.Fingerprints.ToHashSet(StringComparer.Ordinal)).ToArray();
         var postings = sets.SelectMany((set, index) => set.Select(fingerprint => (fingerprint, index)))
             .ToLookup(entry => entry.fingerprint, entry => entry.index, StringComparer.Ordinal);
         for (var left = 0; left < members.Length; left++)
@@ -54,7 +54,7 @@ internal sealed class DuplicateCandidates(MethodFact[] methods, CancellationToke
     // Used by the performance harness to measure actual exact comparisons outside timed runs.
     internal static long CountComparisons(MethodFact[] methods, double threshold, CancellationToken token)
     {
-        var search = new DuplicateCandidates(methods, token);
+        var search = new DuplicateCandidates(methods.Select(StructuralExecutable.FromMethod).ToArray(), token);
         foreach (var match in search.Matches(threshold)) { }
         return search.Comparisons;
     }

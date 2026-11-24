@@ -13,7 +13,8 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         using var timeout = Timeout(request, cancellationToken);
         var (config, _) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
         var snapshot = await ProjectDiscovery.DiscoverAsync(request, config, timeout.Token, Definitions);
-        return new(Wire.SchemaVersion, Wire.Target, snapshot, Prerequisites(snapshot));
+        return new(Wire.SchemaVersion, Wire.Target, snapshot with { Diagnostics = DiagnosticScope.Classify(snapshot, snapshot.Diagnostics) },
+            DiagnosticScope.Classify(snapshot, Prerequisites(snapshot)));
     }
 
     private Diagnostic[] Prerequisites(ProjectSnapshot snapshot)
@@ -46,17 +47,22 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         var (config, configFingerprint) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
         var snapshot = (await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions))
             with { SourceOnly = mode == AnalysisMode.SourceOnly };
-        var discoveryDiagnostics = DiscoveryDiagnostics(snapshot);
+        var discoveryDiagnostics = DiagnosticScope.Classify(snapshot, DiscoveryDiagnostics(snapshot));
         var diagnostics = new List<Diagnostic>(discoveryDiagnostics);
-        var report = new AnalysisResponse(Wire.SchemaVersion, "2", Wire.Target, snapshot.SourceFingerprint, configFingerprint,
-            request.Scope, snapshot.SelectedFiles, snapshot.Modules, [], discoveryDiagnostics) { SourceOnly = snapshot.SourceOnly };
+        var report = new AnalysisResponse
+        {
+            SchemaVersion = Wire.SchemaVersion, RulesetVersion = "2", Message = Wire.Target,
+            SourceFingerprint = snapshot.SourceFingerprint, ConfigurationFingerprint = configFingerprint,
+            Scope = request.Scope, AnalyzedFiles = snapshot.SelectedFiles, Modules = snapshot.Modules,
+            Diagnostics = discoveryDiagnostics, SourceOnly = snapshot.SourceOnly
+        };
         if (mode != AnalysisMode.EvidenceAware && IsEmptyChangeSelection(request, snapshot)) return report;
 
         using var artifacts = await BuildIfRequestedAsync(request, snapshot, diagnostics, token);
         await VerifyBuildSnapshot(request, config, snapshot, token);
         var analysisSnapshot = artifacts is null ? snapshot : snapshot with { ReferenceEvidenceDirectory = artifacts.RunDirectory };
         var facts = await CollectFacts(analysisSnapshot, diagnostics, token);
-        diagnostics.AddRange(snapshot.SourceOnly ? StructuralReview.Diagnostics(facts, snapshot.SelectedFiles) : facts.Diagnostics);
+        diagnostics.AddRange(StructuralDiagnostics.For(facts, snapshot));
         var coverage = await CollectCoverage(new CoverageInput
         {
             Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
@@ -73,8 +79,8 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             await EvidenceStore.PublishRunAsync(snapshot.Root, artifacts, coverage, token);
         return report with
         {
-            Results = results,
-            Diagnostics = diagnostics.OrderBy(d => d.Code, StringComparer.Ordinal).ThenBy(d => d.File, StringComparer.Ordinal).ToArray()
+            Results = results.Select(family => family with { Diagnostics = DiagnosticScope.Classify(snapshot, family.Diagnostics) }).ToArray(),
+            Diagnostics = DiagnosticScope.Classify(snapshot, diagnostics)
         };
     }
 
@@ -153,7 +159,8 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             results.SelectMany(r => r.Dependencies).ToArray(), results.SelectMany(r => r.Diagnostics).ToArray(), results.All(r => r.SemanticComplete))
         {
             Contexts = results.SelectMany(r => r.Contexts).ToArray(),
-            SyntaxGaps = results.SelectMany(r => r.SyntaxGaps).ToArray()
+            SyntaxGaps = results.SelectMany(r => r.SyntaxGaps).ToArray(),
+            Executables = results.SelectMany(r => r.Executables).ToArray()
         };
     }
 
