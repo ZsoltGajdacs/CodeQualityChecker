@@ -94,10 +94,15 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
     private async Task<BuildArtifacts?> BuildIfRequestedAsync(AnalysisRequest request, ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)
     {
         if (!request.Execute) return null;
+        var analysisOnly = Definitions.Where(definition => !definition.ParticipatesInExecution)
+            .Select(definition => definition.Language).ToHashSet(StringComparer.Ordinal);
+        var modules = snapshot.Modules.Where(module => !analysisOnly.Contains(module.Language)).ToArray();
+        if (modules.Length == 0 && snapshot.Modules.Length != 0) return null;
         await EvidenceStore.EnsureWritableAsync(snapshot.Root, token);
         try
         {
-            var artifacts = await new BuildExecutor(adapters.OfType<ILanguageExecution>()).CollectAsync(snapshot, token);
+            var artifacts = await new BuildExecutor(adapters.OfType<ILanguageExecution>())
+                .CollectAsync(snapshot with { Modules = modules }, token);
             diagnostics.AddRange(artifacts.Results.SelectMany(result => result.Diagnostics));
             return artifacts;
         }

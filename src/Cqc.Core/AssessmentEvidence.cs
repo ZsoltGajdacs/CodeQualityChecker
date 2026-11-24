@@ -7,6 +7,9 @@ public sealed record AnalysisContext(string Id, string ModulePath, string Source
     string[] ReachableContexts, bool Verified, string[] Blockers);
 public sealed record SyntaxGap(string File, string Language, string? ContextId, string Code)
 {
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? DiagnosticCode { get; init; }
+
     public bool UnknownEntities { get; init; } = true;
     public Location? Location { get; init; }
     public string? Construct { get; init; }

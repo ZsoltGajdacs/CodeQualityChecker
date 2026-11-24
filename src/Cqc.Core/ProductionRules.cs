@@ -37,11 +37,11 @@ internal static class ProductionRules
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var diagnostics = missing.Count == 0 ? Array.Empty<Diagnostic>() :
             [new Diagnostic("coverage.incomplete", "Combined scoring requires complete syntax, resolved method identities and source/configuration-matched coverage. Inspect entity blockers; execute=true can collect coverage but may not resolve every blocker.")];
-        var initializerFindings = staticComplexity.InitializerFindings(config).ToArray();
+        var executableFindings = staticComplexity.ExecutableFindings(config).ToArray();
         return context.Finish(new()
         {
-            Family = "code", Types = types, Findings = assessments.SelectMany(a => a.Findings).Concat(initializerFindings),
-            StaticOnlyFindingIds = initializerFindings.Select(finding => finding.Id).ToHashSet(StringComparer.Ordinal),
+            Family = "code", Types = types, Findings = assessments.SelectMany(a => a.Findings).Concat(executableFindings),
+            StaticOnlyFindingIds = executableFindings.Select(finding => finding.Id).ToHashSet(StringComparer.Ordinal),
             PrimaryScoreApplies = id => byType.Contains(id) || !staticComplexity.HasExecutables(id),
             Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id],
             Metrics = id => staticComplexity.Metrics(id, metrics.GetValueOrDefault(id)), Diagnostics = diagnostics

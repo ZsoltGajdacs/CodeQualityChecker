@@ -1,12 +1,12 @@
 # CodeQualityChecker MCP
 
-A local MCP server for deterministic Java and C# code/test quality checks. One generic tool interface dispatches to language modules, then shared engines calculate findings and separate file/class scores.
+A local MCP server for deterministic Java, C#, TypeScript, and React quality checks. Language adapters collect facts and shared engines calculate findings and scores. TypeScript and React support static complexity, structural duplication, and source-module dependencies for `.ts` and `.tsx`.
 
 **10 is the desired score.** Each distinct scored finding deducts one point from its check-family score, clamped at zero. There is no combined score. Missing required evidence produces `score: null`, never an invented 10. These are CQC scores, not CodeScene Code Health scores.
 
 ## Install on macOS Apple Silicon
 
-Extract `dist/cqc-osx-arm64.tar.gz` into a permanent directory. Keep the whole directory together: it contains the self-contained .NET server, Java worker, and Java runtime. No host Java or .NET runtime is required for source analysis.
+Extract `dist/cqc-osx-arm64.tar.gz` into a permanent directory. Keep the server, workers, and bundled Java and Node runtimes together. Source analysis runs with the bundled runtimes.
 
 Example Codex MCP configuration:
 
@@ -80,16 +80,19 @@ Reports live in private server temporary storage for 60 minutes, with at most 10
 
 ```sh
 mvn -B -f java-worker/pom.xml package
+npm ci --prefix typescript-worker --ignore-scripts
 dotnet test CodeQualityChecker.sln
 ./scripts/package-macos.sh
 ```
 
-The package build requires .NET SDK 11.0.100, Maven, and the pinned JBR JDK described in [distribution](docs/distribution.md). Package generation runs a real MCP smoke test with host Java/.NET runtime discovery disabled. Package artifacts remain under ignored `dist/`.
+The package build requires .NET SDK 11.0.100, Maven, Node 24 with npm, and the pinned JBR JDK. The build fetches or reads the pinned Node archive and verifies its checksum. Package generation runs a real MCP smoke test with only Git on `PATH`. See [distribution](docs/distribution.md).
 
 See [ruleset and configuration](docs/ruleset.md), [architecture and extension contract](docs/architecture.md), [evidence and execution](docs/evidence.md), and [third-party attribution](THIRD_PARTY.md).
 
 ## Evidence-specific assessments (ruleset 2)
 
 Evidence-aware production entities retain their combined complexity/CRAP score and expose a separate `staticComplexity` assessment. The static score deducts once per complexity finding and requires complete syntax, without requiring coverage or call resolution. A numeric static score never establishes a combined production score. Entity pages expose `blockers` for the primary score and status, score, finding IDs and blockers for `staticComplexity`; summaries include separate static score distributions.
+
+Use `check_dependencies` or `check_all` with `execute: false` for TypeScript dependency checks. TypeScript follows static project configuration and uses dependencies already present on disk. Findings identify source modules and import locations. Test-quality scoring and coverage collection are unavailable for TypeScript, including during an explicit mixed-language run.
 
 Java schema-2 facts identify symbols by Maven module and main/test source set. Explicit execution collects evaluated module contexts, preserves dependency order, and records paths and hashes for existing build outputs and dependencies in `.cqc/java-contexts.json`. Analysis-only calls to the scoped tools can reuse verified matching contexts; without them semantic-dependent scores remain incomplete while valid syntax assessments remain available. Different dependency versions in unrelated modules are permitted. Legacy reference manifests require a fresh execution. Upgrade the server and worker together. After refreshing evidence, you can manually remove any old `.cqc/references/` directory. Builds can still leave unsupported constructs or unresolved generated methods.

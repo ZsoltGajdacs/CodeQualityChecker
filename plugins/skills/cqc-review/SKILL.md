@@ -1,6 +1,6 @@
 ---
 name: cqc-review
-description: Review Java and C# code with the CQC MCP tools, explain quality findings, and apply and verify requested improvements. Use for CQC checks and Java/C# quality reviews; not for package vulnerability scans or unrelated languages.
+description: Review Java, C#, TypeScript, and React source with the CQC MCP tools. Explain quality findings and apply and verify requested improvements.
 ---
 
 # CQC review and improvement
@@ -27,6 +27,8 @@ The two review tools take the same nested request with fixed scope.
 ```
 
 Default to `execute: false`. The fixed-scope tools use source and static project configuration for static complexity and duplication, skipping saved coverage and reference evidence. Present the results directly. The summary note about execution is informational. Findings can reference unchanged counterparts because the tools use repository context.
+
+For `.ts` and `.tsx`, use `check_dependencies` with `execute: false` for resolved module cycles and boundaries. The report's `class` kind represents a source module for TypeScript. Explain dependency blockers such as missing packages or ambiguous project configuration. TypeScript supports static complexity, duplication, and dependency analysis. Test quality and coverage are unavailable, and explicit execution applies only to supported Java and C# projects.
 
 Use `execute: true` when the user requests execution and authorizes project-controlled restores, builds, and tests. Both review tools then run all four families. Execution runs in the checkout and can modify it through project build or test code. Normal build outputs remain available for reuse, and CQC writes evidence to `.cqc/`. The supported integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
 

@@ -54,7 +54,7 @@ An optional `.cqc.json` at the project root overrides defaults:
 }
 ```
 
-Component patterns match qualified type names. Plain patterns match an exact name or namespace prefix; `*` and `?` are case-sensitive globs. Optional `java:`/`csharp:` prefixes limit a pattern to one language. Without an explicit prefix, patterns match the unprefixed qualified name. First matching component in ordinal component-name order wins. Unmatched types use the language-qualified name prefix before the final dot as a component (usually the namespace; explicitly configure nested-type grouping when needed).
+Component patterns match qualified type names or TypeScript source paths. Plain patterns match an exact name or namespace prefix. The `*` and `?` globs are case-sensitive. Optional `java:`, `csharp:`, and `typescript:` prefixes limit a pattern to one language. For example, `typescript:src/ui/*` matches source modules under `src/ui/`. First matching component in ordinal component-name order wins. Unmatched entities use the language-qualified name prefix before the final dot as a component. Configure TypeScript components explicitly to group source paths.
 
 An allowed list constrains only the named source component; `"*"` permits any target. Explicit forbidden edges still apply. Self-component edges are permitted. Policy names must refer to declared components. Invalid settings and unknown configuration fields are rejected. The effective configuration has a stable fingerprint in every analysis response.
 

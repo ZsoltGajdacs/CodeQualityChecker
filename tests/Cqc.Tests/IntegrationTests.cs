@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Cqc.Core;
 using Cqc.CSharp;
 using Cqc.Java;
+using Cqc.TypeScript;
 using Xunit;
 
 namespace Cqc.Tests;
@@ -134,31 +135,37 @@ public sealed class IntegrationTests
 
     [Fact]
     [Trait("Category", "Execution")]
-    public async Task ExplicitMixedBuildCollectsCoverageAndKeepsOriginalSourceUnchanged()
+    public async Task ExplicitMixedBuildCollectsJavaAndCSharpCoverageWithTypeScriptPresent()
     {
         using var workspace = FixtureWorkspace.Copy("mixed");
+        await File.WriteAllTextAsync(Path.Combine(workspace.Root, "tsconfig.json"), """{"files":["analysis.ts"]}""");
+        await File.WriteAllTextAsync(Path.Combine(workspace.Root, "analysis.ts"), "export const sign = (value: number) => value > 0 ? 1 : -1;");
         var before = workspace.SourceContents();
-        var result = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 },
+        var service = new AnalysisService([new CSharpAnalyzer(), new JavaAnalyzer(), new TypeScriptAnalyzer()]);
+        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 },
             ["code", "tests", "duplication", "dependencies"], CancellationToken.None);
         Assert.True(result.Diagnostics.All(x => x.Code != "execution_failed"), System.Text.Json.JsonSerializer.Serialize(result, Wire.Json));
         var code = Assert.Single(result.Results, x => x.Family == "code");
         AssertBothLanguagesScored(code);
+        var typeScript = Assert.Single(code.Entities, entity => entity.EntityId == "typescript:analysis.ts");
+        Assert.Null(typeScript.Score);
+        Assert.Equal(10, typeScript.StaticComplexity?.Score);
         Assert.All(result.Results, family => Assert.Equal(family.Family is "tests" or "duplication" or "dependencies" ? "incomplete" : "complete", family.Status));
         Assert.Equal(before, workspace.SourceContents());
         Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
-        var readOnly = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
+        var readOnly = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(code, Wire.Json),
             System.Text.Json.JsonSerializer.Serialize(Assert.Single(readOnly.Results), Wire.Json));
-        await LegacyCSharpCoverageRequiresRefresh(workspace);
+        await LegacyCSharpCoverageRequiresRefresh(workspace, service);
     }
 
-    private static async Task LegacyCSharpCoverageRequiresRefresh(FixtureWorkspace workspace)
+    private static async Task LegacyCSharpCoverageRequiresRefresh(FixtureWorkspace workspace, AnalysisService service)
     {
         var path = Path.Combine(workspace.Root, ".cqc", "coverage.json");
         var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(path));
         Assert.True(evidence.ToolVersions.Remove("csharp:methodIdentity"));
         await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json));
-        var result = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
+        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
         Assert.Contains(result.Diagnostics, item => item.Code == "coverage.identity_stale" && item.Language == "csharp");
         var entities = Assert.Single(result.Results).Entities;
         Assert.NotNull(Assert.Single(entities, item => item.EntityId == "java:java/pom.xml#main::demo.Calculator").Score);

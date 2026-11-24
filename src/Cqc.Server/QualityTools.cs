@@ -7,7 +7,7 @@ using ModelContextProtocol.Protocol;
 [McpServerToolType]
 public sealed class QualityTools(AnalysisService service, ReportStore reports)
 {
-    [McpServerTool(Name = "inspect_project", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Detect Java/C# modules, integrations and prerequisites without executing project code. 10 is the desired score.")]
+    [McpServerTool(Name = "inspect_project", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Detect Java, C#, and TypeScript modules, integrations and prerequisites without executing project code. 10 is the desired score.")]
     public Task<CallToolResult> InspectProject(AnalysisRequest request, CancellationToken cancellationToken) => McpReply.Invoke(async () => await reports.PublishAsync(await service.InspectAsync(request with { Execute = false }, cancellationToken), cancellationToken, request.Scope), cancellationToken);
 
     [McpServerTool(Name = "check_code_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Review the whole repository. Source-only by default, with static complexity, structural duplication, and counts of scored and unscored production files. 10 is the desired score. execute=true permits project-controlled builds and tests in the checkout and evaluates all quality families.")]

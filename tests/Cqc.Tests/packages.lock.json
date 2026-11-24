@@ -437,6 +437,7 @@
           "Cqc.CSharp": "[1.0.0, )",
           "Cqc.Core": "[1.0.0, )",
           "Cqc.Java": "[1.0.0, )",
+          "Cqc.TypeScript": "[1.0.0, )",
           "Microsoft.Extensions.Hosting": "[10.0.0, )",
           "ModelContextProtocol": "[2.3.1, )"
         }
@@ -452,6 +453,12 @@
         }
       },
       "cqc.java": {
+        "type": "Project",
+        "dependencies": {
+          "Cqc.Core": "[1.0.0, )"
+        }
+      },
+      "cqc.typescript": {
         "type": "Project",
         "dependencies": {
           "Cqc.Core": "[1.0.0, )"

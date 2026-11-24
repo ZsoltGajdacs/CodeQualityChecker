@@ -1,11 +1,12 @@
 # macOS arm64 distribution
 
-The initial distribution is a directory/tarball, not a global installer. Keep `cqc`, managed libraries, `java-worker.jar`, `maven-metadata.jar`, `runtime/`, and legal notices together. The host is published self-contained for `osx-arm64`; the Java runtime is a trimmed `jlink` image. Source-only analysis therefore needs neither a host .NET runtime nor host Java. Explicit execution still needs the target project's toolchains.
+The distribution is a directory and tarball for `osx-arm64`. Keep the self-contained server, `java-worker.jar`, `maven-metadata.jar`, `typescript-worker/`, both runtime directories, and notices together. Source analysis uses the shipped .NET, Java, and Node runtimes. Explicit Java and C# execution uses the target project's toolchains.
 
 ## Build prerequisites and pins
 
 - .NET SDK 11.0.100 (`scripts/global.json`) for packaging. The development SDK is pinned separately in the root `global.json`. NuGet versions and transitive dependencies are recorded in project lock files.
 - Maven, with Java worker dependencies/plugins pinned in its POM.
+- Node 24 and npm to install the locked TypeScript worker dependencies during packaging.
 - `JAVA_HOME` pointing to JetBrains Runtime SDK `25.0.2+10-b300.57`, macOS aarch64, JBRSDK/JCEF edition.
 - Python 3 for packaging metadata and MCP smoke testing.
 
@@ -18,7 +19,7 @@ export JAVA_HOME=/absolute/path/to/pinned/jbr-sdk/Contents/Home
 ./scripts/package-macos.sh
 ```
 
-The script builds the Java worker and Maven metadata extension, publishes the self-contained server, links the pinned Java modules, gathers notices, records build/file hashes, and starts a real MCP client smoke test. Tool dependency builds use dedicated public Maven Central settings without changing host settings or target-project execution policy. The smoke process removes Java/.NET discovery environment variables and restricts `PATH` to a temporary directory containing only Git. It discovers all eight tools, invokes the seven inspection/check tools against a mixed Java/C# source fixture, and reconstructs reports through `get_report_page` raw pages. It verifies bounded messages, both language analyzers, and unchanged input bytes.
+The script builds the two workers and Maven metadata extension, publishes the server, gathers notices, and records runtime versions and file hashes. It downloads the official macOS arm64 Node archive and verifies its pinned SHA-256 before extracting the runtime. Set `CQC_NODE_ARCHIVE` to use a previously downloaded archive with the same checksum. The MCP smoke test runs with only Git on `PATH`, exercises Java, C#, and TypeScript, and checks React complexity, a resolved module cycle, bounded messages, raw pagination, and unchanged inputs.
 
 Outputs:
 

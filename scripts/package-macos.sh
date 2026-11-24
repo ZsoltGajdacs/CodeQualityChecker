@@ -28,15 +28,32 @@ for relative, sha in expected.items():
         raise SystemExit(f'Runtime input {relative} does not match upstream.lock.json')
 PY
 
-task_output="$task_root/dist/cqc-osx-arm64"
-if [[ -L "$task_root/dist" || -L "$task_output" ]]; then
+task_destination="$task_root/dist/cqc-osx-arm64"
+if [[ -L "$task_root/dist" || -L "$task_destination" ]]; then
   echo 'Refusing symlinked distribution paths.' >&2
   exit 1
 fi
 mkdir -p "$task_root/dist"
-rm -rf "$task_output"
-task_scratch="$(mktemp -d "${TMPDIR:-/tmp/}cqc-package.XXXXXX")"
-trap 'rm -rf "$task_scratch"' EXIT
+task_scratch="$(mktemp -d "$task_root/dist/.cqc-package.XXXXXX")"
+cleanup() {
+  if [[ -d "$task_scratch/previous" && ! -e "$task_destination" ]]; then
+    if ! mv "$task_scratch/previous" "$task_destination"; then
+      echo "Previous package retained at $task_scratch/previous" >&2
+      return 1
+    fi
+  fi
+  rm -rf "$task_scratch"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+task_output="$task_scratch/cqc-osx-arm64"
+python3 scripts/stage-node-runtime.py "$task_output" "$task_scratch"
+mkdir -p "$task_output/typescript-worker"
+cp typescript-worker/*.mjs typescript-worker/package*.json "$task_output/typescript-worker/"
+npm ci --prefix "$task_output/typescript-worker" --ignore-scripts --omit=dev --no-audit --no-fund
+mkdir -p "$task_output/legal/typescript"
+cp "$task_output/typescript-worker/node_modules/typescript/"{LICENSE.txt,ThirdPartyNoticeText.txt} "$task_output/legal/typescript/"
 cat > "$task_scratch/settings.xml" <<'XML'
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"><mirrors><mirror><id>central</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors></settings>
 XML
@@ -110,12 +127,19 @@ manifest = {
     'architecture': 'osx-arm64',
     'dotnetSdk': sys.argv[2],
     'javaRuntime': (output / 'runtime/release').read_text(),
+    'nodeRuntime': json.loads(Path('upstream.lock.json').read_text())['nodeRuntime']['version'],
+    'typescript': json.loads((output / 'typescript-worker/node_modules/typescript/package.json').read_text())['version'],
     'files': {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(output.rglob('*')) if p.is_file()}
 }
 (output / 'build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
 PY
 python3 scripts/smoke-package.py "$task_output"
-tar -czf "$task_root/dist/cqc-osx-arm64.tar.gz" -C "$task_root/dist" cqc-osx-arm64
+tar -czf "$task_scratch/cqc-osx-arm64.tar.gz" -C "$task_scratch" cqc-osx-arm64
+if [[ -e "$task_destination" ]]; then
+  mv "$task_destination" "$task_scratch/previous"
+fi
+mv "$task_output" "$task_destination"
+mv "$task_scratch/cqc-osx-arm64.tar.gz" "$task_root/dist/cqc-osx-arm64.tar.gz"
 (cd "$task_root/dist" && shasum -a 256 cqc-osx-arm64.tar.gz > cqc-osx-arm64.tar.gz.sha256)
 echo "Package verified: $task_root/dist/cqc-osx-arm64.tar.gz"

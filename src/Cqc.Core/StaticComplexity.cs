@@ -10,7 +10,7 @@ internal sealed class StaticComplexity(RuleContext context)
 
     internal string[] Blockers(TypeFact type) => context.Structure.Blockers(type, executables[type.Id]);
 
-    internal IEnumerable<Finding> InitializerFindings(QualityConfig config) =>
+    internal IEnumerable<Finding> ExecutableFindings(QualityConfig config) =>
         executables.SelectMany(group => group).Where(executable => !executable.IsMethod)
             .Select(executable => Finding(executable, config)).OfType<Finding>();
 

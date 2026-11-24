@@ -25,12 +25,15 @@ internal static class JavaWorkerFacts
         if (facts.Methods.Any(method => method.DuplicationLines is null or < 0) ||
             facts.Executables.Any(executable => executable.DuplicationLines is null or < 0))
             return ProtocolError("Java facts require duplication line counts.");
-        return facts;
+        return facts with { SyntaxGaps = facts.SyntaxGaps.Select(AssociateDiagnostic).ToArray() };
     }
+
+    private static SyntaxGap AssociateDiagnostic(SyntaxGap gap) =>
+        gap.Code == "syntax.parse" ? gap with { DiagnosticCode = "java.parse" } : gap;
 
     private static AnalysisFacts ProtocolError(string message) =>
         Unavailable("java.worker_protocol", message + " Install matching server and worker artifacts.");
 
     public static AnalysisFacts Unavailable(string code, string message) =>
-        new([], [], [], [new(code, message, Language: "java")], false);
+        new([], [], [], [new Diagnostic(code, message, Language: "java") { IsAnalyzerFailure = true }], false);
 }

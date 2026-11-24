@@ -4,6 +4,9 @@ namespace Cqc.Core;
 
 public sealed record Diagnostic(string Code, string Message, string? File = null, string? Language = null)
 {
+    [JsonIgnore]
+    public bool IsAnalyzerFailure { get; init; }
+
     public Location? Location { get; init; }
     public string? Construct { get; init; }
     public string? Scope { get; init; }

@@ -1,0 +1,7 @@
+{
+  "components": {
+    "ui": ["typescript:src/ui/*"],
+    "state": ["typescript:src/state/*"]
+  },
+  "forbiddenDependencies": [["ui", "state"]]
+}

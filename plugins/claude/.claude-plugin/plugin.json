@@ -1,7 +1,7 @@
 {
   "name": "cqc",
   "version": "0.3.0",
-  "description": "Review and improve Java and C# code with local CodeQualityChecker MCP checks.",
+  "description": "Review Java, C#, TypeScript, and React code with local CodeQualityChecker MCP checks.",
   "author": {
     "name": "CodeQualityChecker contributors"
   }

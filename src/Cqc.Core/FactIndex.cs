@@ -18,7 +18,7 @@ internal sealed class FactIndex
 
     public MethodFact[] Methods { get; }
     public StructuralExecutable[] Executables => executables ??= Methods.Select(StructuralExecutable.FromMethod)
-        .Concat(facts.Executables.Select(StructuralExecutable.FromInitializer)).ToArray();
+        .Concat(facts.Executables.Select(StructuralExecutable.FromExecutable)).ToArray();
     public ILookup<string, MethodFact> FixturesByType => fixturesByType ??=
         Methods.Where(m => m.IsFixture).ToLookup(m => m.TypeId, StringComparer.Ordinal);
     public ILookup<string, TypeFact> TypesById => typesById ??=
@@ -48,7 +48,7 @@ internal sealed record StructuralExecutable
             DuplicationLines = method.DuplicationLines, Syntax = AssessmentEvidence.Of(method).Syntax, IsMethod = true
         };
 
-    internal static StructuralExecutable FromInitializer(ExecutableFact executable) =>
+    internal static StructuralExecutable FromExecutable(ExecutableFact executable) =>
         new()
         {
             Id = executable.Id, TypeId = executable.TypeId, Language = executable.Language, Location = executable.Location,

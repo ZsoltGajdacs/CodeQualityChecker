@@ -3,11 +3,11 @@ namespace Cqc.Core;
 internal static class StructuralDiagnostics
 {
     internal static IEnumerable<Diagnostic> For(AnalysisFacts facts, ProjectSnapshot snapshot) =>
-        snapshot.SourceOnly ? SourceOnly(facts, snapshot.SelectedFiles) : EvidenceAware(facts);
+        snapshot.SourceOnly ? SourceOnly(facts, snapshot) : EvidenceAware(facts);
 
-    private static IEnumerable<Diagnostic> SourceOnly(AnalysisFacts facts, string[] selectedFiles)
+    private static IEnumerable<Diagnostic> SourceOnly(AnalysisFacts facts, ProjectSnapshot snapshot)
     {
-        var languages = selectedFiles.Select(StructuralEvidence.Language).ToHashSet(StringComparer.Ordinal);
+        var languages = snapshot.SelectedFiles.Select(file => snapshot.SourceLanguages.GetValueOrDefault(file)).ToHashSet(StringComparer.Ordinal);
         return facts.Diagnostics.Where(StructuralEvidence.IsAnalyzerFailure).Concat(facts.SyntaxGaps.Select(Describe))
             .Where(diagnostic => diagnostic.Language is null || languages.Contains(diagnostic.Language)).Distinct();
     }
@@ -29,5 +29,5 @@ internal static class StructuralDiagnostics
     private static (string Code, string? File) Key(Diagnostic diagnostic) => (diagnostic.Code, diagnostic.File);
 
     private static (string Code, string? File) GapKey(SyntaxGap gap) =>
-        (gap is { Language: "java", Code: "syntax.parse" } ? "java.parse" : gap.Code, gap.File);
+        (gap.DiagnosticCode ?? gap.Code, gap.File);
 }

@@ -59,8 +59,12 @@ public static class ProjectDiscovery
                 .Where(path => !Generated(new FileInfo(Path.Combine(root.FullName, path)))).ToArray();
             var selected = await GitScope.SelectAsync(root.FullName, sources, request, token);
             var modules = Modules();
-            var fingerprint = await Fingerprint(token);
-            return new(root.FullName, sources, selected, modules, fingerprint, Diagnostics(modules));
+            var fingerprint = await Fingerprint(modules, token);
+            return new(root.FullName, sources, selected, modules, fingerprint, Diagnostics(modules))
+            {
+                SourceLanguages = sources.ToDictionary(path => path,
+                    path => definitions.First(definition => definition.IsSource(path)).Language, StringComparer.Ordinal)
+            };
         }
 
         private ProjectModule[] Modules()
@@ -85,9 +89,12 @@ public static class ProjectDiscovery
             return diagnostics.ToArray();
         }
 
-        private async Task<string> Fingerprint(CancellationToken token)
+        private async Task<string> Fingerprint(ProjectModule[] modules, CancellationToken token)
         {
-            var inputs = allFiles.Where(path => definitions.Any(definition => Fingerprinted(definition, path)))
+            var languages = modules.Select(module => module.Language).ToHashSet(StringComparer.Ordinal);
+            var active = definitions.Where(definition => languages.Contains(definition.Language)).ToArray();
+            var inputs = allFiles.Where(path => definitions.Any(definition => definition.IsSource(path))
+                || active.Any(definition => IsBuildInput(definition, path)))
                 .Concat(ignoredBuildInputs).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
             var fingerprint = new StringBuilder();
             foreach (var path in inputs)
@@ -103,7 +110,7 @@ public static class ProjectDiscovery
             return Wire.Hash(fingerprint.ToString());
         }
 
-        private bool Fingerprinted(LanguageDefinition definition, string path) => definition.IsSource(path) || Manifest(definition, path)
+        private bool IsBuildInput(LanguageDefinition definition, string path) => Manifest(definition, path)
             || (definition.BuildInputPatterns ?? []).Any(pattern => Matches(path, pattern));
 
         private IEnumerable<string> Enumerate(DirectoryInfo directory)

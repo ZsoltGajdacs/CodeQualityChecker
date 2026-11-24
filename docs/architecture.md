@@ -1,6 +1,6 @@
 # Architecture and language extension contract
 
-The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery orchestration, scope selection, configuration, build execution and temporary file lifetime, normalized evidence, four check engines, scoring, and full internal reports. `Cqc.Server` owns the schema-v3 MCP summaries, report storage, pagination, and byte-budget enforcement. `Cqc.CSharp` uses Roslyn; `Cqc.Java` invokes the JavaParser worker through a private JSON protocol. Each language module owns its build commands and native coverage-report reader. The Java worker is isolated behind a process boundary; this is not a public plugin API.
+The MCP host is .NET 10 with the official MCP C# SDK. `Cqc.Core` owns discovery, scope selection, normalized evidence, execution orchestration, shared rules, and scoring. `Cqc.Server` owns schema-v3 MCP summaries, report storage, pagination, and byte budgets. `Cqc.CSharp` uses Roslyn. `Cqc.Java` and `Cqc.TypeScript` invoke separate JavaParser and TypeScript compiler workers through private JSON protocols. Each adapter owns its language behavior and any supported build or coverage integration.
 
 The processing pipeline is:
 
@@ -16,6 +16,8 @@ The processing pipeline is:
 Repository context remains available for cross-file dependencies, clone groups, helpers, and partial classes when only one file is selected. Method identities include the declaring type and parameter signature. C# identities also include generic method arity and the owning project path when a project owns the source. Partial declarations merge within their owning project and retain their separate source locations.
 
 The C# adapter groups files by project and builds a Roslyn compilation for each group. Supported project references link the compilations in dependency order. The symbol identity component maps resolved symbols back to their owning projects so helpers and type edges can cross project boundaries. Loose files use their own context. External reference metadata and incomplete analysis diagnostics are scoped by project.
+
+The TypeScript adapter emits one source-module entity per authored `.ts` or `.tsx` file, represented by the existing `class` report kind. The worker supplies executable ranges and structural fingerprints for functions, components, hooks, class members, nested callbacks, and module-level code. Compiler resolution supplies module edges for imports and re-exports, including type-only imports and literal dynamic imports. The shared engines calculate complexity, duplication, and dependency scores.
 
 ## MCP report delivery
 
@@ -41,7 +43,11 @@ Keep language-specific parsing, symbol resolution, normalization, test-framework
 
 Implement the optional `ILanguageExecution` integration for explicitly authorized builds. `ExecuteAsync(ProjectSnapshot, runDirectory, CancellationToken)` builds in the snapshot root and returns `LanguageBuildResult` containing the language, staged manifest name, report paths, and tool versions. `ReadCoverage(LanguageBuildResult, IEnumerable<MethodFact>)` converts native reports into exact normalized `MethodCoverage` counters. `BuildExecutor` dispatches drivers and owns the run directory. Each module owns build commands, reference collection, report interpretation, and ambiguity handling. `AnalysisService` analyzes the staged manifests and publishes through `EvidenceStore` after verifying the source fingerprint. A new language does not add another language switch to the shared rule engines or MCP tools.
 
+Set `LanguageDefinition.ParticipatesInExecution` to false for analysis-only languages. Those modules remain visible during inspection and mixed-language analysis. Discovery records source language ownership for scoped structural diagnostics. Adapters mark fatal worker diagnostics and supply any association between a syntax gap and a language-specific diagnostic.
+
 The Java worker reads one `ProjectSnapshot` JSON object from stdin and emits one `AnalysisFacts` object on stdout. Diagnostics belong in the returned facts or stderr. Enum/property naming follows the shared web JSON contract. `CQC_JAVA_WORKER` can override the worker JAR during development; installed packages use `java-worker.jar` beside the host and `runtime/bin/java` before host Java discovery.
+
+The TypeScript worker uses the same stdin/stdout protocol shape with facts schema 2. The package places it under `typescript-worker/` and launches it with `node-runtime/bin/node`. Development uses Node 24 from `PATH` and the worker's locked compiler dependency.
 
 Every new module needs real fixture coverage for identities, language constructs, source ranges, unresolved semantics, test helpers, clone normalization, source-only operation, coverage mapping, cancellation, and repeatability. Unknown constructs and unresolved symbols must produce honest incompleteness rather than a verified score of 10.
 

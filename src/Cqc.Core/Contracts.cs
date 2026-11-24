@@ -54,6 +54,9 @@ public sealed record ProjectSnapshot(
     string Root, string[] Files, string[] SelectedFiles, ProjectModule[] Modules,
     string SourceFingerprint, Diagnostic[] Diagnostics, string SchemaVersion = Wire.SchemaVersion)
 {
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> SourceLanguages { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SourceOnly { get; init; }
 

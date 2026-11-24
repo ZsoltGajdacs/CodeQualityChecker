@@ -1,5 +1,9 @@
 {
   "schemaVersion": "1",
+  "nodeRuntime": {
+    "version": "24.22.3",
+    "sha256": "1d64136c8a43d648d1b3bad10797a4c995b1ca032d2bde8799de43b37f058fe5"
+  },
   "upstreams": [
     {
       "repository": "https://github.com/unclebob/crapper",

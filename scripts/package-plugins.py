@@ -57,7 +57,7 @@ def marketplace(client):
     entry = {'name': 'cqc', 'source': './plugins/cqc'}
     catalog = {
         'name': f'cqc-local-{client}',
-        'description': 'Local CodeQualityChecker MCP connection and Java/C# review skill.',
+        'description': 'Local CodeQualityChecker MCP connection for Java, C#, TypeScript, and React.',
         'plugins': [entry]
     }
     if client == 'claude':

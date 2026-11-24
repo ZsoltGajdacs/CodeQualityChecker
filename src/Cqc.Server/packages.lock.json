@@ -357,6 +357,12 @@
         "dependencies": {
           "Cqc.Core": "[1.0.0, )"
         }
+      },
+      "cqc.typescript": {
+        "type": "Project",
+        "dependencies": {
+          "Cqc.Core": "[1.0.0, )"
+        }
       }
     },
     "net10.0/osx-arm64": {

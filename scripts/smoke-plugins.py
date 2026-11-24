@@ -14,6 +14,7 @@ SMOKE = runpy.run_path(str(ROOT / 'scripts/smoke-package.py'))
 
 def verify_analysis(result):
     SMOKE['verify_diagnostics'](result)
+    SMOKE['verify_typescript'](result)
     entities = [entity for family in result['results'] for entity in family['entities']]
     assert any(e['entityId'].startswith('java:') for e in entities), result
     assert any(e['entityId'].startswith('csharp:') for e in entities), result
@@ -49,6 +50,7 @@ def run(output):
         root = Path(directory)
         shutil.copytree(ROOT / 'fixtures/scoring', root / 'scoring',
                         ignore=shutil.ignore_patterns('bin', 'obj', 'target', '.cqc'))
+        SMOKE['copy_typescript_fixture'](root)
         (root / 'unsupported').mkdir()
         (root / 'unsupported/example.py').write_text('print("unsupported")\n')
         SMOKE['initialize_git'](root)
@@ -56,7 +58,7 @@ def run(output):
         for client in ('claude', 'codex'):
             verify_client(output / client, root)
             assert SMOKE['digest_sources'](root) == original, 'Source-only analysis changed fixtures'
-            print(f'PASS: {client}: eight real tools, bounded pages, Java/C#, missing coverage, unchanged inputs')
+            print(f'PASS: {client}: eight real tools, bounded pages, Java/C#/TypeScript, unchanged inputs')
 
 
 if __name__ == '__main__':

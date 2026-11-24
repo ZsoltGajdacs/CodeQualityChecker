@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Verify packaged MCP tools with host Java/.NET runtimes removed from PATH."""
+"""Verify packaged MCP tools with only Git on PATH."""
 import hashlib
 import json
 import os
 from pathlib import Path
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,12 +13,13 @@ import threading
 
 
 FIXED_REVIEW_TOOLS = {'check_code_quality', 'check_uncommitted_changes_quality'}
+TYPESCRIPT_FIXTURE = Path(__file__).resolve().parents[1] / 'fixtures/typescript'
 
 
 class McpSession:
     def __init__(self, package, server=None):
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(('JAVA_', 'JDK_', 'DOTNET_', 'CQC_'))}
+                       if not key.startswith(('JAVA_', 'JDK_', 'DOTNET_', 'NODE_', 'CQC_'))}
         self.command_path = tempfile.TemporaryDirectory(prefix='cqc-smoke-path-')
         (Path(self.command_path.name) / 'git').symlink_to('/usr/bin/git')
         environment['PATH'] = self.command_path.name
@@ -171,6 +173,7 @@ def verify_languages(result):
     entities = [entity for family in result['results'] for entity in family['entities']]
     assert any(entity['entityId'].startswith('java:') for entity in entities), result
     assert any(entity['entityId'].startswith('csharp:') for entity in entities), result
+    verify_typescript(result)
     verify_standard_modules(result)
     verify_diagnostics(result)
 
@@ -205,6 +208,26 @@ def verify_diagnostics(result):
     assert not any('worker_' in d['code'] or d['code'] == 'analyzer_failed' for d in diagnostics), result
 
 
+def copy_typescript_fixture(root):
+    shutil.copytree(TYPESCRIPT_FIXTURE, root / 'typescript')
+
+
+def verify_typescript(result):
+    families = {family['family']: family for family in result['results']}
+    assert any(finding['rule'] == 'code.complexity' and
+               finding['locations'][0]['file'] == 'typescript/src/ui/App.tsx'
+               for finding in families['code']['findings']), families['code']
+    verify_typescript_dependencies(families['dependencies'])
+
+
+def verify_typescript_dependencies(dependencies):
+    modules = [entity for entity in dependencies['entities'] if entity['entityId'].startswith('typescript:')]
+    assert modules and all(module['status'] == 'complete' for module in modules), dependencies
+    assert any(finding['rule'] == 'dependencies.cycle' and
+               any(entity.startswith('typescript:') for entity in finding['entityIds'])
+               for finding in dependencies['findings']), dependencies
+
+
 def run(package):
     with tempfile.TemporaryDirectory(prefix='cqc-package-smoke-') as directory:
         root = Path(directory)
@@ -215,6 +238,7 @@ def run(package):
         (root / 'Example.cs').write_text('using System.Data.Common; namespace Sample; public class Example { '
                                         'public DbConnection? Connection { get; set; } '
                                         'public int Add(int a, int b) { return a + b; } }\n')
+        copy_typescript_fixture(root)
         initialize_git(root)
         original = digest_sources(root)
         session = McpSession(package)
@@ -226,7 +250,7 @@ def run(package):
             assert digest_sources(root) == original, 'Analysis-only changed fixture files'
         finally:
             session.close()
-    print('PASS: eight packaged MCP tools, bounded summaries/raw pages, Java/C# without host runtimes.')
+    print('PASS: eight packaged MCP tools, bounded reports, Java/C#/TypeScript without host runtimes.')
 
 
 if __name__ == '__main__':

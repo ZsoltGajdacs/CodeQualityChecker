@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Cqc.Core;
 
@@ -32,19 +31,17 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         if (jar is null)
             return JavaWorkerFacts.Unavailable("java.worker_missing", "Build java-worker with Maven or install the packaged server containing java-worker.jar.");
         var bundled = Path.Combine(AppContext.BaseDirectory, "runtime", "bin", "java");
-        var start = new ProcessStartInfo(File.Exists(bundled) ? bundled : "java")
-        {
-            RedirectStandardInput = true, RedirectStandardOutput = true,
-            RedirectStandardError = true, UseShellExecute = false,
-            WorkingDirectory = snapshot.Root
-        };
-        start.ArgumentList.Add("-jar");
-        start.ArgumentList.Add(jar);
         var version = snapshot.SourceOnly ? SourceOnlySchemaVersion : Wire.SchemaVersion;
         try
         {
-            var workerInput = snapshot with { SchemaVersion = version };
-            var result = await JavaWorkerProcess.RunAsync(start, JsonSerializer.Serialize(workerInput, Wire.Json), cancellationToken);
+            var command = new ProcessCommand
+            {
+                Executable = File.Exists(bundled) ? bundled : "java",
+                Arguments = ["-jar", jar],
+                Directory = snapshot.Root,
+                Input = JsonSerializer.Serialize(snapshot with { SchemaVersion = version }, Wire.Json)
+            };
+            var result = await ProcessRunner.RunAsync(command, cancellationToken);
             if (result.ExitCode != 0)
                 return JavaWorkerFacts.Unavailable("java.worker_failed", "Java analyzer failed: " + result.Error.Trim());
             return JavaWorkerFacts.Read(result.Output, version);
