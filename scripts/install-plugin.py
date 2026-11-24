@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, generate, and install CQC for one local client, or install existing packages."""
+"""Build and install CQC for Claude Code, Codex, or both."""
 import argparse
 import json
 import os
@@ -166,8 +166,9 @@ def refresh_installation(client, marketplace, cwd):
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description=__doc__,
-        epilog='With no options, build CQC and connect to <repository>/dist/cqc-osx-arm64/cqc.')
-    parser.add_argument('client', choices=('claude', 'codex'))
+        epilog='Run install-plugin.sh without arguments to build once and refresh both clients. '
+               'The default executable is <repository>/dist/cqc-osx-arm64/cqc.')
+    parser.add_argument('client', choices=('claude', 'codex', 'both'))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--mcp-dir', type=Path,
                       help='Use an existing directory containing cqc instead of building')
@@ -178,17 +179,20 @@ def parse_arguments():
 
 def main():
     arguments = parse_arguments()
+    clients = ('claude', 'codex') if arguments.client == 'both' else (arguments.client,)
     try:
-        if shutil.which(arguments.client) is None:
-            raise ValueError(f'{arguments.client} CLI was not found in PATH')
+        for client in clients:
+            if shutil.which(client) is None:
+                raise ValueError(f'{client} CLI was not found in PATH')
         packaging = runpy.run_path(str(REPOSITORY / 'scripts/package-plugins.py'))
         root = prepare(arguments, packaging)
-        marketplace = validate_package(root, arguments.client, packaging)
-        install(arguments.client, marketplace)
+        marketplaces = {client: validate_package(root, client, packaging) for client in clients}
+        for client, marketplace in marketplaces.items():
+            install(client, marketplace)
+            print(f'CQC installed. Restart {client} to use it.', flush=True)
     except (OSError, ValueError, KeyError, TypeError, StopIteration, subprocess.CalledProcessError) as error:
         print(f'Cannot install CQC plugin: {error}', file=sys.stderr)
         return 1
-    print(f'CQC installed. Restart {arguments.client} to use it.')
     return 0
 
 

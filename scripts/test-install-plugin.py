@@ -55,7 +55,7 @@ class InstallerTests(unittest.TestCase):
         self.repository.mkdir()
         self.scripts = self.repository / 'scripts'
         self.scripts.mkdir()
-        for name in ('install-plugin.py', 'install-claude-plugin.sh',
+        for name in ('install-plugin.py', 'install-plugin.sh', 'install-claude-plugin.sh',
                      'install-codex-plugin.sh', 'package-plugins.py'):
             shutil.copy2(ROOT / 'scripts' / name, self.scripts / name)
         shutil.copytree(ROOT / 'plugins', self.repository / 'plugins')
@@ -122,6 +122,24 @@ class InstallerTests(unittest.TestCase):
                 expected = self.repository / 'dist/cqc-osx-arm64/cqc'
                 server = json.loads(configuration.read_text())['mcpServers']['cqc']
                 self.assertEqual(server['command'], str(expected))
+
+    def test_shared_wrapper_refreshes_both_clients_with_one_build(self):
+        executable = self.repository / 'dist/cqc-osx-arm64/cqc'
+        self.write_executable(executable, '#!/bin/sh\nexit 42\n')
+        result = subprocess.run([self.scripts / 'install-plugin.sh'], cwd=self.directory,
+                                env=self.environment, capture_output=True, text=True, timeout=30)
+        self.assert_success(result)
+        self.assertEqual(executable.read_text(), '#!/bin/sh\nexit 0\n')
+        operations = self.operations()
+        self.assertEqual([entry for entry in operations if 'build' in entry], [{'build': True}])
+        self.assertEqual(operations[0], {'build': True})
+        commands = {'claude': ['plugin', 'install'], 'codex': ['plugin', 'add']}
+        for client, command in commands.items():
+            config, = self.configs(client)
+            server = json.loads(config.read_text())['mcpServers']['cqc']
+            self.assertEqual(server['command'], str(executable))
+            self.assertTrue(any(entry['client'] == client and entry['args'][:2] == command
+                                for entry in operations[1:]))
 
     def test_build_failure_stops_before_generation_and_client(self):
         self.environment['CQC_TEST_BUILD_FAIL'] = '1'

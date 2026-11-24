@@ -17,20 +17,27 @@ Each generated plugin contains its client manifest, `.mcp.json`, and a copy of t
 
 ## Install locally
 
-Run either installer from any working directory:
+Run the shared installer from any working directory to rebuild the executable at `dist/cqc-osx-arm64/cqc` and refresh the skill for both clients. Both client CLIs must be on `PATH`.
+
+```sh
+/absolute/path/to/CodeQualityChecker/scripts/install-plugin.sh
+```
+
+To refresh a single client, run its wrapper:
 
 ```sh
 /absolute/path/to/CodeQualityChecker/scripts/install-claude-plugin.sh
 /absolute/path/to/CodeQualityChecker/scripts/install-codex-plugin.sh
 ```
 
-With no arguments, each script runs `scripts/package-macos.sh` to build and smoke-test the self-contained MCP. The default MCP directory is this checkout's `dist/cqc-osx-arm64`; generated `.mcp.json` points directly to its `cqc` executable. A fresh plugin marketplace is generated beneath `dist/` on every run, then the selected client's CQC plugin and local marketplace are refreshed and installed in user settings. Keep that generated directory: the client references it. Other plugins and the other client's settings are preserved.
+With no arguments, each installer builds and smoke-tests the self-contained MCP once. Fresh plugin marketplaces are generated beneath `dist/`, and the selected clients' CQC registrations are refreshed. The generated `.mcp.json` keeps the absolute executable path in this checkout. Keep the generated marketplace directories at their registered locations. Restart the refreshed clients to load the updated executable and skill.
 
 Building requires macOS Apple Silicon, the pinned .NET SDK, Maven, Python 3.9+, and `JAVA_HOME` set to the pinned JBR SDK, as described in [distribution prerequisites](distribution.md). The target client CLI must be on `PATH`. No toolchains are automatically installed. Build and generation failures stop before changing client settings.
 
 To use an already-built MCP directory and skip the build:
 
 ```sh
+./scripts/install-plugin.sh both --mcp-dir "/absolute/path/to/cqc-osx-arm64"
 ./scripts/install-codex-plugin.sh --mcp-dir "/absolute/path/to/cqc-osx-arm64"
 ./scripts/install-claude-plugin.sh --mcp-dir "/absolute/path/to/cqc-osx-arm64"
 ```

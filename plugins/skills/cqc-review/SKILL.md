@@ -5,7 +5,7 @@ description: Review Java and C# code with the CQC MCP tools, explain quality fin
 
 # CQC review and improvement
 
-Use the plugin's CQC MCP tools. Tool prefixes vary by client; identify the server by its inspection/check tools and `get_report_page` rather than assuming a particular prefix. If the server is unavailable, report the connection failure and the configured executable prerequisite. Do not invent results or silently install software or change client configuration.
+Use the plugin's CQC MCP tools. Tool prefixes vary by client. Identify the server by `inspect_project` and `get_report_page`. If it connects but a review tool named below is missing, report that the configured server may be out of date. If the server is unavailable, report the connection failure and the configured executable prerequisite. Installation and client configuration changes require a user request.
 
 ## Choose the scope and checks
 
@@ -13,7 +13,7 @@ Establish the absolute repository root and the user's intended scope. Use `inspe
 
 - For a repository review, use `check_code_quality`.
 - For “check my uncommitted changes”, use `check_uncommitted_changes_quality`. It selects staged, unstaged, and untracked source, applies normal exclusions, and reads the current working-tree contents. An empty selection means zero files. If Git scope fails, explain it. Use explicit paths only when they represent the requested selection.
-- For explicit paths or a Git comparison base, use `check_all` or an individual family tool. Pass `scope: "paths"` with repository-relative `paths`, or `scope: "changed"` with `gitBase`. Choose `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries.
+- For explicit paths, a Git comparison base, or a review that needs saved evidence or a specific family, use `check_all` or an individual family tool. Pass `scope: "paths"` with repository-relative `paths`, or `scope: "changed"` with `gitBase`. Choose `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries.
 
 The two review tools take the same nested request with fixed scope.
 
@@ -26,11 +26,13 @@ The two review tools take the same nested request with fixed scope.
 }
 ```
 
-Default to `execute: false`. The review tools report supported static complexity and duplication using source and static project configuration. Present the results directly. The summary note about execution is informational and does not call for a rerun or permission request. Findings can reference unchanged counterparts because the tools use repository context.
+Default to `execute: false`. The fixed-scope tools use source and static project configuration for static complexity and duplication, skipping saved coverage and reference evidence. Present the results directly. The summary note about execution is informational. Findings can reference unchanged counterparts because the tools use repository context.
 
 Use `execute: true` when the user requests execution and authorizes project-controlled restores, builds, and tests. Both review tools then run all four families. Execution runs in the checkout and can modify it through project build or test code. Normal build outputs remain available for reuse, and CQC writes evidence to `.cqc/`. The supported integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
 
-Optional `configPath` selects CQC configuration. Preserve the user's thresholds and exclusions. `timeoutSeconds` accepts 1–3600. The individual and scoped tools also accept `reportPath` for verified CQC evidence.
+Optional `configPath` selects CQC configuration. Preserve the user's thresholds and exclusions. `timeoutSeconds` accepts 1–3600. With `execute: false`, `check_all` and the individual family tools can reuse matching local evidence and accept `reportPath` for a CQC coverage evidence file.
+
+When diagnostics identify a legacy reference manifest or changed or missing build outputs, explain which assessments lack evidence. The current manifests verify Maven classpath entries and .NET assemblies in their existing locations. Refresh them through an authorized `execute: true` run when the requested assessment needs that evidence.
 
 ## Retrieve the completed report
 
