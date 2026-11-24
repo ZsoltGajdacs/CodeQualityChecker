@@ -5,7 +5,7 @@ import org.apache.maven.execution.ExecutionEvent;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.artifact.Artifact;
 import java.nio.file.*;
-import java.util.*;
+import java.util.List;
 import javax.xml.stream.*;
 
 /** Captures Maven's evaluated project model at the final dependency-resolution goal of each module. */
@@ -13,19 +13,19 @@ public final class MetadataSpy extends AbstractEventSpy {
     @Override public void onEvent(Object event) throws Exception {
         if (!(event instanceof ExecutionEvent execution) || execution.getType() != ExecutionEvent.Type.MojoSucceeded) return;
         var mojo = execution.getMojoExecution();
+        if (!"default-cli".equals(mojo.getExecutionId())) return;
         if (!mojo.getArtifactId().equals("maven-dependency-plugin") || !mojo.getGoal().equals("build-classpath")) return;
-        writeProject(execution.getProject());
+        var project = execution.getProject();
+        var output = ModuleOutput.from(project);
+        if (output != null) writeProject(project, output.metadata());
     }
 
-    private static void writeProject(MavenProject project) throws Exception {
-        Path output = Path.of(project.getBuild().getDirectory(), "cqc-metadata.xml");
-        Files.createDirectories(output.getParent());
-        try (var stream = Files.newOutputStream(output)) {
+    private static void writeProject(MavenProject project, Path output) throws Exception {
+        try (var stream = Files.newOutputStream(output, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
             var xml = XMLOutputFactory.newFactory().createXMLStreamWriter(stream, "UTF-8");
             xml.writeStartDocument("UTF-8", "1.0");
             xml.writeStartElement("project");
             element(xml, "pom", project.getFile().getAbsolutePath());
-            element(xml, "buildDirectory", project.getBuild().getDirectory());
             element(xml, "mainOutput", project.getBuild().getOutputDirectory());
             element(xml, "testOutput", project.getBuild().getTestOutputDirectory());
             coverage(xml, CoverageResult.from(project));

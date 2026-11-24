@@ -34,7 +34,8 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
     private async Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, string[] families, AnalysisMode mode, CancellationToken cancellationToken)
     {
         using var timeout = Timeout(request, cancellationToken);
-        var gate = Gates.GetOrAdd(Path.GetFullPath(request.ProjectRoot), _ => new SemaphoreSlim(1, 1));
+        var root = ProjectPaths.ResolveDirectory(new DirectoryInfo(request.ProjectRoot));
+        var gate = Gates.GetOrAdd(root, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(timeout.Token);
         try { return await AnalyzeLockedAsync(request, families, mode, timeout.Token); }
         finally { gate.Release(); }
@@ -45,30 +46,31 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         var (config, configFingerprint) = Configuration.Load(Path.GetFullPath(request.ProjectRoot), request.ConfigPath);
         var snapshot = (await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions))
             with { SourceOnly = mode == AnalysisMode.SourceOnly };
-        var discoveryDiagnostics = snapshot.SourceOnly
-            ? snapshot.Diagnostics.Where(diagnostic => diagnostic.Code != "unsupported_integration").ToArray()
-            : snapshot.Diagnostics;
+        var discoveryDiagnostics = DiscoveryDiagnostics(snapshot);
         var diagnostics = new List<Diagnostic>(discoveryDiagnostics);
         var report = new AnalysisResponse(Wire.SchemaVersion, "2", Wire.Target, snapshot.SourceFingerprint, configFingerprint,
             request.Scope, snapshot.SelectedFiles, snapshot.Modules, [], discoveryDiagnostics) { SourceOnly = snapshot.SourceOnly };
         if (mode != AnalysisMode.EvidenceAware && IsEmptyChangeSelection(request, snapshot)) return report;
 
-        using var artifacts = request.Execute ? await BuildAsync(snapshot, diagnostics, token) : null;
+        using var artifacts = await BuildIfRequestedAsync(request, snapshot, diagnostics, token);
         await VerifyBuildSnapshot(request, config, snapshot, token);
-        var facts = await CollectFacts(snapshot, diagnostics, token);
+        var analysisSnapshot = artifacts is null ? snapshot : snapshot with { ReferenceEvidenceDirectory = artifacts.RunDirectory };
+        var facts = await CollectFacts(analysisSnapshot, diagnostics, token);
         diagnostics.AddRange(snapshot.SourceOnly ? StructuralReview.Diagnostics(facts, snapshot.SelectedFiles) : facts.Diagnostics);
         var coverage = await CollectCoverage(new CoverageInput
         {
             Snapshot = snapshot, ConfigurationFingerprint = configFingerprint, Request = request,
             Facts = facts, Artifacts = artifacts
         }, diagnostics, token);
-        await VerifySnapshot(request, config, snapshot, token);
         var results = QualityEngine.Evaluate(new EvaluationRequest
         {
-            Snapshot = snapshot, Facts = facts, Config = config, Evidence = request.Execute && artifacts is null ? null : coverage,
+            Snapshot = snapshot, Facts = facts, Config = config, Evidence = coverage,
             ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = token
         });
+        await VerifySnapshot(request, config, snapshot, token);
         token.ThrowIfCancellationRequested();
+        if (artifacts is not null && coverage is not null)
+            await EvidenceStore.PublishRunAsync(snapshot.Root, artifacts, coverage, token);
         return report with
         {
             Results = results,
@@ -79,8 +81,13 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
     private static bool IsEmptyChangeSelection(AnalysisRequest request, ProjectSnapshot snapshot) =>
         request.Scope == "changed" && snapshot.SelectedFiles.Length == 0;
 
-    private async Task<BuildArtifacts?> BuildAsync(ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)
+    private static Diagnostic[] DiscoveryDiagnostics(ProjectSnapshot snapshot) => snapshot.SourceOnly
+        ? snapshot.Diagnostics.Where(diagnostic => diagnostic.Code != "unsupported_integration").ToArray()
+        : snapshot.Diagnostics;
+
+    private async Task<BuildArtifacts?> BuildIfRequestedAsync(AnalysisRequest request, ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)
     {
+        if (!request.Execute) return null;
         await EvidenceStore.EnsureWritableAsync(snapshot.Root, token);
         try
         {
@@ -98,6 +105,7 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
     private async Task<CoverageEvidence?> CollectCoverage(CoverageInput input, List<Diagnostic> diagnostics, CancellationToken token)
     {
         if (input.Snapshot.SourceOnly) return null;
+        if (input.Request.Execute && input.Artifacts is null) return null;
         try { return await new CoverageCollection(adapters).CollectAsync(input, diagnostics, token); }
         catch (Exception ex) when (ex is JsonException or ArgumentException or System.Xml.XmlException)
         {

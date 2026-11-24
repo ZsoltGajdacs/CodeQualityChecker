@@ -40,7 +40,8 @@ internal sealed class FixtureWorkspace : IDisposable
         var paths = PlatformReferences.Read([]).Concat([typeof(FactAttribute).Assembly.Location, typeof(Assert).Assembly.Location]).ToArray();
         var projects = snapshot.Modules.Where(module => module.Language == "csharp" && StaticProjectSettings.Read(snapshot, module).IsTestProject)
             .Select(module => new CSharpProjectReferences(module.Path, paths));
-        return CSharpReferenceMetadata.WriteAsync(snapshot, Root, projects, CancellationToken.None);
+        var evidence = Directory.CreateDirectory(Path.Combine(Root, ".cqc")).FullName;
+        return CSharpReferenceMetadata.WriteAsync(snapshot, evidence, projects, CancellationToken.None);
     }
 
     public async Task Git(params string[] arguments)
@@ -49,8 +50,11 @@ internal sealed class FixtureWorkspace : IDisposable
         Assert.True(result.ExitCode == 0, result.Error);
     }
 
-    public string SourceContents() => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
-        .Where(x => !Path.GetRelativePath(Root, x).Split(Path.DirectorySeparatorChar).Any(p => p is ".cqc" or "obj" or "bin" or "target" or "TestResults" or ".git"))
-        .Order(StringComparer.Ordinal).Select(x => Path.GetRelativePath(Root, x) + "\0" + File.ReadAllText(x)));
+    public IEnumerable<string> SourceFiles() => Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
+        .Where(path => !Path.GetRelativePath(Root, path).Split(Path.DirectorySeparatorChar)
+            .Any(part => part is ".cqc" or "obj" or "bin" or "target" or "TestResults" or ".git"));
+
+    public string SourceContents() => string.Join("\n", SourceFiles().Order(StringComparer.Ordinal)
+        .Select(path => Path.GetRelativePath(Root, path) + "\0" + File.ReadAllText(path)));
     public void Dispose() => Directory.Delete(Root, true);
 }

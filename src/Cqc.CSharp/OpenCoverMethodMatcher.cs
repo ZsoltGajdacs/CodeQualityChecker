@@ -5,7 +5,7 @@ namespace Cqc.CSharp;
 internal sealed class OpenCoverMethodMatcher(IEnumerable<MethodFact> methods, string? sourceRoot)
 {
     private readonly ILookup<string, MethodFact> byFile = methods.ToLookup(method => method.Location.File, StringComparer.Ordinal);
-    private readonly string? realRoot = sourceRoot is null ? null : CSharpPaths.ResolveDirectory(new DirectoryInfo(sourceRoot));
+    private readonly string? realRoot = sourceRoot is null ? null : ProjectPaths.ResolveDirectory(new DirectoryInfo(sourceRoot));
 
     internal MethodFact? Find(OpenCoverMethodIdentity identity, int[] lines, bool allowSourceFallback = true)
     {

@@ -12,7 +12,7 @@ final class ManifestValidation {
 
     private static void validateHeader(ContextManifest.Manifest manifest, String fingerprint) {
         Objects.requireNonNull(manifest, "Module manifest is required.");
-        if (!"2".equals(manifest.schemaVersion())) throw new IllegalArgumentException("Incompatible module manifest schema; expected 2.");
+        if (!"3".equals(manifest.schemaVersion())) throw new IllegalArgumentException("Incompatible module manifest schema; expected 3.");
         if (!fingerprint.equals(manifest.sourceFingerprint())) throw new IllegalArgumentException("Stale module metadata.");
         Objects.requireNonNull(manifest.contexts(), "Module contexts are required.");
     }
@@ -55,6 +55,7 @@ final class ManifestValidation {
     private static void validateEntry(ContextManifest.Entry entry) {
         Objects.requireNonNull(entry, "Classpath artifact is required.");
         Objects.requireNonNull(entry.path(), "Artifact path is required.");
+        Objects.requireNonNull(entry.kind(), "Artifact kind must be jar or directory.");
         Objects.requireNonNull(entry.sha256(), "Artifact hash is required.");
         if (!entry.sha256().matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Invalid artifact hash.");
     }

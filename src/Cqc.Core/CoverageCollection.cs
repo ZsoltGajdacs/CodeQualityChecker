@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace Cqc.Core;
 
 internal sealed record CoverageInput
@@ -11,22 +9,20 @@ internal sealed record CoverageInput
     public BuildArtifacts? Artifacts { get; init; }
 }
 
-/// <summary>Owns coverage provenance, adapter report conversion and atomic evidence publication.</summary>
+/// <summary>Validates saved coverage and normalizes native reports from the current build.</summary>
 internal sealed class CoverageCollection(IEnumerable<ILanguageAnalyzer> adapters)
 {
     internal async Task<CoverageEvidence?> CollectAsync(CoverageInput input, List<Diagnostic> diagnostics, CancellationToken token)
     {
         var drivers = adapters.OfType<ILanguageExecution>().ToDictionary(x => x.Language, StringComparer.Ordinal);
         if (input.Artifacts is not { } artifacts) return await ReadCachedAsync(input, drivers.Values, diagnostics, token);
-        var evidence = BuildEvidence(input, artifacts, drivers);
-        await PublishAsync(input.Snapshot.Root, evidence, token);
-        return evidence;
+        return BuildEvidence(input, artifacts, drivers);
     }
 
     private static async Task<CoverageEvidence?> ReadCachedAsync(CoverageInput input, IEnumerable<ILanguageExecution> drivers,
         List<Diagnostic> diagnostics, CancellationToken token)
     {
-        var path = Path.GetFullPath(input.Request.ReportPath ?? ".cqc/coverage.json", input.Snapshot.Root);
+        var path = Path.GetFullPath(input.Request.ReportPath ?? Path.Combine(".cqc", EvidenceStore.CoverageFileName), input.Snapshot.Root);
         if (!File.Exists(path)) return null;
         var cached = EvidenceStore.Read(await File.ReadAllTextAsync(path, token));
         return MatchIdentities(cached, drivers, diagnostics);
@@ -42,19 +38,6 @@ internal sealed class CoverageCollection(IEnumerable<ILanguageAnalyzer> adapters
         foreach (var build in artifacts.Results)
             if (drivers[build.Language].CoverageIdentityVersion is { } version) versions[IdentityKey(build.Language)] = version;
         return new(Wire.SchemaVersion, input.Snapshot.SourceFingerprint, input.ConfigurationFingerprint, true, versions, entries);
-    }
-
-    private static async Task PublishAsync(string root, CoverageEvidence evidence, CancellationToken token)
-    {
-        EvidenceStore.EnsureArtifactDirectory(root);
-        var path = Path.Combine(root, ".cqc", "coverage.json");
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(evidence, Wire.Json), token);
-            File.Move(temporary, path, true);
-        }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     private static CoverageEvidence MatchIdentities(CoverageEvidence evidence, IEnumerable<ILanguageExecution> drivers, List<Diagnostic> diagnostics)

@@ -11,8 +11,8 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
     public string? CoverageIdentityVersion => CSharpExecution.MethodIdentityVersion;
     public LanguageDefinition Definition => CSharpDiscovery.Definition;
 
-    public Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string scratchDirectory, CancellationToken cancellationToken) =>
-        new CSharpExecution().ExecuteAsync(snapshot, scratchDirectory, cancellationToken);
+    public Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string runDirectory, CancellationToken cancellationToken) =>
+        new CSharpExecution().ExecuteAsync(snapshot, runDirectory, cancellationToken);
 
     public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods) =>
         new CSharpExecution().ReadCoverage(build, methods);

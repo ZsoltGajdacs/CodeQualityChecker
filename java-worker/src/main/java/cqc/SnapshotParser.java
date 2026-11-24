@@ -24,7 +24,7 @@ final class SnapshotParser {
 
     Context load() throws IOException {
         var manifest = input.sourceOnly() ? List.<ContextManifest.Context>of()
-            : new ContextManifest(root, reporter).read(input.sourceFingerprint());
+            : new ContextManifest(root, reporter).read(input.sourceFingerprint(), input.referenceEvidenceDirectory());
         var definitions = new SourceContexts(root, manifest, input.modules(), reporter, input.sourceOnly());
         var sources = new ArrayList<Worker.Source>();
         var parser = new JavaParser(configuration());
@@ -59,13 +59,13 @@ final class SnapshotParser {
             if (path.startsWith(root) && Files.isDirectory(path)) solver.add(new JavaParserTypeSolver(path, configuration()));
         }
         boolean complete = true;
-        for (String jar : context.jars()) complete &= addJar(solver, jar, context);
+        for (var artifact : context.artifacts()) complete &= addArtifact(solver, artifact, context);
         var resolver = new JavaSymbolSolver(solver);
         sources.owned(context.id()).forEach(source -> resolver.inject(source.unit()));
         if (complete) return context;
         var blockers = new TreeSet<>(Arrays.asList(context.blockers()));
         blockers.add("context.artifactChanged");
-        return new ContextManifest.Context(context.definition(), context.jars(), false, blockers.toArray(String[]::new));
+        return new ContextManifest.Context(context.definition(), context.artifacts(), false, blockers.toArray(String[]::new));
     }
 
     private Optional<Worker.Source> parseFile(JavaParser parser, String file, String contextId) throws IOException {
@@ -81,10 +81,11 @@ final class SnapshotParser {
         return result.getResult().map(unit -> new Worker.Source(file, unit, null));
     }
 
-    private boolean addJar(CombinedTypeSolver solver, String jar, ContextManifest.Context context) {
-        try { solver.add(new JarTypeSolver(jar)); return true; }
+    private boolean addArtifact(CombinedTypeSolver solver, ClasspathArtifact artifact, ContextManifest.Context context) {
+        // JavaParser's bytecode solver also accepts compiled class directories directly.
+        try { solver.add(new JarTypeSolver(artifact.path())); return true; }
         catch (Exception exception) {
-            reporter.report("java.classpath", "Cannot load dependency " + Path.of(jar).getFileName() + " in " + context.id(), context.modulePath());
+            reporter.report("java.classpath", "Cannot load dependency " + artifact.path().getFileName() + " in " + context.id(), context.modulePath());
             return false;
         }
     }

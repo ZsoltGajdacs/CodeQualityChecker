@@ -26,17 +26,17 @@ public sealed class ScoringFixtureTests
 
     private static async Task<AnalysisResponse> ExecuteAndVerify(FixtureWorkspace workspace, ScoreWitness[] expectations)
     {
-        var source = SourceBytes(workspace.Root);
+        var source = SourceBytes(workspace);
         var service = new AnalysisService([new CSharpAnalyzer(), new JavaAnalyzer()]);
         var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 }, Families, CancellationToken.None);
         Assert.Empty(result.Diagnostics);
         Assert.All(result.Results, family => Assert.Equal("complete", family.Status));
         Assert.Equal(Wire.Target, result.Message);
         foreach (var witness in expectations) AssertWitness(result, witness);
-        Assert.Equal(source, SourceBytes(workspace.Root));
+        Assert.Equal(source, SourceBytes(workspace));
         var replay = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, Families, CancellationToken.None);
         Assert.Equal(JsonSerializer.Serialize(result, Wire.Json), JsonSerializer.Serialize(replay, Wire.Json));
-        Assert.Equal(source, SourceBytes(workspace.Root));
+        Assert.Equal(source, SourceBytes(workspace));
         return result;
     }
 
@@ -81,9 +81,9 @@ public sealed class ScoringFixtureTests
         Assert.Equal(expected.Length, group.Locations.Length);
     }
 
-    private static SortedDictionary<string, string> SourceBytes(string root) => new(Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-        .Where(path => !Path.GetRelativePath(root, path).StartsWith(".cqc/", StringComparison.Ordinal))
-        .ToDictionary(path => Path.GetRelativePath(root, path), path => Wire.HashBytes(File.ReadAllBytes(path)), StringComparer.Ordinal), StringComparer.Ordinal);
+    private static SortedDictionary<string, string> SourceBytes(FixtureWorkspace workspace) => new(workspace.SourceFiles()
+        .ToDictionary(path => Path.GetRelativePath(workspace.Root, path), path => Wire.HashBytes(File.ReadAllBytes(path)),
+            StringComparer.Ordinal), StringComparer.Ordinal);
 
     private sealed record ScoreWitness
     {

@@ -55,6 +55,9 @@ public sealed record ProjectSnapshot(
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SourceOnly { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReferenceEvidenceDirectory { get; init; }
 }
 
 public sealed record AnalysisRequest

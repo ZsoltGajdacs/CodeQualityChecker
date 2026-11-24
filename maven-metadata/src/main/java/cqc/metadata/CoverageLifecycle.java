@@ -7,23 +7,27 @@ import org.apache.maven.lifecycle.internal.LifecycleExecutionPlanCalculator;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.Objects;
 
 /** Selects per-module JaCoCo instrumentation and schedules a report after the tests. */
 public final class CoverageLifecycle extends AbstractMavenLifecycleParticipant {
     private LifecycleExecutionPlanCalculator calculator;
 
     @Override public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
-        var fallbackVersion = session.getUserProperties().getProperty("cqc.jacoco.fallbackVersion");
-        var scratch = session.getUserProperties().getProperty("cqc.scratchDirectory");
-        if (fallbackVersion == null || scratch == null) return;
+        var properties = session.getUserProperties();
+        var reactorDirectory = properties.getProperty("cqc.reactorDirectory");
+        if (reactorDirectory == null) return;
         try {
-            var paths = new CoveragePaths(Path.of(scratch));
+            var fallbackVersion = Objects.requireNonNull(properties.getProperty("cqc.jacoco.fallbackVersion"), "Missing fallback JaCoCo version.");
+            var projectRoot = Objects.requireNonNull(properties.getProperty("cqc.projectRoot"), "Missing project root.");
+            var paths = new CoveragePaths(Path.of(projectRoot));
+            var output = Path.of(reactorDirectory).toRealPath();
             var fallback = JacocoPlugin.plugin(fallbackVersion);
             var modules = new LinkedHashMap<ModuleCoverage, ModuleCoverage.Selection>();
             for (var project : session.getProjects()) {
                 var moduleSession = session.clone();
                 moduleSession.setCurrentProject(project);
-                var module = new ModuleCoverage(calculator, moduleSession, paths);
+                var module = new ModuleCoverage(calculator, moduleSession, paths, ModuleOutput.create(output, project));
                 modules.put(module, module.select(fallback));
             }
             for (var entry : modules.entrySet()) entry.getKey().finish(entry.getValue());

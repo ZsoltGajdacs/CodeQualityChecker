@@ -8,7 +8,6 @@ import org.apache.maven.model.PluginExecution;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,14 +21,16 @@ final class ModuleCoverage {
     private final MavenSession session;
     private final MavenProject project;
     private final CoveragePaths paths;
+    private final ModuleOutput output;
     private Plugin addedPlugin;
     private PluginExecution fallback;
 
-    ModuleCoverage(LifecycleExecutionPlanCalculator calculator, MavenSession session, CoveragePaths paths) {
+    ModuleCoverage(LifecycleExecutionPlanCalculator calculator, MavenSession session, CoveragePaths paths, ModuleOutput output) {
         this.calculator = calculator;
         this.session = session;
         this.project = session.getCurrentProject();
         this.paths = paths;
+        this.output = output;
     }
 
     Selection select(Plugin fallbackPlugin) throws Exception {
@@ -47,7 +48,7 @@ final class ModuleCoverage {
         var agent = resolved.get(0);
         if (plan.indexOf(agents.get(0)) > test)
             return Selection.unavailable(agent.version(), "The project JaCoCo agent is scheduled after Surefire starts.");
-        return selectReport(agent);
+        return Selection.from(agent);
     }
 
     private Selection selectFallback(Plugin fallbackPlugin) throws Exception {
@@ -63,36 +64,21 @@ final class ModuleCoverage {
         fallback = FALLBACK.create();
         JacocoPlugin.add(plugin, fallback);
         var agent = calculate().stream().filter(FALLBACK::scheduled).findFirst().orElseThrow();
-        return selectReport(resolve(agent));
+        return Selection.from(resolve(agent));
     }
 
     private ResolvedAgent resolve(MojoExecution mojo) throws Exception {
         calculator.setupMojoExecution(session, project, mojo);
         var settings = AgentSettings.resolve(session, mojo);
         var reason = settings.unavailableReason();
-        if (reason != null) return new ResolvedAgent(settings.version(), null, reason);
+        if (reason != null) return new ResolvedAgent(mojo, null, reason);
 
         var configured = project.getBasedir().toPath().resolve(settings.destFile());
-        var dataFile = paths.insideScratch(configured);
+        var dataFile = paths.insideProject(configured);
         if (dataFile == null)
-            return new ResolvedAgent(settings.version(), null, "The JaCoCo execution data path is outside the isolated copy.");
+            return new ResolvedAgent(mojo, null, "The configured JaCoCo execution data path is outside the project.");
         paths.claim(dataFile);
-        if (Files.exists(dataFile))
-            return new ResolvedAgent(settings.version(), null, "The JaCoCo execution data path already exists.");
-        return new ResolvedAgent(settings.version(), dataFile, null);
-    }
-
-    private Selection selectReport(ResolvedAgent agent) {
-        if (agent.reason() != null) return Selection.unavailable(agent.version(), agent.reason());
-
-        var plugin = project.getPlugin(JacocoPlugin.KEY);
-        if (REPORT.idInUse(plugin))
-            return Selection.unavailable(agent.version(), "A project JaCoCo execution already uses the CQC report execution ID.");
-        var report = paths.insideScratch(Path.of(project.getBuild().getDirectory(), "cqc-coverage", "jacoco.xml"));
-        if (report == null || Files.exists(report))
-            return Selection.unavailable(agent.version(), "The CQC JaCoCo report path is outside the isolated copy or already exists.");
-        paths.claim(report);
-        return new Selection(agent.version(), agent.dataFile(), report, null);
+        return new ResolvedAgent(mojo, dataFile, null);
     }
 
     void finish(Selection selection) throws Exception {
@@ -103,16 +89,39 @@ final class ModuleCoverage {
 
     private CoverageResult scheduleReport(Selection selection) throws Exception {
         if (selection.reason() != null) return new CoverageResult(selection.version(), null, selection.reason());
-        if (paths.shared(selection.dataFile()) || paths.shared(selection.report()))
-            return new CoverageResult(selection.version(), null, "Multiple Maven modules claim the JaCoCo execution data or the CQC report path.");
+        var selected = selection.agent();
+        if (paths.shared(selected.configuredData()))
+            return new CoverageResult(selection.version(), null, "Multiple Maven modules claim the configured JaCoCo execution data path.");
 
         var plugin = project.getPlugin(JacocoPlugin.KEY);
-        var report = JacocoPlugin.report(selection.dataFile(), selection.report().getParent());
+        if (REPORT.idInUse(plugin))
+            return new CoverageResult(selection.version(), null, "A project JaCoCo execution already uses the CQC report execution ID.");
+        var agent = plugin.getExecutionsAsMap().get(selected.mojo().getExecutionId());
+        if (agent == null)
+            return new CoverageResult(selection.version(), null, "Maven did not expose the selected JaCoCo agent configuration.");
+
+        var original = agent.getConfiguration();
+        JacocoPlugin.redirectAgent(agent, output.data());
+        var report = JacocoPlugin.report(output.data(), output.directory());
         JacocoPlugin.add(plugin, report);
-        if (reportFollowsSurefire(calculate())) return new CoverageResult(selection.version(), selection.report(), null);
+        var plan = calculate();
+        var failure = verifyCoveragePlan(plan, selected);
+        if (failure == null) return new CoverageResult(selection.version(), output.report(), null);
 
         JacocoPlugin.remove(plugin, report);
-        return new CoverageResult(selection.version(), null, "Maven did not schedule the CQC JaCoCo report after all Surefire executions.");
+        agent.setConfiguration(original);
+        return new CoverageResult(selection.version(), null, failure);
+    }
+
+    private String verifyCoveragePlan(List<MojoExecution> plan, ResolvedAgent selected) throws Exception {
+        if (!reportFollowsSurefire(plan))
+            return "Maven did not schedule the CQC JaCoCo report after all Surefire executions.";
+        for (var mojo : plan) {
+            if (!selected.matches(mojo)) continue;
+            calculator.setupMojoExecution(session, project, mojo);
+            if (output.data().toString().equals(AgentSettings.resolve(session, mojo).destFile())) return null;
+        }
+        return "Maven did not route the selected JaCoCo agent to this run's execution data.";
     }
 
     private void removeFallback() {
@@ -147,11 +156,22 @@ final class ModuleCoverage {
         return calculator.calculateExecutionPlan(session, project, List.of(new LifecycleTask("test")), false)
             .getMojoExecutions();
     }
-    record Selection(String version, Path dataFile, Path report, String reason) {
+    record Selection(String version, ResolvedAgent agent, String reason) {
         static Selection unavailable(String version, String reason) {
-            return new Selection(version, null, null, reason);
+            return new Selection(version, null, reason);
+        }
+
+        static Selection from(ResolvedAgent agent) {
+            return new Selection(agent.version(), agent, agent.reason());
         }
     }
 
-    private record ResolvedAgent(String version, Path dataFile, String reason) {}
+    private record ResolvedAgent(MojoExecution mojo, Path configuredData, String reason) {
+        String version() { return mojo.getVersion(); }
+
+        boolean matches(MojoExecution candidate) {
+            return JacocoPlugin.preparesAgent(candidate) && mojo.getExecutionId().equals(candidate.getExecutionId())
+                && mojo.getGoal().equals(candidate.getGoal());
+        }
+    }
 }

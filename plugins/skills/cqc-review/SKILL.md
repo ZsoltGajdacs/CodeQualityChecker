@@ -28,7 +28,7 @@ The two review tools take the same nested request with fixed scope.
 
 Default to `execute: false`. The review tools report supported static complexity and duplication using source and static project configuration. Present the results directly. The summary note about execution is informational and does not call for a rerun or permission request. Findings can reference unchanged counterparts because the tools use repository context.
 
-Use `execute: true` when the user requests execution and authorizes project-controlled restores, builds, and tests. Both review tools then run all four families. Execution runs in an isolated copy and writes reusable evidence to `.cqc/` in the original root. The supported integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
+Use `execute: true` when the user requests execution and authorizes project-controlled restores, builds, and tests. Both review tools then run all four families. Execution runs in the checkout and can modify it through project build or test code. Normal build outputs remain available for reuse, and CQC writes evidence to `.cqc/`. The supported integrations are Maven/JUnit 5 and SDK-style .NET/xUnit with VSTest.
 
 Optional `configPath` selects CQC configuration. Preserve the user's thresholds and exclusions. `timeoutSeconds` accepts 1–3600. The individual and scoped tools also accept `reportPath` for verified CQC evidence.
 

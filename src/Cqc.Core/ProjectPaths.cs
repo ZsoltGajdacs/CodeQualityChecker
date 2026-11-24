@@ -1,8 +1,8 @@
-namespace Cqc.CSharp;
+namespace Cqc.Core;
 
-internal static class CSharpPaths
+public static class ProjectPaths
 {
-    internal static string ResolveDirectory(DirectoryInfo directory)
+    public static string ResolveDirectory(DirectoryInfo directory)
     {
         if (directory.LinkTarget is not null && directory.ResolveLinkTarget(true) is { } target)
             return ResolveDirectory(new DirectoryInfo(target.FullName));

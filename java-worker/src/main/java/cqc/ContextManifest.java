@@ -7,10 +7,10 @@ import java.util.*;
 
 /** Reads provenance-checked module metadata without executing Maven. */
 final class ContextManifest {
-    record Entry(String path, String sha256) { }
+    record Entry(String path, ClasspathArtifact.Kind kind, String sha256) { }
     record Definition(String id, String modulePath, String sourceSet, String[] sourceRoots, Entry[] classpath, String[] reachableContexts) { }
     record Manifest(String schemaVersion, String sourceFingerprint, Definition[] contexts) { }
-    record Context(Definition definition, List<String> jars, boolean verified, String[] blockers) {
+    record Context(Definition definition, List<ClasspathArtifact> artifacts, boolean verified, String[] blockers) {
         String id() { return definition.id(); }
         String modulePath() { return definition.modulePath(); }
         String sourceSet() { return definition.sourceSet(); }
@@ -23,9 +23,10 @@ final class ContextManifest {
 
     ContextManifest(Path root, MavenClasspath.Reporter reporter) { this.root = root; this.reporter = reporter; }
 
-    List<Context> read(String fingerprint) throws IOException {
-        Path path = root.resolve(".cqc/java-contexts.json");
-        if (!Files.isRegularFile(path)) return missing();
+    List<Context> read(String fingerprint, String stagedDirectory) throws IOException {
+        Path directory = stagedDirectory == null ? root.resolve(".cqc") : Path.of(stagedDirectory);
+        Path path = directory.resolve("java-contexts.json");
+        if (!Files.isRegularFile(path)) return stagedDirectory == null ? missing() : List.of();
         try {
             var manifest = new Gson().fromJson(Files.readString(path), Manifest.class);
             ManifestValidation.validate(manifest, fingerprint, root);

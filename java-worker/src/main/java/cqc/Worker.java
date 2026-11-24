@@ -20,7 +20,8 @@ public final class Worker {
     private final List<SyntaxGap> syntaxGaps = new ArrayList<>();
 
     record Module(String language, String path) { }
-    record Snapshot(String root, String[] files, String sourceFingerprint, Module[] modules, String schemaVersion, boolean sourceOnly) { }
+    record Snapshot(String root, String[] files, String sourceFingerprint, Module[] modules, String schemaVersion, boolean sourceOnly,
+        String referenceEvidenceDirectory) { }
     record Location(String file, int startLine, int endLine) { }
     record Diagnostic(String code, String message, String file, String language) { }
     record EvidenceState(boolean syntax, boolean identity, boolean calls, boolean dependencies, boolean verifiedContext, String[] blockers) {

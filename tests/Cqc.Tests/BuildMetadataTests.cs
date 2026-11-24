@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.IO.Compression;
 using Cqc.Core;
 using Cqc.Java;
 using Xunit;
@@ -33,105 +31,40 @@ public sealed class BuildMetadataTests
     }
 
     [Fact]
-    public async Task NewBuildMetadataReplacesRemovedDependenciesInsteadOfCertifyingThemAsFresh()
-    {
-        using var fixture = new ScratchProject();
-        fixture.Write(".cqc/java-classpath.txt", "/old/dependency.jar\n");
-        fixture.Write(".cqc/java-classpath.txt.source", "old-source");
-        fixture.Write(".cqc/csharp-references.txt", "/old/assembly.dll\n");
-        var snapshot = new ProjectSnapshot(fixture.Root, [], [], [], "current-source", []);
-        var cache = new ArtifactCache(snapshot);
-        await cache.ReplaceLinesAsync("java-classpath.txt", ["/new/dependency.jar"], CancellationToken.None);
-        await cache.ReplaceLinesAsync("csharp-references.txt", [], CancellationToken.None);
-        Assert.Equal(new[] { "/new/dependency.jar" }, File.ReadAllLines(Path.Combine(fixture.Root, ".cqc/java-classpath.txt")));
-        Assert.All(File.ReadAllLines(Path.Combine(fixture.Root, ".cqc/csharp-references.txt")), line => Assert.True(string.IsNullOrEmpty(line)));
-        Assert.Equal("current-source", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-classpath.txt.source")));
-    }
-
-    [Fact]
-    public async Task MavenContextCacheRetainsJarsAndCompiledDirectoryContents()
-    {
-        using var fixture = new ScratchProject();
-        using var scratch = new ScratchProject();
-        scratch.Write("module/target/dependency.jar", "jar content");
-        scratch.Write("module/target/classes/Generated.class", "compiled content");
-        var classes = Path.Combine(scratch.Root, "module/target/classes");
-        var jar = Path.Combine(scratch.Root, "module/target/dependency.jar");
-        var module = new MavenMetadata { Pom = Path.Combine(scratch.Root, "module/pom.xml"),
-            BuildDirectory = Path.Combine(scratch.Root, "module/target"), MainOutput = classes,
-            TestOutput = Path.Combine(scratch.Root, "module/target/test-classes"),
-            SourceSets = [new("main", [], [classes, jar])] };
-        await new JavaContextCache(new(fixture.Root, [], [], [], "source", []), scratch.Root)
-            .PublishAsync([module], CancellationToken.None);
-        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
-        var retained = manifest.RootElement.GetProperty("contexts")[0].GetProperty("classpath").EnumerateArray().ToArray();
-        var compiled = retained[0].GetProperty("path").GetString()!;
-        using var archive = ZipFile.OpenRead(compiled);
-        Assert.NotNull(archive.GetEntry("Generated.class"));
-        Assert.Equal("jar content", await File.ReadAllTextAsync(retained[1].GetProperty("path").GetString()!));
-        Assert.All(retained, entry => Assert.StartsWith(Path.Combine(fixture.Root, ".cqc/references"), entry.GetProperty("path").GetString()));
-    }
-
-    [Fact]
-    public void CopySkipsBuildOutputsCachesAndSymbolicLinksButPreservesBuildConfiguration()
-    {
-        using var fixture = new ScratchProject();
-        using var destination = new ScratchProject();
-        fixture.Write(".mvn/maven.config", "-s settings.xml");
-        fixture.Write("settings.xml", "<settings />");
-        fixture.Write("target/generated.java", "generated");
-        fixture.Write(".cqc/coverage.json", "cached");
-        fixture.Write("src/Real.java", "class Real {}");
-        File.CreateSymbolicLink(Path.Combine(fixture.Root, "src/Linked.java"), Path.Combine(fixture.Root, "src/Real.java"));
-        SnapshotCopy.Copy(fixture.Root, destination.Root);
-        Assert.True(File.Exists(Path.Combine(destination.Root, ".mvn/maven.config")));
-        Assert.True(File.Exists(Path.Combine(destination.Root, "settings.xml")));
-        Assert.True(File.Exists(Path.Combine(destination.Root, "src/Real.java")));
-        Assert.False(File.Exists(Path.Combine(destination.Root, "src/Linked.java")));
-        Assert.False(Directory.Exists(Path.Combine(destination.Root, "target")));
-        Assert.False(Directory.Exists(Path.Combine(destination.Root, ".cqc")));
-    }
-
-    [Fact]
-    public void SnapshotPreservesWrapperExecutableMode()
-    {
-        if (OperatingSystem.IsWindows()) return;
-        using var fixture = new ScratchProject();
-        using var destination = new ScratchProject();
-        fixture.Write("mvnw", "#!/bin/sh\nexit 0\n");
-        var wrapper = Path.Combine(fixture.Root, "mvnw");
-        File.SetUnixFileMode(wrapper, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        SnapshotCopy.Copy(fixture.Root, destination.Root);
-        Assert.Equal(File.GetUnixFileMode(wrapper), File.GetUnixFileMode(Path.Combine(destination.Root, "mvnw")));
-    }
-
-    [Fact]
     public async Task MavenWrapperIsPreferredAndFailureDoesNotFallBack()
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
         var snapshot = WrapperProject(fixture, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo wrapper-version; exit 0; fi\necho wrapper-failure >&2\nexit 19\n");
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None));
         Assert.Contains("wrapper-failure", error.Message);
         Assert.Contains("19", error.Message);
     }
 
     [Fact]
-    public async Task MavenWrapperRunsInCopyAndRecordsItsVersion()
+    public async Task MavenWrapperCanReadExistingProjectOutputsAndStagesOnlyCurrentRunEvidence()
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
-        using var scratch = new ScratchProject();
-        fixture.Write("pom.xml", "<project />");
-        fixture.Write("mvnw", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo wrapper-version; else echo used > wrapper-ran; mkdir -p target/site/jacoco; touch target/site/jacoco/jacoco.xml; " + MetadataScript() + "fi\n");
-        File.SetUnixFileMode(Path.Combine(fixture.Root, "mvnw"), UnixFileMode.UserRead | UnixFileMode.UserExecute);
-        SnapshotCopy.Copy(fixture.Root, scratch.Root);
-        var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("pom.xml")], "fingerprint", []);
-        var build = await new JavaExecution().ExecuteAsync(snapshot, scratch.Root, CancellationToken.None);
-        Assert.Equal("wrapper-version", build.ToolVersions["maven:pom.xml"]);
-        Assert.Empty(build.Reports);
-        Assert.True(File.Exists(Path.Combine(scratch.Root, "wrapper-ran")));
-        Assert.False(File.Exists(Path.Combine(fixture.Root, "wrapper-ran")));
+        fixture.Write("target/existing-output", "from a prior build");
+        fixture.Write("target/cqc-metadata.xml", "stale metadata must not be read");
+        var snapshot = WrapperProject(fixture, """
+            #!/bin/sh
+            set -eu
+            if [ "$1" = "--version" ]; then echo wrapper-version; exit 0; fi
+            cp target/existing-output target/wrapper-ran
+            """ + "\n" + MetadataScript());
+        var build = await new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None);
+        using (build)
+        {
+            Assert.Equal("wrapper-version", Assert.Single(build.Results).ToolVersions["maven:pom.xml"]);
+            Assert.Empty(Assert.Single(build.Results).Reports);
+            Assert.True(File.Exists(Path.Combine(build.RunDirectory, "java-contexts.json")));
+            Assert.False(File.Exists(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        }
+        Assert.False(Directory.Exists(build.RunDirectory));
+        Assert.Equal("from a prior build", File.ReadAllText(Path.Combine(fixture.Root, "target/wrapper-ran")));
     }
 
     [Fact]
@@ -140,8 +73,8 @@ public sealed class BuildMetadataTests
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
         var snapshot = WrapperProject(fixture, "#!/bin/sh\necho ok\n");
-        var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
-        Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing");
+        using var build = await new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None);
+        Assert.Contains(Assert.Single(build.Results).Diagnostics, d => d.Code == "java.classpath_missing");
     }
 
     [Fact]
@@ -150,8 +83,8 @@ public sealed class BuildMetadataTests
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
         var snapshot = WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript());
-        var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
-        Assert.DoesNotContain(build.Diagnostics, d => d.Code is "java.coverage_missing" or "java.classpath_missing");
+        using var build = await new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None);
+        Assert.DoesNotContain(Assert.Single(build.Results).Diagnostics, d => d.Code is "java.coverage_missing" or "java.classpath_missing");
     }
 
     [Fact]
@@ -162,16 +95,16 @@ public sealed class BuildMetadataTests
         fixture.Write("one/pom.xml", "<project />");
         fixture.Write("one/mvnw", "#!/bin/sh\necho ok\n");
         fixture.Write("two/pom.xml", "<project />");
-        fixture.Write("two/mvnw", "#!/bin/sh\nmkdir -p target/cqc-coverage\ntouch target/cqc-coverage/jacoco.xml\n" + MetadataScript(coverage: true));
+        fixture.Write("two/mvnw", "#!/bin/sh\n" + MetadataScript(coverage: true));
         foreach (var path in new[] { "one/mvnw", "two/mvnw" }) File.SetUnixFileMode(Path.Combine(fixture.Root, path), UnixFileMode.UserRead | UnixFileMode.UserExecute);
-        fixture.Write(".cqc/java-classpath.txt.source", "fingerprint");
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("one/pom.xml"), Maven("two/pom.xml")], "fingerprint", []);
-        var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
-        Assert.Single(build.Reports);
-        Assert.Equal("two/pom.xml", Assert.Single(build.ReportModules).Value);
-        Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing" && d.File == "one/pom.xml");
-        Assert.DoesNotContain(build.Diagnostics, d => d.Code == "java.coverage_missing");
-        Assert.True(File.Exists(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        using var build = await new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None);
+        var result = Assert.Single(build.Results);
+        Assert.Single(result.Reports);
+        Assert.Equal("two/pom.xml", Assert.Single(result.ReportModules).Value);
+        Assert.Contains(result.Diagnostics, d => d.Code == "java.classpath_missing" && d.File == "one/pom.xml");
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "java.coverage_missing");
+        Assert.True(File.Exists(Path.Combine(build.RunDirectory, "java-contexts.json")));
     }
 
     [Fact]
@@ -180,10 +113,10 @@ public sealed class BuildMetadataTests
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
         var snapshot = WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript("/missing-cqc-fixture/dependency.jar"));
-        fixture.Write(".cqc/java-classpath.txt.source", "fingerprint");
-        var build = await new JavaExecution().ExecuteAsync(snapshot, fixture.Root, CancellationToken.None);
-        Assert.Contains(build.Diagnostics, d => d.Code == "java.classpath_missing" && d.Message.Contains("dependency.jar"));
-        Assert.Contains("0000000000000000000000000000000000000000000000000000000000000000", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        using var build = await new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None);
+        Assert.Contains(Assert.Single(build.Results).Diagnostics, d => d.Code == "java.classpath_missing" && d.Message.Contains("dependency.jar"));
+        Assert.Contains("0000000000000000000000000000000000000000000000000000000000000000",
+            File.ReadAllText(Path.Combine(build.RunDirectory, "java-contexts.json")));
     }
 
     [Fact]
@@ -231,12 +164,11 @@ public sealed class BuildMetadataTests
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
-        using var scratch = new ScratchProject();
         fixture.Write("pom.xml", "<project />");
         File.CreateSymbolicLink(Path.Combine(fixture.Root, "mvnw"), "missing-wrapper");
-        SnapshotCopy.Copy(fixture.Root, scratch.Root);
         var snapshot = new ProjectSnapshot(fixture.Root, [], [], [Maven("pom.xml")], "fingerprint", []);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => new JavaExecution().ExecuteAsync(snapshot, scratch.Root, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new BuildExecutor([new JavaAnalyzer()]).CollectAsync(snapshot, CancellationToken.None));
         Assert.Contains("Maven Wrapper", error.Message);
     }
 
@@ -257,16 +189,82 @@ public sealed class BuildMetadataTests
     }
 
     [Fact]
-    public async Task ProvenanceFileLinksAreReplacedWithoutChangingTheLinkedSource()
+    public async Task BuildThatChangesInputsDoesNotReplacePublishedEvidence()
     {
+        if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
-        fixture.Write("Source.cs", "class Source {}");
+        WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript(beforeCapture: "printf '\\n' >> pom.xml\n"));
+        fixture.Write(".cqc/java-contexts.json", "previous contexts");
+        fixture.Write(".cqc/coverage.json", "previous coverage");
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AnalyzeAsync(
+            new() { ProjectRoot = fixture.Root, Execute = true }, ["code"], CancellationToken.None));
+        Assert.Contains("Source/build inputs changed during execution", error.Message);
+        Assert.Equal("previous contexts", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        Assert.Equal("previous coverage", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/coverage.json")));
+    }
+
+    [Fact]
+    public async Task ManifestPublicationReplacesASymlinkWithoutChangingItsTarget()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var fixture = new ScratchProject();
+        WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript());
         fixture.Write(".cqc/placeholder", "");
-        File.CreateSymbolicLink(Path.Combine(fixture.Root, ".cqc/java-classpath.txt.source"), Path.Combine(fixture.Root, "Source.cs"));
-        var snapshot = new ProjectSnapshot(fixture.Root, [], [], [], "current-source", []);
-        await new ArtifactCache(snapshot).ReplaceLinesAsync("java-classpath.txt", [], CancellationToken.None);
-        Assert.Equal("class Source {}", File.ReadAllText(Path.Combine(fixture.Root, "Source.cs")));
-        Assert.Equal("current-source", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-classpath.txt.source")));
+        fixture.Write("Tracked.java", "class Tracked {}");
+        var source = Path.Combine(fixture.Root, "Tracked.java");
+        var manifest = Path.Combine(fixture.Root, ".cqc/java-contexts.json");
+        File.CreateSymbolicLink(manifest, source);
+
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var result = await service.AnalyzeAsync(new() { ProjectRoot = fixture.Root, Execute = true }, ["code"], CancellationToken.None);
+        Assert.DoesNotContain(result.Diagnostics, item => item.Code == "execution_failed");
+        Assert.Null(new FileInfo(manifest).LinkTarget);
+        Assert.Equal("class Tracked {}", File.ReadAllText(source));
+    }
+
+    [Fact]
+    public async Task PublicationWithAnOccupiedCoveragePathLeavesPreviousManifestInPlace()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var fixture = new ScratchProject();
+        WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript());
+        fixture.Write(".cqc/java-contexts.json", "previous contexts");
+        var coverage = Directory.CreateDirectory(Path.Combine(fixture.Root, ".cqc/coverage.json")).FullName;
+        var service = new AnalysisService([new JavaAnalyzer()]);
+
+        await Assert.ThrowsAnyAsync<IOException>(() => service.AnalyzeAsync(
+            new() { ProjectRoot = fixture.Root, Execute = true }, ["code"], CancellationToken.None));
+        Assert.Equal("previous contexts", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
+        Assert.True(Directory.Exists(coverage));
+    }
+
+    [Fact]
+    public async Task CheckoutAliasesSerializeInPlaceBuilds()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var fixture = new ScratchProject();
+        using var parent = new ScratchProject();
+        var alias = Path.Combine(parent.Root, "alias");
+        Directory.CreateSymbolicLink(alias, fixture.Root);
+        WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript(beforeCapture: """
+            mkdir target/build-in-progress
+            trap 'rmdir target/build-in-progress' EXIT
+            while [ ! -f target/allow-build-to-finish ]; do sleep 0.05; done
+            """ + "\n"));
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var request = new AnalysisRequest { ProjectRoot = fixture.Root, Execute = true, TimeoutSeconds = 20 };
+        var first = service.AnalyzeAsync(request, ["code"], CancellationToken.None);
+        var marker = Path.Combine(fixture.Root, "target", "build-in-progress");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (!Directory.Exists(marker)) await Task.Delay(25, timeout.Token);
+
+        var second = service.AnalyzeAsync(request with { ProjectRoot = alias }, ["code"], CancellationToken.None);
+        await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(1)));
+        fixture.Write("target/allow-build-to-finish", "");
+        var results = await Task.WhenAll(first, second);
+        Assert.All(results, result => Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed"));
+        Assert.False(Directory.Exists(marker));
     }
 
     [Fact]
@@ -283,11 +281,20 @@ public sealed class BuildMetadataTests
         Assert.Empty(execution.ReadCoverage(single with { Reports = [report, report] }, [method]));
     }
 
-    private static string MetadataScript(string? missingJar = null, bool coverage = false) =>
-        "mkdir -p target\ncat > target/cqc-metadata.xml <<EOF\n" +
-        "<project><pom>$PWD/pom.xml</pom><buildDirectory>$PWD/target</buildDirectory>" +
+    private static string MetadataScript(string? missingJar = null, bool coverage = false, string beforeCapture = "") =>
+        """
+        set -eu
+        if [ "$1" = "--version" ]; then echo wrapper-version; exit 0; fi
+        for argument in "$@"; do
+          case "$argument" in -Dcqc.reactorDirectory=*) reactor="${argument#*=}" ;; esac
+        done
+        output="$reactor/module-fixture"
+        mkdir -p "$output" target
+        """ + "\n" + beforeCapture + (coverage ? "touch \"$output/jacoco.xml\"\n" : "") +
+        "cat > \"$output/metadata.xml\" <<EOF\n" +
+        "<project><pom>$PWD/pom.xml</pom>" +
         "<mainOutput>$PWD/target/classes</mainOutput><testOutput>$PWD/target/test-classes</testOutput>" +
-        (coverage ? "<coverage version='0.8.15' report='$PWD/target/cqc-coverage/jacoco.xml'/>" : "") +
+        (coverage ? "<coverage version='0.8.15' report='$output/jacoco.xml'/>" : "") +
         "<context sourceSet='main'>" + (missingJar is null ? "" : "<classpath>" + missingJar + "</classpath>") +
         "</context><context sourceSet='test'/></project>\nEOF\n";
 

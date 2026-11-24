@@ -2,11 +2,10 @@ using System.Xml.Linq;
 
 namespace Cqc.Java;
 
-/// <summary>Evaluated Maven output, captured inside the isolated build by the bundled extension.</summary>
+/// <summary>Evaluated Maven outputs captured by the bundled extension.</summary>
 internal sealed record MavenMetadata
 {
     public required string Pom { get; init; }
-    public required string BuildDirectory { get; init; }
     public required string MainOutput { get; init; }
     public required string TestOutput { get; init; }
     public required MavenSourceSet[] SourceSets { get; init; }
@@ -17,7 +16,7 @@ internal sealed record MavenMetadata
     {
         var project = XDocument.Load(file).Root ?? throw new InvalidOperationException("Empty Maven metadata.");
         var coverage = project.Element("coverage");
-        return new() { Pom = Required(project, "pom"), BuildDirectory = Required(project, "buildDirectory"),
+        return new() { Pom = Required(project, "pom"),
             MainOutput = Required(project, "mainOutput"), TestOutput = Required(project, "testOutput"),
             Coverage = coverage is null ? null : new(
                 (string?)coverage.Attribute("version"), (string?)coverage.Attribute("report"), (string?)coverage.Attribute("reason")),

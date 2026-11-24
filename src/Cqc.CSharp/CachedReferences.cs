@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Cqc.Core;
 using Microsoft.CodeAnalysis;
 using Diagnostic = Cqc.Core.Diagnostic;
@@ -9,8 +10,8 @@ internal sealed class CachedReferences
 {
     private readonly ProjectSnapshot snapshot;
     private readonly List<Diagnostic> manifestDiagnostics = [];
-    private readonly Dictionary<string, CSharpProjectReferences> projects;
-    private readonly Dictionary<string, PortableExecutableReference> references = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CSharpReferenceProject> projects;
+    private readonly Dictionary<(string Path, string? Sha256), PortableExecutableReference> references = [];
     private readonly Lazy<(string[] Paths, Diagnostic[] Diagnostics)> platform = new(ReadPlatform);
 
     internal CachedReferences(ProjectSnapshot snapshot)
@@ -24,17 +25,20 @@ internal sealed class CachedReferences
     {
         diagnostics.AddRange(manifestDiagnostics);
         var manifest = projects.GetValueOrDefault(source.Path);
-        var paths = manifest is { Paths.Length: > 0 } ? manifest.Paths : Fallback(source, diagnostics);
-        return paths.Select(path => GetReference(path, source, diagnostics)).OfType<MetadataReference>().ToArray();
+        var metadata = manifest is { References.Length: > 0 }
+            ? manifest.References.Select(reference => GetReference(reference.Path, reference.Sha256, source, diagnostics))
+            : Fallback(source, diagnostics).Select(path => GetReference(path, null, source, diagnostics));
+        return metadata.OfType<MetadataReference>().ToArray();
     }
 
-    private PortableExecutableReference? GetReference(string path, ParsedProject source, List<Diagnostic> diagnostics)
+    private PortableExecutableReference? GetReference(string path, string? sha256, ParsedProject source, List<Diagnostic> diagnostics)
     {
-        if (references.TryGetValue(path, out var reference)) return reference;
+        var key = (path, sha256);
+        if (references.TryGetValue(key, out var reference)) return reference;
         try
         {
-            reference = MetadataReference.CreateFromFile(path);
-            references.Add(path, reference);
+            reference = sha256 is null ? MetadataReference.CreateFromFile(path) : ReadVerified(path, sha256);
+            references.Add(key, reference);
             return reference;
         }
         catch (Exception exception) when (exception is IOException or BadImageFormatException or UnauthorizedAccessException)
@@ -42,6 +46,13 @@ internal sealed class CachedReferences
             diagnostics.Add(new("metadata-invalid", exception.Message, source.Path, "csharp"));
             return null;
         }
+    }
+
+    private static PortableExecutableReference ReadVerified(string path, string sha256)
+    {
+        var bytes = File.ReadAllBytes(path);
+        if (Wire.HashBytes(bytes) != sha256) throw new IOException("Reference assembly changed: " + path);
+        return MetadataReference.CreateFromImage(ImmutableCollectionsMarshal.AsImmutableArray(bytes), filePath: path);
     }
 
     private string[] Fallback(ParsedProject source, List<Diagnostic> diagnostics)

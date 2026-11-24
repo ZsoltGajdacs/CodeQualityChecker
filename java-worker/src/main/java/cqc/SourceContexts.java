@@ -37,8 +37,8 @@ final class SourceContexts {
         if (existing.isPresent()) return unverified(existing.get(), source);
         var definition = new ContextManifest.Definition(id, module, set, new String[]{sourceRoot(source)}, new ContextManifest.Entry[0],
             set.equals("test") ? new String[]{module + "#main"} : new String[0]);
-        var jars = sourceOnly ? List.<String>of() : MavenFallback.jars(root, module, reporter);
-        var context = new ContextManifest.Context(definition, jars, false, new String[]{"context.unverified"});
+        var artifacts = sourceOnly ? List.<ClasspathArtifact>of() : MavenFallback.artifacts(root, module, reporter);
+        var context = new ContextManifest.Context(definition, artifacts, false, new String[]{"context.unverified"});
         contexts.add(context);
         if (!sourceOnly)
             reporter.report("java.context_unverified", "No verified Maven metadata for " + id + "; semantic scores require explicit execution.", module);
@@ -47,7 +47,7 @@ final class SourceContexts {
 
     private ContextManifest.Context unverified(ContextManifest.Context found, Worker.Source source) {
         if (!found.verified()) return found;
-        var invalid = new ContextManifest.Context(found.definition(), found.jars(), false, new String[]{"context.unverified"});
+        var invalid = new ContextManifest.Context(found.definition(), found.artifacts(), false, new String[]{"context.unverified"});
         contexts.set(contexts.indexOf(found), invalid);
         reporter.report("java.context_unverified", "Source " + source.file() + " is outside evaluated roots for " + found.id() + ".", source.file());
         return invalid;

@@ -1,33 +1,25 @@
-using System.Text.Json;
 using Cqc.Core;
 
 namespace Cqc.Java;
 
-internal sealed record JavaClasspathEntry(string Path, string Sha256);
+internal sealed record JavaClasspathEntry(string Path, string Kind, string Sha256);
 internal sealed record JavaContext(string Id, string ModulePath, string SourceSet, string[] SourceRoots,
     JavaClasspathEntry[] Classpath, string[] ReachableContexts);
 internal sealed record JavaContextManifest(string SchemaVersion, string SourceFingerprint, JavaContext[] Contexts);
 
-/// <summary>Publishes ordered context metadata and immutable binaries after a successful isolated build.</summary>
-internal sealed class JavaContextCache(ProjectSnapshot snapshot, string scratch)
+/// <summary>Stages Maven's ordered module contexts and direct classpath references.</summary>
+internal sealed class JavaContextCache(ProjectSnapshot snapshot)
 {
-    private readonly JavaBinaryCache binaries = new(snapshot, scratch);
+    internal const string FileName = "java-contexts.json";
+    private readonly JavaClasspathReferences references = new();
 
-    internal async Task PublishAsync(MavenMetadata[] modules, CancellationToken token)
+    internal Task StageAsync(string runDirectory, MavenMetadata[] modules, CancellationToken token)
     {
         var owners = OutputOwners(modules);
         var contexts = modules.SelectMany(module => module.SourceSets.Select(source => Context(module, source, owners, token)))
             .OrderBy(context => context.Id, StringComparer.Ordinal).ToArray();
-        var manifest = new JavaContextManifest("2", snapshot.SourceFingerprint, contexts);
-        EvidenceStore.EnsureArtifactDirectory(snapshot.Root);
-        var destination = Path.Combine(snapshot.Root, ".cqc", "java-contexts.json");
-        var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(manifest, Wire.Json), token);
-            File.Move(temporary, destination, true);
-        }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        var manifest = new JavaContextManifest("3", snapshot.SourceFingerprint, contexts);
+        return EvidenceStore.WriteJsonAsync(new DirectoryInfo(runDirectory), FileName, manifest, token);
     }
 
     private Dictionary<string, string> OutputOwners(MavenMetadata[] modules)
@@ -53,7 +45,7 @@ internal sealed class JavaContextCache(ProjectSnapshot snapshot, string scratch)
             .Where(root => !root.Split('/').Contains("target", StringComparer.Ordinal))
             .Where(root => snapshot.Files.Any(file => root == "." || file.StartsWith(root.TrimEnd('/') + "/", StringComparison.Ordinal)))
             .Distinct(StringComparer.Ordinal).ToArray();
-        var entries = source.Classpath.Where(path => IncludeEntry(path, module)).Select(path => binaries.Persist(path, token)).ToArray();
+        var entries = source.Classpath.Where(path => IncludeEntry(path, module)).Select(path => references.Read(path, token)).ToArray();
         return new(id, pom, source.Name, roots, entries, reachable);
     }
 
@@ -65,11 +57,5 @@ internal sealed class JavaContextCache(ProjectSnapshot snapshot, string scratch)
         return true;
     }
 
-    private string Relative(string path)
-    {
-        var relative = MavenPaths.Relative(scratch, path);
-        if (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal))
-            throw new InvalidOperationException("Maven source/project path is outside the isolated project: " + path);
-        return relative;
-    }
+    private string Relative(string path) => MavenPaths.ProjectRelative(snapshot.Root, path);
 }

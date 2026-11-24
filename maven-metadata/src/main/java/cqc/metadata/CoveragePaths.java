@@ -7,22 +7,22 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Resolves paths in the isolated build and counts claims across the reactor. */
+/** Resolves project-configured coverage paths and counts claims across the reactor. */
 final class CoveragePaths {
-    private final Path scratchRoot;
+    private final Path projectRoot;
     private final Map<Path, Integer> claims = new HashMap<>();
 
-    CoveragePaths(Path scratchRoot) throws IOException {
-        this.scratchRoot = scratchRoot.toRealPath();
+    CoveragePaths(Path projectRoot) throws IOException {
+        this.projectRoot = projectRoot.toRealPath();
     }
 
-    Path insideScratch(Path path) {
+    Path insideProject(Path path) {
         try {
             var full = path.toAbsolutePath().normalize();
             var ancestor = full;
             while (!Files.exists(ancestor, LinkOption.NOFOLLOW_LINKS)) ancestor = ancestor.getParent();
             var canonical = ancestor.toRealPath().resolve(ancestor.relativize(full));
-            return canonical.startsWith(scratchRoot) ? canonical : null;
+            return canonical.startsWith(projectRoot) ? canonical : null;
         } catch (IOException inaccessible) {
             return null;
         }

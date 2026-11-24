@@ -10,25 +10,26 @@ public sealed class CSharpExecution : ILanguageExecution
     public string Language => "csharp";
     public string? CoverageIdentityVersion => MethodIdentityVersion;
 
-    public async Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string scratchDirectory, CancellationToken cancellationToken)
+    public async Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string runDirectory, CancellationToken cancellationToken)
     {
-        scratchDirectory = CSharpPaths.ResolveDirectory(new DirectoryInfo(scratchDirectory));
+        var projectRoot = ProjectPaths.ResolveDirectory(new DirectoryInfo(snapshot.Root));
         var projects = new List<BuiltProject>();
         var versions = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        var results = Path.Combine(scratchDirectory, ".cqc-dotnet-results-" + Guid.NewGuid().ToString("N"));
+        var results = Path.Combine(runDirectory, "dotnet-results");
         Directory.CreateDirectory(results);
-        var environment = new ExecutionEnvironment(scratchDirectory, results, versions);
+        var environment = new ExecutionEnvironment(projectRoot, runDirectory, results, versions);
         foreach (var module in snapshot.Modules.Where(module => module.Language == Language))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!module.Supported) throw new InvalidOperationException("C# execution requires SDK-style .NET projects.");
             projects.Add(await BuildModuleAsync(environment, module, cancellationToken));
         }
-        await CSharpReferenceMetadata.WriteAsync(snapshot, scratchDirectory, projects.Select(project => project.References), cancellationToken);
+        await CSharpReferenceMetadata.WriteAsync(snapshot, runDirectory, projects.Select(project => project.References), cancellationToken);
         var reports = ReportOwners(projects);
         return new(Language, reports.Keys.ToArray(), versions)
         {
-            SourceRoot = scratchDirectory,
+            SourceRoot = projectRoot,
+            ReferenceManifestName = CSharpReferenceMetadata.FileName,
             ReportModules = reports,
             ProjectOutputs = projects.ToDictionary(project => project.References.ProjectPath, project => project.TargetPath, StringComparer.Ordinal)
         };
@@ -45,21 +46,21 @@ public sealed class CSharpExecution : ILanguageExecution
 
     private static async Task<BuiltProject> BuildModuleAsync(ExecutionEnvironment environment, ProjectModule module, CancellationToken token)
     {
-        var scratch = environment.Scratch;
-        var project = Path.Combine(scratch, module.Path);
+        var root = environment.ProjectRoot;
+        var project = Path.Combine(root, module.Path);
         if (environment.Collector is null)
         {
-            environment.Versions["dotnet"] = (await Required("dotnet", ["--version"], scratch, token)).Output.Trim();
+            environment.Versions["dotnet"] = (await Required("dotnet", ["--version"], root, token)).Output.Trim();
             environment.Versions["coverlet"] = CoverletVersion;
-            environment.Collector = await CollectorPath(scratch, token);
+            environment.Collector = await CollectorPath(root, environment.RunDirectory, token);
         }
         var collector = environment.Collector;
         var results = Path.Combine(environment.Results, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(results);
         await Required("dotnet", ["test", project, "--test-adapter-path", collector, "--collect",
-            "XPlat Code Coverage;Format=opencover", "--results-directory", results], scratch, token);
+            "XPlat Code Coverage;Format=opencover", "--results-directory", results], root, token);
         var references = await Required("dotnet", ["msbuild", project, "-target:ResolveReferences", "-getItem:ReferencePath",
-            "-getProperty:TargetPath", "-nologo"], scratch, token);
+            "-getProperty:TargetPath", "-nologo"], root, token);
         using var json = JsonDocument.Parse(references.Output);
         var paths = json.RootElement.GetProperty("Items").GetProperty("ReferencePath").EnumerateArray()
             .Where(item => !ProjectOutput(item)).Select(item => item.GetProperty("FullPath").GetString()!)
@@ -71,19 +72,19 @@ public sealed class CSharpExecution : ILanguageExecution
     private static bool ProjectOutput(JsonElement item) =>
         item.TryGetProperty("ReferenceSourceTarget", out var source) && source.GetString() == "ProjectReference";
 
-    private sealed record ExecutionEnvironment(string Scratch, string Results, SortedDictionary<string, string> Versions)
+    private sealed record ExecutionEnvironment(string ProjectRoot, string RunDirectory, string Results, SortedDictionary<string, string> Versions)
     {
         public string? Collector { get; set; }
     }
 
-    private static async Task<string> CollectorPath(string scratch, CancellationToken token)
+    private static async Task<string> CollectorPath(string projectRoot, string runDirectory, CancellationToken token)
     {
         var packageRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
         var collector = Path.Combine(packageRoot, "coverlet.collector", CoverletVersion, "build", "netstandard2.0");
         if (Directory.Exists(collector)) return collector;
-        var tools = Path.Combine(scratch, "cqc-tools.csproj");
+        var tools = Path.Combine(runDirectory, "cqc-tools.csproj");
         await File.WriteAllTextAsync(tools, $"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"coverlet.collector\" Version=\"{CoverletVersion}\" /></ItemGroup></Project>", token);
-        await Required("dotnet", ["restore", tools], scratch, token);
+        await Required("dotnet", ["restore", tools], projectRoot, token);
         return collector;
     }
 

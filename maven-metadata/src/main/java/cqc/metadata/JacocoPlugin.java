@@ -35,6 +35,15 @@ final class JacocoPlugin {
         return report;
     }
 
+    static void redirectAgent(PluginExecution agent, Path dataFile) {
+        var original = (Xpp3Dom) agent.getConfiguration();
+        var config = original == null ? new Xpp3Dom("configuration") : new Xpp3Dom(original);
+        var destination = config.getChild("destFile");
+        if (destination == null) child(config, "destFile", dataFile.toString());
+        else destination.setValue(dataFile.toString());
+        agent.setConfiguration(config);
+    }
+
     static boolean preparesAgent(MojoExecution mojo) {
         return isJacoco(mojo) && (PREPARE.equals(mojo.getGoal()) || "prepare-agent-integration".equals(mojo.getGoal()));
     }

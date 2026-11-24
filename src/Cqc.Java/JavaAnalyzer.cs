@@ -18,8 +18,8 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         BuildTools = ["java"], InspectPrerequisites = MavenTool.InspectPrerequisites
     };
 
-    public Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string scratchDirectory, CancellationToken cancellationToken)
-        => new JavaExecution().ExecuteAsync(snapshot, scratchDirectory, cancellationToken);
+    public Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string runDirectory, CancellationToken cancellationToken)
+        => new JavaExecution().ExecuteAsync(snapshot, runDirectory, cancellationToken);
 
     public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods)
         => new JavaExecution().ReadCoverage(build, methods);

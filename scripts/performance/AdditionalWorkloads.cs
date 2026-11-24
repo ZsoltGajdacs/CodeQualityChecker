@@ -24,7 +24,7 @@ internal static class AdditionalWorkloads
                 reachableContexts = index == 0 ? Array.Empty<string>() : [$"m{index - 1}/pom.xml#main"] });
         }
         Directory.CreateDirectory(Path.Combine(root, ".cqc"));
-        await File.WriteAllTextAsync(Path.Combine(root, ".cqc/java-contexts.json"), JsonSerializer.Serialize(new { schemaVersion = "2", sourceFingerprint = "source", contexts }));
+        await File.WriteAllTextAsync(Path.Combine(root, ".cqc/java-contexts.json"), JsonSerializer.Serialize(new { schemaVersion = "3", sourceFingerprint = "source", contexts }));
         var snapshot = new ProjectSnapshot(root, files.ToArray(), files.ToArray(), [], "source", []);
         var facts = await samples.Measure("java-modules.java", () => new JavaAnalyzer().AnalyzeAsync(snapshot, default));
         if (!facts.SemanticComplete || facts.Types.Length != 40) throw new InvalidOperationException("Java workload lost complete resolution.");

@@ -21,6 +21,7 @@ public sealed class MavenReactorExecutionTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.AnalyzeAsync(
             new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 }, ["code"], cancellation.Token));
         Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
         Assert.Equal(before, workspace.SourceContents());
     }
 
@@ -38,6 +39,8 @@ public sealed class MavenReactorExecutionTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
         Assert.All(Assert.Single(result.Results).Entities, entity => Assert.Null(entity.Score));
         Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        Assert.True(Directory.Exists(Path.Combine(workspace.Root, "independent", "target", "classes")));
         Assert.Equal(before, workspace.SourceContents());
     }
 
@@ -58,8 +61,8 @@ public sealed class MavenReactorExecutionTests
             MavenBuildRoots.Select(snapshot.Modules, workspace.Root).Select(module => module.Path).Order(StringComparer.Ordinal));
 
         var service = new AnalysisService([new JavaAnalyzer()]);
-        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 },
-            ["code"], CancellationToken.None);
+        var request = new AnalysisRequest { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 };
+        var result = await service.AnalyzeAsync(request, ["code"], CancellationToken.None);
         var details = JsonSerializer.Serialize(result, Wire.Json);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
         var code = Assert.Single(result.Results);
@@ -74,7 +77,10 @@ public sealed class MavenReactorExecutionTests
         var classpath = manifest.RootElement.GetProperty("contexts").EnumerateArray()
             .SelectMany(context => context.GetProperty("classpath").EnumerateArray()).Select(entry => entry.GetProperty("path").GetString()!).ToArray();
         Assert.NotEmpty(classpath);
-        Assert.All(classpath, path => Assert.True(File.Exists(path), path));
+        Assert.All(classpath, path => Assert.True(File.Exists(path) || Directory.Exists(path), path));
+        var classes = Path.Combine(workspace.Root, "group", "api", "target", "classes");
+        Assert.Contains(classpath, path => MavenPaths.Relative(classes, path) == ".");
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, ".cqc", "references")));
         var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
         Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/api/pom.xml"]);
         Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/service/pom.xml"]);
@@ -85,10 +91,19 @@ public sealed class MavenReactorExecutionTests
             Assert.Contains("CQC_WRAPPER_SELECTED", evidence.ToolVersions["java:maven:independent/pom.xml"], StringComparison.Ordinal);
         }
 
-        var replay = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
+        var replay = await service.AnalyzeAsync(request with { Execute = false }, ["code"], CancellationToken.None);
         Assert.Equal(JsonSerializer.Serialize(code, Wire.Json), JsonSerializer.Serialize(Assert.Single(replay.Results), Wire.Json));
         Assert.DoesNotContain(replay.Diagnostics, diagnostic => diagnostic.Code is "java.stale_classpath" or "java.classpath");
         Assert.Equal(before, workspace.SourceContents());
+
+        var apiTarget = Path.GetDirectoryName(classes)!;
+        var existingData = Path.Combine(apiTarget, "project-coverage.exec");
+        await File.WriteAllTextAsync(existingData, "previous agent data");
+        await File.WriteAllTextAsync(Path.Combine(apiTarget, "cqc-metadata.xml"), "previous metadata");
+        var second = await service.AnalyzeAsync(request, ["code"], CancellationToken.None);
+        Assert.DoesNotContain(second.Diagnostics, diagnostic => diagnostic.Code is "execution_failed" or "java.coverage_missing");
+        Assert.Equal(JsonSerializer.Serialize(code, Wire.Json), JsonSerializer.Serialize(Assert.Single(second.Results), Wire.Json));
+        Assert.Equal("previous agent data", await File.ReadAllTextAsync(existingData));
     }
 
     [Fact]

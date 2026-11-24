@@ -13,7 +13,7 @@ JAR = Path(__file__).parent.resolve() / "target/java-worker.jar"
 
 
 class JavaWorkerTests(unittest.TestCase):
-    def analyze(self, files):
+    def analyze(self, files, evidence_directory=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name, source in files.items():
@@ -24,6 +24,8 @@ class JavaWorkerTests(unittest.TestCase):
                 else:
                     path.write_text(source)
             snapshot = {"root": directory, "files": sorted(files), "sourceFingerprint": "fixture", "schemaVersion": "2"}
+            if evidence_directory is not None:
+                snapshot["referenceEvidenceDirectory"] = str(root / evidence_directory)
             process = subprocess.run(["java", "-jar", str(JAR)], input=json.dumps(snapshot),
                                      text=True, capture_output=True, timeout=30, check=True)
             self.assertEqual("", process.stderr)
@@ -154,7 +156,7 @@ class Example {
         self.assertEqual(self.analyze(source), self.analyze(source))
 
     def manifest(self, contexts):
-        return json.dumps({"schemaVersion": "2", "sourceFingerprint": "fixture", "contexts": contexts})
+        return json.dumps({"schemaVersion": "3", "sourceFingerprint": "fixture", "contexts": contexts})
 
     def context(self, module="pom.xml", source_set="main", **options):
         return {"id": module + "#" + source_set, "modulePath": module, "sourceSet": source_set,
@@ -201,7 +203,7 @@ class Example {
         self.assertFalse(any(c["verified"] for c in facts["contexts"]))
 
     def test_corrupt_context_does_not_poison_other_module(self):
-        contexts = [self.context(classpath=[{"path": ".cqc/missing.jar", "sha256": "0" * 64}]),
+        contexts = [self.context(classpath=[{"path": ".cqc/missing.jar", "kind": "jar", "sha256": "0" * 64}]),
                     self.context(module="other/pom.xml", roots=["other/src/main/java"])]
         facts = self.analyze({
             "src/main/java/A.java": "class A { int value() { return 1; } }",
@@ -241,8 +243,8 @@ class Example {
                 self.artifact("1", classes={"demo/Support.class": support}),
                 self.artifact("2", classes={"demo/Library.class": library}),
                 self.artifact("3")]
-        entries = [{"path": f".cqc/{index}.jar", "sha256": hashlib.sha256(content).hexdigest()} for index, content in enumerate(jars)]
-        files = {f".cqc/{index}.jar": content for index, content in enumerate(jars)}
+        entries = [{"path": f"repo/{index}.jar", "kind": "jar", "sha256": hashlib.sha256(content).hexdigest()} for index, content in enumerate(jars)]
+        files = {entry["path"]: content for entry, content in zip(entries, jars)}
         files["src/main/java/A.java"] = "class A { int x() { return 1; } }"
         files[".cqc/java-contexts.json"] = self.manifest([self.context(classpath=entries)])
         facts = self.analyze(files)
@@ -252,11 +254,11 @@ class Example {
     def test_different_module_versions_are_valid_but_same_context_conflicts(self):
         one = self.artifact("1", classes={"demo/Library.class": self.class_bytes(1)})
         two = self.artifact("2", classes={"demo/Library.class": self.class_bytes(2)})
-        first = {"path": ".cqc/one.jar", "sha256": hashlib.sha256(one).hexdigest()}
-        second = {"path": ".cqc/two.jar", "sha256": hashlib.sha256(two).hexdigest()}
+        first = {"path": "repo/one.jar", "kind": "jar", "sha256": hashlib.sha256(one).hexdigest()}
+        second = {"path": "repo/two.jar", "kind": "jar", "sha256": hashlib.sha256(two).hexdigest()}
         files = {"src/main/java/A.java": "class A { int x() { return 1; } }",
                  "other/src/main/java/B.java": "class B { int x() { return 2; } }",
-                 ".cqc/one.jar": one, ".cqc/two.jar": two}
+                 first["path"]: one, second["path"]: two}
         contexts = [self.context(classpath=[first]),
                     self.context(module="other/pom.xml", roots=["other/src/main/java"], classpath=[second])]
         files[".cqc/java-contexts.json"] = self.manifest(contexts)
@@ -268,6 +270,38 @@ class Example {
         self.assertFalse(types["A"]["evidence"]["verifiedContext"])
         self.assertTrue(types["B"]["evidence"]["verifiedContext"])
         self.assertTrue(any(d["code"] == "java.classpath_conflict" for d in facts["diagnostics"]))
+
+    def test_class_directory_resolves_generated_types_and_verifies_current_bytes(self):
+        classes = {"demo/Library.class": self.class_bytes(1), "demo/Support.class": self.class_bytes(2, "Support")}
+        digest = hashlib.sha256()
+        for path, content in sorted(classes.items()):
+            digest.update(path.encode() + b"\0" + hashlib.sha256(content).digest())
+        directory = "target/classes"
+        entry = {"path": directory, "kind": "directory", "sha256": digest.hexdigest()}
+        files = {f"{directory}/{path}": content for path, content in classes.items()}
+        files["src/main/java/A.java"] = "import demo.Library; class A { int x() { return new Library().value(); } }"
+        files[".cqc/java-contexts.json"] = self.manifest([self.context(classpath=[entry])])
+        self.assertTrue(self.analyze(files)["semanticComplete"])
+
+        conflicting_jar = self.artifact("2", classes={"demo/Library.class": self.class_bytes(3)})
+        jar = {"path": "repo/conflicting.jar", "kind": "jar", "sha256": hashlib.sha256(conflicting_jar).hexdigest()}
+        files[jar["path"]] = conflicting_jar
+        files[".cqc/java-contexts.json"] = self.manifest([self.context(classpath=[entry, jar])])
+        self.assertTrue(any(d["code"] == "java.classpath_conflict" for d in self.analyze(files)["diagnostics"]))
+
+        files[".cqc/java-contexts.json"] = self.manifest([self.context(classpath=[entry])])
+        files[f"{directory}/demo/Support.class"] = b"changed"
+        facts = self.analyze(files)
+        self.assertFalse(facts["contexts"][0]["verified"])
+        self.assertTrue(any(d["code"] == "java.classpath_invalid" for d in facts["diagnostics"]))
+
+    def test_staged_contexts_take_precedence_without_using_preexisting_evidence(self):
+        files = {"src/main/java/A.java": "class A { int x() { return 1; } }",
+                 ".cqc/java-contexts.json": self.manifest([self.context()])}
+        self.assertTrue(self.analyze(files)["contexts"][0]["verified"])
+        self.assertFalse(self.analyze(files, "run")["contexts"][0]["verified"])
+        files["run/java-contexts.json"] = files.pop(".cqc/java-contexts.json")
+        self.assertTrue(self.analyze(files, "run")["contexts"][0]["verified"])
 
     def test_reactor_edges_and_helper_calls_use_declaring_module_identity(self):
         contexts = [self.context(module="api/pom.xml", roots=["api/src/main/java"]),
@@ -287,6 +321,10 @@ class Example {
         facts = self.analyze(files)
         self.assertTrue(facts["methods"][0]["evidence"]["syntax"])
         self.assertFalse(facts["methods"][0]["evidence"]["verifiedContext"])
+        self.assertTrue(any(d["code"] == "java.stale_classpath" for d in facts["diagnostics"]))
+        files[".cqc/java-contexts.json"] = self.manifest([self.context()]).replace('"3"', '"2"')
+        facts = self.analyze(files)
+        self.assertFalse(facts["contexts"][0]["verified"])
         self.assertTrue(any(d["code"] == "java.stale_classpath" for d in facts["diagnostics"]))
         del files[".cqc/java-contexts.json"]
         files[".cqc/java-classpath.txt"] = "old.jar"

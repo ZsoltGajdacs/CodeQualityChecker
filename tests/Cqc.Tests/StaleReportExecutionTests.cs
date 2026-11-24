@@ -8,7 +8,7 @@ public sealed class StaleReportExecutionTests
 {
     [Fact]
     [Trait("Category", "Execution")]
-    public async Task ExecutionDoesNotCertifyHitsFromReportsCopiedFromTheOriginalProject()
+    public async Task InPlaceExecutionIgnoresExistingOpenCoverReports()
     {
         using var workspace = FixtureWorkspace.Copy("mixed/csharp");
         var cached = Path.Combine(workspace.Root, "old-reports", "coverage.opencover.xml");
