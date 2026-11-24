@@ -5,6 +5,7 @@ namespace Cqc.Core;
 public static class EvidenceStore
 {
     internal const string CoverageFileName = "coverage.json";
+    private static readonly char[] InvalidNameCharacters = [.. Path.GetInvalidFileNameChars(), '\\'];
 
     public static async Task WriteJsonAsync<T>(DirectoryInfo directory, string name, T value, CancellationToken token)
     {
@@ -13,44 +14,80 @@ public static class EvidenceStore
         await JsonSerializer.SerializeAsync(stream, value, Wire.Json, token);
     }
 
-    internal static async Task PublishRunAsync(string root, BuildArtifacts artifacts, CoverageEvidence coverage, CancellationToken token)
+    internal static async Task PublishRunAsync(DirectoryInfo root, BuildArtifacts artifacts, CoverageEvidence coverage, CancellationToken token)
     {
-        var names = artifacts.Results.Select(result => result.ReferenceManifestName).OfType<string>().ToList();
+        token.ThrowIfCancellationRequested();
+        var names = artifacts.Results.Select(result => result.ReferenceManifestName).OfType<string>()
+            .Append(CoverageFileName).ToArray();
         var source = new DirectoryInfo(artifacts.RunDirectory);
         await WriteJsonAsync(source, CoverageFileName, coverage, token);
-        names.Add(CoverageFileName);
-        EnsureArtifactDirectory(root);
-        var destination = new DirectoryInfo(Path.Combine(root, ".cqc"));
-        await PublishAsync(source, destination, names, token);
-    }
-
-    private static async Task PublishAsync(DirectoryInfo source, DirectoryInfo destination, List<string> names, CancellationToken token)
-    {
-        var staged = new List<(string Temporary, string Target)>();
+        var destination = ArtifactDirectory(root);
+        EnsureSafeArtifactDirectory(destination);
+        var target = EvidencePath(destination, EvidenceBundle.FileName);
+        var staged = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            foreach (var name in names)
-            {
-                var target = EvidencePath(destination, name);
-                if (Directory.Exists(target)) throw new IOException("Evidence destination is a directory: " + target);
-                var temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                staged.Add((temporary, target));
-                await using var input = File.OpenRead(EvidencePath(source, name));
-                await using var output = File.Create(temporary);
-                await input.CopyToAsync(output, token);
-            }
+            await EvidenceBundle.WriteAsync(staged, source, names, token);
+            await using (var output = File.OpenRead(staged))
+                await EvidenceBundle.ReadAsync(output, destination: null, token);
             token.ThrowIfCancellationRequested();
-            foreach (var (temporary, target) in staged) File.Move(temporary, target, true);
+            File.Move(staged, target, overwrite: true);
         }
-        finally { foreach (var (temporary, _) in staged) File.Delete(temporary); }
+        finally { File.Delete(staged); }
     }
 
-    private static string EvidencePath(DirectoryInfo directory, string name)
+    internal static async Task<EvidenceSnapshot> OpenAsync(DirectoryInfo root, List<Diagnostic> diagnostics, CancellationToken token)
     {
-        if (name is "" or "." or ".." || Path.GetFileName(name) != name)
+        var legacy = ArtifactDirectory(root);
+        try
+        {
+            await using var input = OpenPublishedBundle(legacy);
+            return input is null ? new(legacy) : await MaterializeAsync(legacy, input, token);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            diagnostics.Add(new("evidence_invalid", "Saved evidence bundle could not be read: " + exception.Message));
+            return new(legacy, Directory.CreateTempSubdirectory("cqc-evidence-"));
+        }
+    }
+
+    private static FileStream? OpenPublishedBundle(DirectoryInfo directory)
+    {
+        try
+        {
+            // A reader keeps its original file handle if another process publishes a replacement.
+            return new(EvidencePath(directory, EvidenceBundle.FileName), FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        }
+        catch (FileNotFoundException) { return null; }
+        catch (DirectoryNotFoundException) { return null; }
+    }
+
+    private static async Task<EvidenceSnapshot> MaterializeAsync(DirectoryInfo legacy, Stream input, CancellationToken token)
+    {
+        var temporary = Directory.CreateTempSubdirectory("cqc-evidence-");
+        try
+        {
+            await EvidenceBundle.ReadAsync(input, temporary, token);
+            return new(legacy, temporary);
+        }
+        catch
+        {
+            temporary.Delete(recursive: true);
+            throw;
+        }
+    }
+
+    internal static bool IsEvidenceName(string name) => name is not ("" or "." or "..")
+        && name.IndexOfAny(InvalidNameCharacters) < 0;
+
+    internal static string EvidencePath(DirectoryInfo directory, string name)
+    {
+        if (!IsEvidenceName(name))
             throw new ArgumentException("Evidence name must be a simple filename.", nameof(name));
         return Path.Combine(directory.FullName, name);
     }
+
+    private static DirectoryInfo ArtifactDirectory(DirectoryInfo root) => new(Path.Combine(root.FullName, ".cqc"));
 
     public static CoverageEvidence Read(string json)
     {
@@ -64,18 +101,20 @@ public static class EvidenceStore
         return evidence;
     }
 
-    public static void EnsureArtifactDirectory(string root)
+    public static void EnsureArtifactDirectory(string root) => EnsureSafeArtifactDirectory(ArtifactDirectory(new(root)));
+
+    private static void EnsureSafeArtifactDirectory(DirectoryInfo directory)
     {
-        var directory = Path.Combine(root, ".cqc");
-        if (Directory.Exists(directory) && (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+        directory.Refresh();
+        if (directory.Exists && (directory.Attributes & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("The .cqc artifact directory must not be a symbolic link.");
-        Directory.CreateDirectory(directory);
+        directory.Create();
     }
 
     public static async Task EnsureWritableAsync(string root, CancellationToken token)
     {
-        var directory = Path.Combine(root, ".cqc");
-        if (!Directory.Exists(directory)) return;
+        var directory = ArtifactDirectory(new(root));
+        if (!directory.Exists) return;
         try
         {
             var tracked = await ProcessRunner.RunAsync("git", ["ls-files", "-z", "--", ".cqc"], root, token);
@@ -83,7 +122,7 @@ public static class EvidenceStore
                 throw new ArgumentException("The .cqc directory contains tracked files. Move tracked evidence before requesting execution.");
         }
         catch (System.ComponentModel.Win32Exception) { }
-        EnsureArtifactDirectory(root);
+        EnsureSafeArtifactDirectory(directory);
     }
 
     private static bool Valid(MethodCoverage method) => method is not null && !string.IsNullOrWhiteSpace(method.MethodId)

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cqc.Core;
 using ModelContextProtocol.Client;
 using Xunit;
 
@@ -118,7 +119,7 @@ public sealed class FixedScopeMcpTests
         Assert.Equal(new[] { "code", "dependencies", "duplication", "tests" }, Families(executed, "families"));
         Assert.Equal(3, executed.GetProperty("fileCount").GetInt32());
         Assert.False(executed.TryGetProperty("analysisNote", out var note) && note.ValueKind == JsonValueKind.String);
-        Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
         Assert.Contains(Family(executed, "families", "code").GetProperty("scores").EnumerateArray(),
             bucket => bucket.GetProperty("score").ValueKind == JsonValueKind.Number);
         var after = await McpTests.Read(client, ChangesTool, sourceRequest, timeout.Token);

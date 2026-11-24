@@ -26,25 +26,20 @@ internal static class ProductionRules
             context.CancellationToken.ThrowIfCancellationRequested();
             return Assess(m, config, coverage.GetValueOrDefault(m.Id));
         }).ToArray();
-        var ids = types.Select(t => t.Id).Distinct(StringComparer.Ordinal).ToArray();
-        var byType = assessments.ToLookup(a => a.Method.TypeId, StringComparer.Ordinal);
-        var blockers = ids.ToDictionary(id => id, id => byType[id].SelectMany(a => a.Blockers)
-            .Concat(context.Index.TypesById[id].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
-        var staticBlockers = ids.ToDictionary(id => id,
-            id => context.Index.TypesById[id].SelectMany(staticComplexity.Blockers).Distinct().ToArray(), StringComparer.Ordinal);
-        var metrics = assessments.GroupBy(a => a.Method.TypeId, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var executableFindings = staticComplexity.ExecutableFindings(config).ToArray();
         return context.Finish(new()
         {
             Family = "code", Types = types, Findings = assessments.SelectMany(a => a.Findings).Concat(executableFindings),
             StaticOnlyFindingIds = executableFindings.Select(finding => finding.Id).ToHashSet(StringComparer.Ordinal),
-            PrimaryScoreApplies = id => byType.Contains(id) || !staticComplexity.HasExecutables(id),
-            Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id],
-            Metrics = id => staticComplexity.Metrics(id, metrics.GetValueOrDefault(id)),
             Diagnostics = CoverageDiagnostics(assessments, context.ChangedCode),
             Contributions = assessments.Select(Contribution).Concat(staticComplexity.Contributions(sourceOnly: false)),
-            SharedBlockers = type => AssessmentEvidence.Syntax(type, []), SharedStaticBlockers = staticComplexity.SharedBlockers
+            IncludeTouchedDeclaration = (type, scope) => scope.Includes(type.Location) && staticComplexity.DeclarationBlockers(type).Length != 0,
+            Aggregate = selected => selected.Assess(
+                primary: selected.Contributions.Any(entry => entry.Primary)
+                    || (selected.Contributions.Length == 0 && !staticComplexity.HasExecutables(selected.TypeId)),
+                staticScore: true,
+                declarationBlockers: selected.Declarations.SelectMany(type => AssessmentEvidence.Syntax(type, [])),
+                staticDeclarationBlockers: selected.Declarations.SelectMany(staticComplexity.DeclarationBlockers))
         });
     }
 

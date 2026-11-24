@@ -1,5 +1,6 @@
 package cqc;
 
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
@@ -15,7 +16,7 @@ import static cqc.AstIdentity.*;
 final class DependencyAnalyzer {
     private final MavenClasspath.Reporter reporter;
     private final Worker.Source source;
-    private final Map<String, Worker.Location> edges = new TreeMap<>();
+    private final Map<String, Set<Worker.Location>> references = new TreeMap<>();
     private boolean complete = true;
 
     DependencyAnalyzer(MavenClasspath.Reporter reporter, Worker.Source source) { this.reporter = reporter; this.source = source; }
@@ -35,15 +36,16 @@ final class DependencyAnalyzer {
             .forEach(annotation -> annotation(annotation));
         type.findAll(MethodReferenceExpr.class).stream().filter(n -> owner(n).map(t -> t == type).orElse(false))
             .forEach(reference -> methodReference(reference));
-        var result = edges.entrySet().stream().filter(e -> !e.getKey().equals(typeId))
-            .map(e -> new Worker.DependencyFact(typeId, e.getKey(), e.getValue())).toList();
+        var result = references.entrySet().stream().filter(e -> !e.getKey().equals(typeId))
+            .flatMap(entry -> entry.getValue().stream()
+                .map(location -> new Worker.DependencyFact(typeId, entry.getKey(), location))).toList();
         return new Result(result, complete);
     }
 
     private void reference(ClassOrInterfaceType reference) {
         try {
             var resolved = reference.resolve();
-            if (resolved.isReferenceType()) edges.putIfAbsent(resolved.asReferenceType().getQualifiedName(), location(source.file(), reference));
+            if (resolved.isReferenceType()) add(resolved.asReferenceType().getQualifiedName(), reference);
         } catch (RuntimeException exception) {
             complete = false;
             reporter.report("java.unresolved_type", "Cannot resolve type " + reference.asString() + "; supply restored Maven classpath for complete dependency analysis.", source.file());
@@ -51,7 +53,7 @@ final class DependencyAnalyzer {
     }
 
     private void call(MethodCallExpr call) {
-        try { edges.putIfAbsent(call.resolve().declaringType().getQualifiedName(), location(source.file(), call)); }
+        try { add(call.resolve().declaringType().getQualifiedName(), call); }
         catch (RuntimeException exception) {
             complete = false;
             reporter.report("java.unresolved_call", "Cannot resolve call " + call.getNameAsString() + " at line " + line(call) + ".", source.file());
@@ -80,18 +82,22 @@ final class DependencyAnalyzer {
     }
 
     private void annotation(AnnotationExpr annotation) {
-        try { edges.putIfAbsent(annotation.resolve().getQualifiedName(), location(source.file(), annotation)); }
+        try { add(annotation.resolve().getQualifiedName(), annotation); }
         catch (RuntimeException exception) { unresolvedField(annotation.toString()); }
     }
 
     private void methodReference(MethodReferenceExpr reference) {
-        try { edges.putIfAbsent(reference.resolve().declaringType().getQualifiedName(), location(source.file(), reference)); }
+        try { add(reference.resolve().declaringType().getQualifiedName(), reference); }
         catch (RuntimeException exception) { unresolvedField(reference.toString()); }
     }
 
     private void value(Expression expression, ResolvedValueDeclaration value) {
-        if (value.isField()) edges.putIfAbsent(value.asField().declaringType().getQualifiedName(), location(source.file(), expression));
-        if (value.isEnumConstant()) edges.putIfAbsent(value.getType().asReferenceType().getQualifiedName(), location(source.file(), expression));
+        if (value.isField()) add(value.asField().declaringType().getQualifiedName(), expression);
+        if (value.isEnumConstant()) add(value.getType().asReferenceType().getQualifiedName(), expression);
+    }
+
+    private void add(String target, Node reference) {
+        references.computeIfAbsent(target, ignored -> new LinkedHashSet<>()).add(location(source.file(), reference));
     }
 
     private void unresolvedField(String name) {

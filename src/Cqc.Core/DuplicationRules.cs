@@ -11,8 +11,6 @@ internal static class DuplicationRules
         var groups = Findings(eligible, matches).ToArray();
         var findings = groups.Select(group => group.Finding).ToArray();
         var origins = groups.ToDictionary(group => group.Finding.Id, group => group.Origins, StringComparer.Ordinal);
-        var executablesByType = eligible.ToLookup(executable => executable.TypeId, StringComparer.Ordinal);
-        var groupCounts = findings.SelectMany(finding => finding.EntityIds).ToLookup(id => id, StringComparer.Ordinal);
         var incompleteTypes = context.Facts.Types.Where(type => context.Structure.IncompleteLanguages.Contains(type.Language))
             .Select(type => type.Id).ToHashSet(StringComparer.Ordinal);
         return context.Finish(new()
@@ -21,10 +19,11 @@ internal static class DuplicationRules
             Types = context.Facts.Types,
             Findings = findings,
             Incomplete = context.Structure.HasIncompleteSelectedLanguage,
-            Blockers = id => incompleteTypes.Contains(id) ? ["structure.incomplete"] : [],
-            Metrics = id => Metrics(executablesByType[id], groupCounts[id].Count()),
-            Contributions = context.ChangedCode is null ? [] : Contributions(context.Index.Executables, eligible),
-            SharedBlockers = type => incompleteTypes.Contains(type.Id) ? ["structure.incomplete"] : [],
+            Contributions = Contributions(context.Index.Executables, eligible),
+            IncludeTouchedDeclaration = (type, scope) => scope.IsWholeFile(type.Location.File),
+            Aggregate = evidence => evidence.Assess(
+                declarationBlockers: incompleteTypes.Contains(evidence.TypeId) ? ["structure.incomplete"] : [])
+                with { Metrics = Metrics(evidence.Contributions, evidence.Findings.Count()) },
             FindingOrigins = id => origins[id]
         });
     }
@@ -32,18 +31,19 @@ internal static class DuplicationRules
     private static IEnumerable<ScoringContribution> Contributions(StructuralExecutable[] executables, StructuralExecutable[] eligible)
     {
         var candidates = eligible.ToHashSet();
-        return executables.Select(executable => new ScoringContribution(executable.TypeId, executable.Location)
-        {
-            DuplicateCandidate = candidates.Contains(executable)
-                ? executable.IsMethod ? DuplicateCandidateKind.Method : DuplicateCandidateKind.Executable : null
-        });
+        foreach (var executable in executables)
+            yield return new(executable.TypeId, executable.Location)
+            {
+                DuplicateCandidate = candidates.Remove(executable)
+                    ? executable.IsMethod ? DuplicateCandidateKind.Method : DuplicateCandidateKind.Executable : null
+            };
     }
 
-    private static SortedDictionary<string, double?> Metrics(IEnumerable<StructuralExecutable> executables, int groups) =>
+    private static SortedDictionary<string, double?> Metrics(ScoringContribution[] entries, int groups) =>
         new(StringComparer.Ordinal)
         {
-            ["eligibleMethods"] = executables.Count(executable => executable.IsMethod),
-            ["eligibleExecutables"] = executables.Count(),
+            ["eligibleMethods"] = entries.Count(entry => entry.DuplicateCandidate == DuplicateCandidateKind.Method),
+            ["eligibleExecutables"] = entries.Count(entry => entry.DuplicateCandidate is not null),
             ["duplicateGroups"] = groups
         };
 

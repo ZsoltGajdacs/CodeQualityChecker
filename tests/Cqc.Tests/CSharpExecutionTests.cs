@@ -66,7 +66,8 @@ public sealed class CSharpExecutionTests
         var service = new AnalysisService([new CSharpAnalyzer()]);
         var first = await service.AnalyzeAsync(request, ["code"], CancellationToken.None);
         Assert.DoesNotContain(first.Diagnostics, item => item.Code is "execution_failed" or "metadata-invalid");
-        var snapshot = await workspace.Discover();
+        using var savedEvidence = await EvidenceStore.OpenAsync(new(workspace.Root), [], CancellationToken.None);
+        var snapshot = (await workspace.Discover()) with { ReferenceEvidenceDirectory = savedEvidence.ReferenceDirectory };
         var manifest = CSharpReferenceMetadata.Read(snapshot, []);
         Assert.NotNull(manifest);
         Assert.Equal("2", manifest.SchemaVersion);

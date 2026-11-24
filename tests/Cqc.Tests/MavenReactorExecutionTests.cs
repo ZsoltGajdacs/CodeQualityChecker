@@ -20,8 +20,7 @@ public sealed class MavenReactorExecutionTests
         var service = new AnalysisService([new JavaAnalyzer()]);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.AnalyzeAsync(
             new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 }, ["code"], cancellation.Token));
-        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
-        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
         Assert.Equal(before, workspace.SourceContents());
     }
 
@@ -38,8 +37,7 @@ public sealed class MavenReactorExecutionTests
             ["code"], CancellationToken.None);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
         Assert.All(Assert.Single(result.Results).Entities, entity => Assert.Null(entity.Score));
-        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
-        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
         Assert.True(Directory.Exists(Path.Combine(workspace.Root, "independent", "target", "classes")));
         Assert.Equal(before, workspace.SourceContents());
     }
@@ -73,7 +71,7 @@ public sealed class MavenReactorExecutionTests
             Assert.Equal(1, entity.Metrics["method:" + entity.EntityId + ".number():coverage"]);
         }
         Assert.Equal(before, workspace.SourceContents());
-        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        using var manifest = JsonDocument.Parse(await workspace.ReadBundleEntryAsync("java-contexts.json"));
         var classpath = manifest.RootElement.GetProperty("contexts").EnumerateArray()
             .SelectMany(context => context.GetProperty("classpath").EnumerateArray()).Select(entry => entry.GetProperty("path").GetString()!).ToArray();
         Assert.NotEmpty(classpath);
@@ -81,7 +79,7 @@ public sealed class MavenReactorExecutionTests
         var classes = Path.Combine(workspace.Root, "group", "api", "target", "classes");
         Assert.Contains(classpath, path => MavenPaths.Relative(classes, path) == ".");
         Assert.False(Directory.Exists(Path.Combine(workspace.Root, ".cqc", "references")));
-        var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        var evidence = EvidenceStore.Read(await workspace.ReadBundleEntryAsync("coverage.json"));
         Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/api/pom.xml"]);
         Assert.Equal("0.8.15", evidence.ToolVersions["java:jacoco:group/service/pom.xml"]);
         Assert.Equal(JavaExecution.JacocoVersion, evidence.ToolVersions["java:jacoco:independent/pom.xml"]);

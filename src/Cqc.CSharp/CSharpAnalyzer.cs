@@ -52,7 +52,7 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
     {
         var known = collector.Types.Select(type => type.Id).ToHashSet(StringComparer.Ordinal);
         return collector.Dependencies.Where(edge => known.Contains(edge.To))
-            .DistinctBy(edge => (edge.From, edge.To, edge.Location.File, edge.Location.StartLine))
+            .Distinct()
             .OrderBy(edge => edge.From, StringComparer.Ordinal).ThenBy(edge => edge.To, StringComparer.Ordinal)
             .ThenBy(edge => edge.Location.File, StringComparer.Ordinal).ThenBy(edge => edge.Location.StartLine).ToArray();
     }

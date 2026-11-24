@@ -18,12 +18,19 @@ public sealed class ChangedScoringTests
         var coverage = new CoverageEvidence("2", request.Snapshot.SourceFingerprint, "config", true, new(), [new("edited", 2, 2, 3, 3)]);
         request = request with { Families = ["code"], Evidence = coverage };
 
-        Assert.All(Assert.Single(QualityEngine.Evaluate(request)).Entities, entity =>
+        var touched = Assert.Single(QualityEngine.Evaluate(request));
+        AssertEntities(touched);
+        Assert.All(touched.Entities, entity =>
         {
             Assert.Equal(10, entity.Score);
+            Assert.Empty(entity.Blockers);
+            var prefix = entity.Kind == "file" ? "class:A:" : "";
+            Assert.Equal(1, entity.Metrics[$"{prefix}method:edited:coverage"]);
             Assert.DoesNotContain(entity.Metrics.Keys, key => key.Contains("untouched", StringComparison.Ordinal));
         });
-        Assert.All(Assert.Single(QualityEngine.Evaluate(request with { ChangedCode = null })).Entities, entity =>
+        var whole = Assert.Single(QualityEngine.Evaluate(request with { ChangedCode = null }));
+        AssertEntities(whole);
+        Assert.All(whole.Entities, entity =>
         {
             Assert.Null(entity.Score);
             Assert.Contains("coverage.missing", entity.Blockers);
@@ -45,8 +52,13 @@ public sealed class ChangedScoringTests
         var finding = Assert.Single(scoped.Findings);
         Assert.Equal("dependencies.cycle", finding.Rule);
         Assert.Equal(Edited, Assert.Single(finding.Locations));
+        AssertEntities(scoped);
         Assert.All(scoped.Entities, entity => Assert.Empty(entity.Metrics));
     }
+
+    private static void AssertEntities(FamilyResult family) =>
+        Assert.Equal(new[] { ("class", "A"), ("file", $"file:{File}") },
+            family.Entities.Select(entity => (entity.Kind, entity.EntityId)));
 
     private static async Task<EvaluationRequest> Evaluate(FixtureWorkspace workspace)
     {

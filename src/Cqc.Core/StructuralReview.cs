@@ -11,16 +11,18 @@ internal static class StructuralReview
         var complexity = new StaticComplexity(context);
         var types = context.Facts.Types.Where(type => !type.IsTest).ToArray();
         var blockers = types.GroupBy(type => type.Id, StringComparer.Ordinal).ToDictionary(group => group.Key,
-            group => group.SelectMany(complexity.Blockers).Distinct(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
-        var assessed = types.Where(type => complexity.HasExecutables(type.Id) || blockers[type.Id].Length != 0).ToArray();
+            group => group.Any(type => complexity.DeclarationBlockers(type).Length != 0), StringComparer.Ordinal);
+        var assessed = types.Where(type => complexity.HasExecutables(type.Id) || blockers[type.Id]).ToArray();
         var findings = assessed.Select(type => type.Id).Distinct(StringComparer.Ordinal).SelectMany(id => complexity.Findings(id, config));
         var unavailable = context.Structure.UnavailableSelectedFiles;
         var report = context.Finish(new()
         {
             Family = "code", Types = assessed, Findings = findings, Incomplete = unavailable.Count != 0,
-            Blockers = id => blockers[id], StaticBlockers = id => blockers[id],
-            Metrics = id => complexity.Metrics(id), Contributions = complexity.Contributions(sourceOnly: true),
-            SharedBlockers = complexity.SharedBlockers, SharedStaticBlockers = complexity.SharedBlockers
+            Contributions = complexity.Contributions(sourceOnly: true),
+            IncludeTouchedDeclaration = (type, scope) => scope.Includes(type.Location) && complexity.DeclarationBlockers(type).Length != 0,
+            Aggregate = selected => selected.Assess(staticScore: true,
+                declarationBlockers: selected.Declarations.SelectMany(complexity.DeclarationBlockers),
+                staticDeclarationBlockers: selected.Declarations.SelectMany(complexity.DeclarationBlockers))
         });
         return WithFileCounts(report, unavailable);
     }

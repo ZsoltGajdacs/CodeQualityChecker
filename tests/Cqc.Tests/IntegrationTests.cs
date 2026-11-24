@@ -129,7 +129,7 @@ public sealed class IntegrationTests
         var result = await Service().AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 120 }, ["code"], CancellationToken.None);
         Assert.Contains(result.Diagnostics, x => x.Code == "execution_failed");
         Assert.All(Assert.Single(result.Results).Entities, x => Assert.Null(x.Score));
-        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
         Assert.Equal(before, workspace.SourceContents());
     }
 
@@ -152,7 +152,7 @@ public sealed class IntegrationTests
         Assert.Equal(10, typeScript.StaticComplexity?.Score);
         Assert.All(result.Results, family => Assert.Equal(family.Family is "tests" or "duplication" or "dependencies" ? "incomplete" : "complete", family.Status));
         Assert.Equal(before, workspace.SourceContents());
-        Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
+        Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
         var readOnly = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(code, Wire.Json),
             System.Text.Json.JsonSerializer.Serialize(Assert.Single(readOnly.Results), Wire.Json));
@@ -161,11 +161,11 @@ public sealed class IntegrationTests
 
     private static async Task LegacyCSharpCoverageRequiresRefresh(FixtureWorkspace workspace, AnalysisService service)
     {
-        var path = Path.Combine(workspace.Root, ".cqc", "coverage.json");
-        var evidence = EvidenceStore.Read(await File.ReadAllTextAsync(path));
+        const string reportPath = ".cqc/older-coverage.json";
+        var evidence = EvidenceStore.Read(await workspace.ReadBundleEntryAsync("coverage.json"));
         Assert.True(evidence.ToolVersions.Remove("csharp:methodIdentity"));
-        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json));
-        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root }, ["code"], CancellationToken.None);
+        await File.WriteAllTextAsync(Path.Combine(workspace.Root, reportPath), System.Text.Json.JsonSerializer.Serialize(evidence, Wire.Json));
+        var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, ReportPath = reportPath }, ["code"], CancellationToken.None);
         Assert.Contains(result.Diagnostics, item => item.Code == "coverage.identity_stale" && item.Language == "csharp");
         var entities = Assert.Single(result.Results).Entities;
         Assert.NotNull(Assert.Single(entities, item => item.EntityId == "java:java/pom.xml#main::demo.Calculator").Score);

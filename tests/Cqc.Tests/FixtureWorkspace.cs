@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using Cqc.Core;
 using Cqc.CSharp;
 using Cqc.Java;
@@ -34,6 +35,13 @@ internal sealed class FixtureWorkspace : IDisposable
 
     public Task<ProjectSnapshot> Discover(string scope = "repository") => ProjectDiscovery.DiscoverAsync(new()
         { ProjectRoot = Root, Scope = scope }, new(), CancellationToken.None, Definitions);
+
+    public async Task<string> ReadBundleEntryAsync(string name)
+    {
+        using var archive = ZipFile.OpenRead(Path.Combine(Root, ".cqc", EvidenceBundle.FileName));
+        using var entry = new StreamReader(Assert.Single(archive.Entries, item => item.FullName == name).Open());
+        return await entry.ReadToEndAsync();
+    }
 
     public Task XunitReferences(ProjectSnapshot snapshot)
     {

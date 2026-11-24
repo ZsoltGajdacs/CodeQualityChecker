@@ -49,6 +49,22 @@ public sealed class IndexedScoringTests
         Assert.All(result.Entities.Where(e => e.Kind == "file"), e => Assert.Equal(10, e.Score));
     }
 
+    [Fact]
+    public void FixtureOnlyAssertionsDoNotGiveTheTestAssertionCredit()
+    {
+        var type = Type("Tests", null) with { IsTest = true };
+        var fixture = Method("Tests.setup", type.Id) with { IsFixture = true, Calls = ["Tests.assert"] };
+        var helper = Method("Tests.assert", type.Id) with { Assertions = 1, Complexity = 2 };
+        var test = Method("Tests.check", type.Id) with { IsTest = true };
+        var family = Evaluate(new([type], [fixture, helper, test], [], [], true), "tests");
+        var entity = Assert.Single(family.Entities, row => row.EntityId == type.Id);
+        Assert.Equal(8, entity.Score);
+        Assert.Equal(0, entity.Metrics["method:Tests.check:assertionsWithHelpers"]);
+        Assert.Equal(12, entity.Metrics["method:Tests.check:executableLinesWithHelpers"]);
+        Assert.Equal(1, entity.Metrics["method:Tests.check:branchCountWithHelpers"]);
+        Assert.Contains(family.Findings, finding => finding.Rule == "tests.noAssertion");
+    }
+
     private static TypeFact Type(string id, string? context) => new(id, "java", new(id + ".java", 1, 20), false)
         { ContextId = context, Evidence = Verified };
     private static MethodFact Method(string id, string type) => new(id, type, "java", new(type + ".java", 2, 5),

@@ -205,7 +205,7 @@ public sealed class BuildMetadataTests
     }
 
     [Fact]
-    public async Task ManifestPublicationReplacesASymlinkWithoutChangingItsTarget()
+    public async Task BundlePublicationReplacesASymlinkWithoutChangingItsTarget()
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
@@ -213,30 +213,31 @@ public sealed class BuildMetadataTests
         fixture.Write(".cqc/placeholder", "");
         fixture.Write("Tracked.java", "class Tracked {}");
         var source = Path.Combine(fixture.Root, "Tracked.java");
-        var manifest = Path.Combine(fixture.Root, ".cqc/java-contexts.json");
-        File.CreateSymbolicLink(manifest, source);
+        var bundle = Path.Combine(fixture.Root, ".cqc", EvidenceBundle.FileName);
+        File.CreateSymbolicLink(bundle, source);
 
         var service = new AnalysisService([new JavaAnalyzer()]);
         var result = await service.AnalyzeAsync(new() { ProjectRoot = fixture.Root, Execute = true }, ["code"], CancellationToken.None);
         Assert.DoesNotContain(result.Diagnostics, item => item.Code == "execution_failed");
-        Assert.Null(new FileInfo(manifest).LinkTarget);
+        Assert.Null(new FileInfo(bundle).LinkTarget);
         Assert.Equal("class Tracked {}", File.ReadAllText(source));
     }
 
     [Fact]
-    public async Task PublicationWithAnOccupiedCoveragePathLeavesPreviousManifestInPlace()
+    public async Task PublicationWithAnOccupiedBundlePathLeavesLegacyEvidenceInPlace()
     {
         if (OperatingSystem.IsWindows()) return;
         using var fixture = new ScratchProject();
         WrapperProject(fixture, "#!/bin/sh\n" + MetadataScript());
         fixture.Write(".cqc/java-contexts.json", "previous contexts");
-        var coverage = Directory.CreateDirectory(Path.Combine(fixture.Root, ".cqc/coverage.json")).FullName;
+        fixture.Write(".cqc/coverage.json", "previous coverage");
+        Directory.CreateDirectory(Path.Combine(fixture.Root, ".cqc", EvidenceBundle.FileName));
         var service = new AnalysisService([new JavaAnalyzer()]);
 
         await Assert.ThrowsAnyAsync<IOException>(() => service.AnalyzeAsync(
             new() { ProjectRoot = fixture.Root, Execute = true }, ["code"], CancellationToken.None));
         Assert.Equal("previous contexts", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/java-contexts.json")));
-        Assert.True(Directory.Exists(coverage));
+        Assert.Equal("previous coverage", File.ReadAllText(Path.Combine(fixture.Root, ".cqc/coverage.json")));
     }
 
     [Fact]

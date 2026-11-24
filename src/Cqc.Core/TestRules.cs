@@ -21,17 +21,13 @@ internal static class TestRules
             context.CancellationToken.ThrowIfCancellationRequested();
             return Assess(test, context, lookup);
         }).ToArray();
-        var byType = assessments.ToLookup(a => a.Test.TypeId, StringComparer.Ordinal);
-        var blockers = byType.ToDictionary(g => g.Key, g => g.SelectMany(a => a.Blockers)
-            .Concat(context.Index.TypesById[g.Key].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
-        var metrics = assessments.GroupBy(a => a.Test.TypeId, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
         var incomplete = assessments.Any(a => !a.Complete && (context.ChangedCode?.Includes(a.Test.Location) ?? true));
         var diagnostics = !incomplete ? Array.Empty<Diagnostic>() :
             [new Diagnostic("tests.incomplete", "Some test/fixture/helper facts are unresolved. Resolve diagnostics before scoring affected test classes.")];
         return context.Finish(new() { Family = "tests", Types = context.TypesFor(tests), Findings = assessments.SelectMany(a => Findings(a, config)),
-            Blockers = id => blockers[id], Metrics = id => metrics[id], Diagnostics = diagnostics,
-            SharedBlockers = type => AssessmentEvidence.Syntax(type, []),
+            Diagnostics = diagnostics,
+            Aggregate = selected => selected.Assess(
+                declarationBlockers: selected.Declarations.SelectMany(type => AssessmentEvidence.Syntax(type, []))),
             Contributions = assessments.Select(a => new ScoringContribution(a.Test.TypeId, a.Test.Location)
             { Blockers = a.Blockers, Metrics = Metrics([a]) }) });
     }
@@ -42,9 +38,11 @@ internal static class TestRules
     private static Assessment Assess(MethodFact test, RuleContext context, Dictionary<string, MethodFact> lookup)
     {
         var fixtures = context.Index.FixturesByType[test.TypeId];
-        var closure = Helpers(test, fixtures, lookup);
+        var testCalls = Reachable([test], lookup);
+        var closure = testCalls.Concat(Reachable(fixtures, lookup))
+            .DistinctBy(method => method.Id, StringComparer.Ordinal).ToArray();
         var types = closure.Select(m => m.TypeId).ToHashSet(StringComparer.Ordinal);
-        return new(test, closure.Sum(m => m.ExecutableLines), closure.Sum(m => m.Assertions),
+        return new(test, closure.Sum(m => m.ExecutableLines), testCalls.Sum(m => m.Assertions),
             closure.Sum(m => Math.Max(0, m.Complexity - 1))) { Blockers = closure.SelectMany(AssessmentEvidence.Test)
                 .Concat(types.SelectMany(id => context.Index.TypesById[id])
                     .SelectMany(type => AssessmentEvidence.Syntax(type, []))).Distinct().Order(StringComparer.Ordinal).ToArray() };
@@ -78,10 +76,10 @@ internal static class TestRules
         return result;
     }
 
-    private static MethodFact[] Helpers(MethodFact test, IEnumerable<MethodFact> fixtures, Dictionary<string, MethodFact> lookup)
+    private static MethodFact[] Reachable(IEnumerable<MethodFact> roots, Dictionary<string, MethodFact> lookup)
     {
         var visited = new Dictionary<string, MethodFact>(StringComparer.Ordinal);
-        var pending = new Stack<MethodFact>(fixtures.Append(test));
+        var pending = new Stack<MethodFact>(roots);
         while (pending.TryPop(out var method))
         {
             if (!visited.TryAdd(method.Id, method)) continue;

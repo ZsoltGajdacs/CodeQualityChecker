@@ -3,7 +3,7 @@ namespace Cqc.Core;
 internal static class DependencyMetrics
 {
     internal static Dictionary<string, SortedDictionary<string, double?>> Evaluate(
-        Dictionary<string, TypeFact> types, DependencyFact[] edges, Dictionary<string, string> components)
+        Dictionary<string, TypeFact> types, DependencyEdge[] edges, Dictionary<string, string> components)
     {
         var links = edges.Select(e => (From: components[e.From], To: components[e.To]))
             .Where(e => e.From != e.To).Distinct().ToArray();

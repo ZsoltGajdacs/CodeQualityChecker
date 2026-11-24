@@ -32,10 +32,15 @@ public sealed class TouchedCodeMcpTests
         var changed = await ReadCode(ChangesTool);
         var finding = Assert.Single(changed.GetProperty("findings").EnumerateArray());
         Assert.Contains("Edited", finding.GetProperty("message").GetString());
-        Assert.All(changed.GetProperty("entities").EnumerateArray(), entity =>
+        Assert.All(ExampleEntities(changed), entity =>
         {
-            Assert.Equal(9, entity.GetProperty("staticComplexity").GetProperty("score").GetInt32());
-            Assert.DoesNotContain("Untouched", entity.GetProperty("metrics").GetRawText());
+            var assessment = entity.GetProperty("staticComplexity");
+            Assert.Equal(9, assessment.GetProperty("score").GetInt32());
+            Assert.False(assessment.TryGetProperty("blockers", out _));
+            var prefix = entity.GetProperty("kind").GetString() == "file" ? "class:csharp:Example:" : "";
+            var metric = Assert.Single(entity.GetProperty("metrics").EnumerateObject());
+            Assert.Equal($"{prefix}method:csharp:Example.Edited(System.Int32)@Example.cs:20:complexity", metric.Name);
+            Assert.Equal(2, metric.Value.GetInt32());
         });
         var summary = await McpTests.Read(client, ChangesTool, request, timeout.Token);
         var page = await McpTests.Read(client, "get_report_page", new { reportId = McpTests.ReportId(summary), section = "findings", family = "code" }, timeout.Token);
@@ -66,7 +71,7 @@ public sealed class TouchedCodeMcpTests
         var summary = await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root }, timeout.Token);
         var code = Code(await McpTests.Raw(client, McpTests.ReportId(summary), timeout.Token));
         Assert.Equal(2, code.GetProperty("findings").GetArrayLength());
-        Assert.All(code.GetProperty("entities").EnumerateArray(), entity =>
+        Assert.All(ExampleEntities(code), entity =>
             Assert.Equal(8, entity.GetProperty("staticComplexity").GetProperty("score").GetInt32()));
     }
 
@@ -148,4 +153,12 @@ public sealed class TouchedCodeMcpTests
 
     private static JsonElement Code(JsonElement report) =>
         Assert.Single(report.GetProperty("results").EnumerateArray(), family => family.GetProperty("family").GetString() == "code");
+
+    private static JsonElement[] ExampleEntities(JsonElement family)
+    {
+        var entities = family.GetProperty("entities").EnumerateArray().ToArray();
+        Assert.Equal(new (string?, string?)[] { ("class", "csharp:Example"), ("file", $"file:{Example}") },
+            entities.Select(entity => (entity.GetProperty("kind").GetString(), entity.GetProperty("entityId").GetString())));
+        return entities;
+    }
 }

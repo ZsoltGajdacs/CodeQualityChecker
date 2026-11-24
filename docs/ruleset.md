@@ -8,14 +8,14 @@
 | `code.crap` | Method CRAP > 30 |
 | `tests.branching` | Test or resolved fixture/helper has branching |
 | `tests.size` | Test plus resolved fixture/helper contribution > 50 executable lines |
-| `tests.noAssertion` | No recognized observable assertion, including resolved helpers |
+| `tests.noAssertion` | No recognized observable assertion in the test or its resolved helpers |
 | `duplication.group` | Class participates in a qualifying duplicate group |
 | `dependencies.cycle` | Class participates in a type or architectural component cycle |
 | `dependencies.boundary` | Distinct source type dependency violates configured boundaries |
 
 CRAP = `CC² × (1 − coverage)³ + CC`. Coverage is a fraction, based on branches when a method has branches, otherwise executable lines. Raw metrics accompany the score. For example a method with CC=12 and no covered branches has CRAP=156: it contributes two findings and lowers the class's production score from 10 to 8. Every production method in the scored class must have valid matching coverage evidence; missing reports do not mean 0% coverage.
 
-Test-helper traversal is cycle-safe and charges each reachable test-support method once per test. Production methods called as the system under test are not charged as test scaffolding. Java `src/test` types and C# test-project types are recognized as test support even when a sibling helper class has no test annotation. Parameterized cases are recognized. Known assertion, exception-assertion, and verification APIs count as observable assertions; arbitrary custom assertion abstractions can require additional recognition. Unresolved test/fixture/helper facts block affected test scores. Assertion count alone does not establish test effectiveness.
+Test-helper traversal is cycle-safe and charges each reachable test-support method once per test. Production methods called as the system under test are not charged as test scaffolding. Java `src/test` types and C# test-project types are recognized as test support even when a sibling helper class has no test annotation. Assertions reached only through fixtures do not give the test assertion credit. Fixture methods still contribute size, branching, and evidence completeness. Parameterized cases are recognized. Known assertion, exception-assertion, and verification APIs count as observable assertions; arbitrary custom assertion abstractions can require additional recognition. Unresolved test/fixture/helper facts block affected test scores. Assertion count alone does not establish test effectiveness.
 
 Duplicate candidates must contain at least four lines of body code and default to at least 20 normalized syntax nodes. The line count includes lines with code tokens, including continuations, and excludes declaration signatures, blank lines, comments, brace-only lines, and separately analyzed nested bodies. Set `duplicateMinLines` above four to raise the minimum. Positive values below four use the four-line minimum.
 

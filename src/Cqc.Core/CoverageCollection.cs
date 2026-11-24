@@ -4,9 +4,10 @@ internal sealed record CoverageInput
 {
     public required ProjectSnapshot Snapshot { get; init; }
     public required string ConfigurationFingerprint { get; init; }
-    public required AnalysisRequest Request { get; init; }
+    public string? ReportPath { get; init; }
     public required AnalysisFacts Facts { get; init; }
     public BuildArtifacts? Artifacts { get; init; }
+    public EvidenceSnapshot? SavedEvidence { get; init; }
 }
 
 /// <summary>Validates saved coverage and normalizes native reports from the current build.</summary>
@@ -22,7 +23,8 @@ internal sealed class CoverageCollection(IEnumerable<ILanguageAnalyzer> adapters
     private static async Task<CoverageEvidence?> ReadCachedAsync(CoverageInput input, IEnumerable<ILanguageExecution> drivers,
         List<Diagnostic> diagnostics, CancellationToken token)
     {
-        var path = Path.GetFullPath(input.Request.ReportPath ?? Path.Combine(".cqc", EvidenceStore.CoverageFileName), input.Snapshot.Root);
+        var path = input.ReportPath is { } explicitPath ? Path.GetFullPath(explicitPath, input.Snapshot.Root)
+            : input.SavedEvidence?.CoveragePath;
         if (!File.Exists(path)) return null;
         var cached = EvidenceStore.Read(await File.ReadAllTextAsync(path, token));
         return MatchIdentities(cached, drivers, diagnostics);

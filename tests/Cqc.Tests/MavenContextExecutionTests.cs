@@ -16,7 +16,7 @@ public sealed class MavenContextExecutionTests
         var result = await new AnalysisService([new JavaAnalyzer()]).AnalyzeAsync(
             new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 }, ["dependencies"], CancellationToken.None);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
-        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace.Root, ".cqc", "java-contexts.json")));
+        using var document = JsonDocument.Parse(await workspace.ReadBundleEntryAsync("java-contexts.json"));
         var manifest = document.RootElement;
         Assert.Equal("3", manifest.GetProperty("schemaVersion").GetString());
         var contexts = manifest.GetProperty("contexts").EnumerateArray().ToArray();

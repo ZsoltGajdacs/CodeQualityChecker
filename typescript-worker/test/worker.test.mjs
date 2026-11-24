@@ -112,14 +112,20 @@ test('clone measurements normalize renamed values and exclude declaration lines 
             '}'
         ].join('\n');
     }
-    const input = fixture(t, { 'first.ts': body('a', 'x', 1), 'second.ts': body('b', 'y', 10) });
+    const input = fixture(t, {
+        'first.ts': body('a', 'x', 1),
+        'second.ts': body('b', 'y', 10),
+        'third.ts': body('c', 'z', 100).replace('return changed * 2;', 'throw new Error("unexpected");')
+    });
     const facts = analyze({ ...input, sourceOnly: true });
-    const [first, second] = facts.executables;
+    const [first, second, third] = facts.executables;
     assert.equal(first.duplicationLines, 4);
     assert.equal(second.duplicationLines, 4);
     assert.equal(first.complexity, 2);
     assert.ok(first.nodeCount >= 20);
+    assert.ok(first.fingerprints.length > 0);
     assert.deepEqual(first.fingerprints, second.fingerprints);
+    assert.notDeepEqual(first.fingerprints, third.fingerprints);
 });
 
 test('project reference output paths resolve before any declarations have been built', t => {
