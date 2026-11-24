@@ -8,7 +8,7 @@ internal sealed class AssessmentSelection
     private readonly ILookup<string, AssessmentPart> partsByType;
     private readonly ILookup<string, AssessmentPart> partsByFile;
     private readonly ILookup<string, Finding> findingsByType;
-    private readonly Dictionary<string, FindingOrigin[]> origins;
+    private readonly ILookup<(string TypeId, string File), Finding> findingsByTypeAndFile;
 
     private sealed record AssessmentPart(TypeFact[] Declarations, ScoringContribution[] Contributions)
     {
@@ -24,29 +24,34 @@ internal sealed class AssessmentSelection
         partsByFile = parts.ToLookup(part => part.Type.Location.File, StringComparer.Ordinal);
         Types = parts.SelectMany(part => part.Declarations).ToArray();
 
-        var located = scope is null ? [] : new ChangedFindings(scope).Select(assessment).DistinctBy(entry => entry.Finding.Id).ToArray();
-        origins = located.ToDictionary(entry => entry.Finding.Id, entry => entry.Origins, StringComparer.Ordinal);
-        Findings = (touched ? located.Select(entry => entry.Finding) : assessment.Findings)
-            .DistinctBy(finding => finding.Id).OrderBy(finding => finding.Id, StringComparer.Ordinal).ToArray();
+        var located = (scope is null
+            ? assessment.Findings.Select(finding => ReportedFinding(assessment, finding))
+            : new ChangedFindings(scope).Select(assessment))
+            .DistinctBy(entry => entry.Finding.Id).OrderBy(entry => entry.Finding.Id, StringComparer.Ordinal).ToArray();
+        Findings = located.Select(entry => entry.Finding).ToArray();
         findingsByType = Findings.SelectMany(finding => finding.EntityIds.Select(id => (Id: id, Finding: finding)))
             .ToLookup(entry => entry.Id, entry => entry.Finding, StringComparer.Ordinal);
+        findingsByTypeAndFile = located.SelectMany(entry => entry.Origins
+            .Select(origin => (origin.TypeId, origin.Location.File)).Distinct().Select(key => (Key: key, entry.Finding)))
+            .ToLookup(entry => entry.Key, entry => entry.Finding);
     }
 
     internal TypeFact[] Types { get; }
     internal Finding[] Findings { get; }
 
-    internal IEnumerable<string> ScoringFiles(Finding finding) => touched
-        ? origins[finding.Id].Select(origin => origin.Location.File)
-        : finding.Locations.Select(location => location.File);
+    private static LocatedFinding ReportedFinding(FamilyAssessment assessment, Finding finding)
+    {
+        var locations = finding.Locations.ToHashSet();
+        return new(finding, assessment.OriginsFor(finding).Where(origin => locations.Contains(origin.Location)).ToArray());
+    }
 
-    internal bool ScoresFile(Finding finding, string file, HashSet<string> typeIds) => touched
-        ? origins[finding.Id].Any(origin => origin.Location.File == file && typeIds.Contains(origin.TypeId))
-        : finding.EntityIds.Any(typeIds.Contains);
+    internal Finding[] FindingsForFile(string file, IEnumerable<string> typeIds) => typeIds
+        .SelectMany(typeId => findingsByTypeAndFile[(typeId, file)]).DistinctBy(finding => finding.Id).ToArray();
 
     internal EntityScoringEvidence For(EntityAssessment entity)
     {
         var byFile = entity.Kind == "file";
-        var parts = byFile && touched ? partsByFile[entity.File] : entity.TypeIds.SelectMany(id => partsByType[id]);
+        var parts = byFile ? partsByFile[entity.File] : entity.TypeIds.SelectMany(id => partsByType[id]);
         var assessments = parts.GroupBy(part => part.Type.Id, StringComparer.Ordinal)
             .Select(group => (Id: group.Key, Evidence: AssessType(group.Key, group, entity))).ToArray();
         var metrics = RuleContext.Metrics();
@@ -63,10 +68,7 @@ internal sealed class AssessmentSelection
 
     private EntityScoringEvidence AssessType(string typeId, IEnumerable<AssessmentPart> parts, EntityAssessment entity)
     {
-        var findings = findingsByType[typeId];
-        if (touched && entity.Kind == "file")
-            findings = findings.Where(finding => origins[finding.Id].Any(origin =>
-                origin.TypeId == typeId && origin.Location.File == entity.File));
+        var findings = entity.Kind == "file" ? findingsByTypeAndFile[(typeId, entity.File)] : findingsByType[typeId];
         return assessment.Aggregate(new(typeId, parts.SelectMany(part => part.Declarations).ToArray(),
             parts.SelectMany(part => part.Contributions).ToArray(), findings, touched));
     }

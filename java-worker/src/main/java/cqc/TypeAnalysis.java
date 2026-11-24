@@ -44,7 +44,7 @@ final class TypeAnalysis {
         boolean isTest = context.sourceSet().equals("test") || type.getMethods().stream().anyMatch(TestRecognition::testAnnotation);
         boolean isAbstract = abstractType(type);
         return new Worker.TypeFact(owner.id(), "java", location(source.file(), type), isAbstract, isTest,
-            dependencies && context.verified(), context.id(), name, evidence);
+            dependencies && context.verified(), context.id(), name, packageName(source.unit()), evidence);
     }
 
     private static boolean abstractType(TypeDeclaration<?> type) {

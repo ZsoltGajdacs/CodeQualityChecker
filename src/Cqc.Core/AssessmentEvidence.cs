@@ -10,6 +10,9 @@ public sealed record SyntaxGap(string File, string Language, string? ContextId, 
     [System.Text.Json.Serialization.JsonIgnore]
     public string? DiagnosticCode { get; init; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Message { get; init; }
+
     public bool UnknownEntities { get; init; } = true;
     public Location? Location { get; init; }
     public string? Construct { get; init; }

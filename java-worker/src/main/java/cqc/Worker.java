@@ -40,7 +40,7 @@ public final class Worker {
     record SyntaxGap(String file, String language, String contextId, String code, boolean unknownEntities,
         Location location, String construct) { }
     record TypeFact(String id, String language, Location location, boolean isAbstract, boolean isTest, boolean complete,
-        String contextId, String qualifiedName, EvidenceState evidence) { }
+        String contextId, String qualifiedName, String namespaceName, EvidenceState evidence) { }
     record DependencyFact(String from, String to, Location location) { }
     record MethodFact(String id, String typeId, String language, Location location, int complexity,
         int executableLines, boolean isTest, boolean isFixture, boolean isParameterized,

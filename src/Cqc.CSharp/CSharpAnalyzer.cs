@@ -22,14 +22,12 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
         var sources = await SourceParsing.ReadAsync(snapshot, cancellationToken);
         var projects = new ProjectCompilations(snapshot, sources, cancellationToken).Build();
         var collector = Collect(projects, cancellationToken);
-        var diagnostics = projects.SelectMany(project => project.Diagnostics).Distinct().ToList();
-        var semanticComplete = diagnostics.Count == 0;
+        var diagnostics = projects.SelectMany(project => project.Diagnostics).Distinct().ToArray();
+        var semanticComplete = diagnostics.Length == 0;
         var gaps = sources.SelectMany(source => SourceEvidence.Gaps(source, cancellationToken)).Distinct().ToArray();
-        diagnostics.AddRange(gaps.Where(gap => gap.Code == "csharp.unmodeled_executable")
-            .Select(gap => new Diagnostic(gap.Code, "Executable initializers, primary constructors, or top-level statements are not modeled; structural scores remain incomplete.", gap.File, Language)));
         return new(collector.Types.OrderBy(type => type.Location.File, StringComparer.Ordinal).ThenBy(type => type.Location.StartLine).ToArray(),
             collector.Methods.OrderBy(method => method.Location.File, StringComparer.Ordinal).ThenBy(method => method.Location.StartLine).ToArray(),
-            InternalDependencies(collector), diagnostics.ToArray(), semanticComplete)
+            InternalDependencies(collector), diagnostics, semanticComplete)
         {
             Contexts = projects.Select(project => project.Context).ToArray(),
             SyntaxGaps = gaps
@@ -60,9 +58,11 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
 
 internal static class SourceLocation
 {
-    public static Cqc.Core.Location Of(SyntaxNode node)
+    public static Cqc.Core.Location Of(SyntaxNode node) => Of(node.GetLocation());
+
+    public static Cqc.Core.Location Of(Microsoft.CodeAnalysis.Location location)
     {
-        var span = node.GetLocation().GetLineSpan();
+        var span = location.GetLineSpan();
         return new(span.Path.Replace('\\', '/'), span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1);
     }
 }

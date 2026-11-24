@@ -2,11 +2,7 @@ namespace Cqc.Core;
 
 internal static class StructuralReview
 {
-    internal static FamilyResult[] Evaluate(RuleContext context, QualityConfig config) =>
-        new[] { Complexity(context, config), DuplicationRules.Evaluate(context, config) }
-            .Where(family => family.Status != "notApplicable").ToArray();
-
-    private static FamilyResult Complexity(RuleContext context, QualityConfig config)
+    internal static FamilyResult Evaluate(RuleContext context, QualityConfig config)
     {
         var complexity = new StaticComplexity(context);
         var types = context.Facts.Types.Where(type => !type.IsTest).ToArray();

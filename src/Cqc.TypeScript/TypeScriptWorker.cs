@@ -16,7 +16,11 @@ internal static class TypeScriptWorker
         var facts = root.Deserialize<AnalysisFacts>(Wire.Json);
         if (facts?.Types?.Length != sourceCount)
             throw new JsonException("Expected one TypeScript module fact for each analyzed file.");
-        return facts;
+        return facts with
+        {
+            SyntaxGaps = facts.SyntaxGaps.Select(gap => gap.Code == "typescript.parse"
+                ? gap with { Message = gap.Construct } : gap).ToArray()
+        };
     }
 
     private static bool HasExpectedVersion(JsonElement root) =>

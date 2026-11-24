@@ -16,8 +16,13 @@ final class AstIdentity {
             current = current.getParentNode().orElse(null);
         }
         Collections.reverse(parts);
-        String prefix = type.findCompilationUnit().flatMap(CompilationUnit::getPackageDeclaration).map(p -> p.getNameAsString() + ".").orElse("");
-        return prefix + String.join(".", parts);
+        String name = String.join(".", parts);
+        String namespace = type.findCompilationUnit().map(AstIdentity::packageName).orElse("");
+        return namespace.isEmpty() ? name : namespace + "." + name;
+    }
+
+    static String packageName(CompilationUnit unit) {
+        return unit.getPackageDeclaration().map(p -> p.getNameAsString()).orElse("");
     }
 
     static String callableId(CallableDeclaration<?> declaration) {

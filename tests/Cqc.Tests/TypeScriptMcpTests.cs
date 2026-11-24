@@ -54,6 +54,10 @@ public sealed class TypeScriptMcpTests
         var structural = await McpTests.Raw(client, McpTests.ReportId(changed), timeout.Token);
         Assert.Empty(Findings(structural, "code", "code.complexity"));
         Assert.Equal(1, structural.GetProperty("results")[0].GetProperty("unscoredFileCount").GetInt32());
+        var parserDiagnostic = Assert.Single(structural.GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "typescript.parse");
+        Assert.StartsWith("TS", parserDiagnostic.GetProperty("message").GetString());
+        Assert.Equal(1, parserDiagnostic.GetProperty("location").GetProperty("startLine").GetInt32());
 
         var architecture = await McpTests.Read(client, "check_dependencies", request, timeout.Token);
         var report = await McpTests.Raw(client, McpTests.ReportId(architecture), timeout.Token);

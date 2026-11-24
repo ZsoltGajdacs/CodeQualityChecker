@@ -28,7 +28,9 @@ internal sealed class FactCollector
             symbol.IsAbstract || symbol.TypeKind == TypeKind.Interface)
         {
             IsTest = isTest, Complete = complete, ContextId = context.ContextId,
-            QualifiedName = ProjectSymbolIdentity.TypeName(symbol), Evidence = evidence
+            QualifiedName = ProjectSymbolIdentity.TypeName(symbol),
+            NamespaceName = ProjectSymbolIdentity.NamespaceName(symbol),
+            Evidence = evidence
         });
         foreach (var method in MethodDeclarations.InType(declaration))
         {

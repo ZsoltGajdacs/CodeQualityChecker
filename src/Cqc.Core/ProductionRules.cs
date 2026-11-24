@@ -12,7 +12,7 @@ internal static class ProductionRules
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config,
         CoverageEvidence? evidence, string configFingerprint)
     {
-        var methods = ProductionMethods(context).ToArray();
+        var methods = StaticComplexity.ProductionMethods(context).ToArray();
         var staticComplexity = new StaticComplexity(context);
         var types = context.TypesFor(methods)
             .Concat(context.Facts.Types.Where(type => !type.IsTest
@@ -55,12 +55,6 @@ internal static class ProductionRules
         StaticBlockers = StaticComplexity.SyntaxBlockers(AssessmentEvidence.Of(assessment.Method).Syntax),
         Metrics = Metrics([assessment])
     };
-
-    internal static IEnumerable<MethodFact> ProductionMethods(RuleContext context)
-    {
-        var testTypes = context.Facts.Types.Where(t => t.IsTest).Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
-        return context.Methods.Where(m => !m.IsTest && !m.IsFixture && !testTypes.Contains(m.TypeId));
-    }
 
     private static Dictionary<string, MethodCoverage> MatchingCoverage(string source, string config, CoverageEvidence? evidence)
     {

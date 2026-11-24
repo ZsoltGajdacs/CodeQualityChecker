@@ -1,5 +1,3 @@
-using System.IO.Enumeration;
-
 namespace Cqc.Core;
 
 internal static class DependencyRules
@@ -11,7 +9,7 @@ internal static class DependencyRules
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var edges = DependencyEdge.Group(context, types);
         var findings = CycleFindings(types, edges).ToList();
-        var components = types.ToDictionary(p => p.Key, p => Component(p.Value, config), StringComparer.Ordinal);
+        var components = types.ToDictionary(p => p.Key, p => ComponentAssignment.Resolve(p.Value, config), StringComparer.Ordinal);
         findings.AddRange(ComponentCycles(edges, components, findings));
         findings.AddRange(BoundaryRules.Evaluate(edges, components, config));
         var origins = findings.ToDictionary(entry => entry.Finding.Id, entry => entry.Origins, StringComparer.Ordinal);
@@ -22,7 +20,7 @@ internal static class DependencyRules
             Diagnostics = diagnostics, ShowOnlyTouchedFindingLocations = true,
             IncludeTouchedDeclaration = (type, scope) => scope.IsWholeFile(type.Location.File),
             Aggregate = selected => selected.Assess(
-                declarationBlockers: selected.Touched ? selected.Declarations.SelectMany(evidence.Blockers) : evidence.Blockers(types[selected.TypeId]))
+                declarationBlockers: selected.Declarations.SelectMany(evidence.Blockers))
                 with { Metrics = metrics?[components[selected.TypeId]] ?? RuleContext.Metrics() },
             FindingOrigins = id => origins[id],
             Contributions = context.ChangedCode is null ? [] : Contributions(context.Index, edges) });
@@ -64,27 +62,5 @@ internal static class DependencyRules
 
     private static LocatedFinding Locate(FindingDefinition definition, IEnumerable<DependencyEdge> edges) =>
         new(RuleContext.Finding(definition), edges.SelectMany(edge => edge.References).ToArray());
-
-    private static string Component(TypeFact type, QualityConfig config)
-    {
-        foreach (var component in config.Components)
-            if (component.Value.Any(pattern => Matches(QualifiedName(type, pattern), pattern))) return component.Key;
-        var name = QualifiedName(type, "");
-        var separator = name.LastIndexOf('.');
-        return type.Language + ":" + (separator < 0 ? "<global>" : name[..separator]);
-    }
-
-    private static string QualifiedName(TypeFact type, string pattern)
-    {
-        var id = type.Id;
-        if (type.QualifiedName is { } name) return pattern.Contains(':') ? type.Language + ":" + name : name;
-        if (pattern.Contains(':')) return id;
-        var separator = id.IndexOf(':');
-        return separator < 0 ? id : id[(separator + 1)..];
-    }
-
-    private static bool Matches(string id, string pattern) => pattern.Contains('*') || pattern.Contains('?')
-        ? FileSystemName.MatchesSimpleExpression(pattern, id, ignoreCase: false)
-        : id == pattern || id.StartsWith(pattern + ".", StringComparison.Ordinal);
 
 }

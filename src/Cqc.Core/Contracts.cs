@@ -38,6 +38,7 @@ public sealed record TypeFact(string Id, string Language, Location Location, boo
     public bool Complete { get; init; } = true;
     public string? ContextId { get; init; }
     public string? QualifiedName { get; init; }
+    public string? NamespaceName { get; init; }
     public EvidenceState? Evidence { get; init; }
 }
 public sealed record DependencyFact(string From, string To, Location Location);

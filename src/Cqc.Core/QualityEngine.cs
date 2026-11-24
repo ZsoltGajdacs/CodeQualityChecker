@@ -19,14 +19,14 @@ public static class QualityEngine
     {
         request.CancellationToken.ThrowIfCancellationRequested();
         var context = new RuleContext(request.Snapshot, request.Facts, request.CancellationToken) { ChangedCode = request.ChangedCode };
-        if (request.Snapshot.SourceOnly) return StructuralReview.Evaluate(context, request.Config);
         return request.Families.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(family => family switch
         {
+            "code" when request.Snapshot.SourceOnly => StructuralReview.Evaluate(context, request.Config),
             "code" => ProductionRules.Evaluate(context, request.Config, request.Evidence, request.ConfigurationFingerprint),
             "tests" => TestRules.Evaluate(context, request.Config),
             "duplication" => DuplicationRules.Evaluate(context, request.Config),
             "dependencies" => DependencyRules.Evaluate(context, request.Config),
             _ => throw new ArgumentException($"Unknown check family: {family}", nameof(request))
-        }).ToArray();
+        }).Where(family => !request.Snapshot.SourceOnly || family.Status != "notApplicable").ToArray();
     }
 }

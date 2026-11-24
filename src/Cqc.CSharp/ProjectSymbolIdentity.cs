@@ -34,6 +34,8 @@ internal sealed class ProjectSymbolIdentity
 
     private static IMethodSymbol Definition(IMethodSymbol method) => (method.ReducedFrom ?? method).OriginalDefinition;
     public static string TypeName(ITypeSymbol symbol) => symbol.OriginalDefinition.ToDisplayString(Types);
+    public static string NamespaceName(INamedTypeSymbol symbol) =>
+        symbol.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() : "";
 
     public static string MethodName(IMethodSymbol symbol)
     {

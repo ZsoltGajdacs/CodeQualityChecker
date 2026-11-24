@@ -9,7 +9,6 @@ internal sealed class EntityReport
     private readonly AssessmentSelection selection;
     private readonly ILookup<string, string> typesByFile;
     private readonly ILookup<string, Finding> findingsByEntity;
-    private readonly ILookup<string, Finding> findingsByFile;
     internal sealed record Result(EntityScore[] Entities, Finding[] Findings);
 
     internal EntityReport(FamilyAssessment assessment, AssessmentSelection selection)
@@ -22,8 +21,6 @@ internal sealed class EntityReport
             .Select(file => (File: file, Id: g.Key))).ToLookup(p => p.File, p => p.Id, StringComparer.Ordinal);
         findingsByEntity = findings.SelectMany(f => f.EntityIds.Distinct(StringComparer.Ordinal)
             .Select(id => (Id: id, Finding: f))).ToLookup(p => p.Id, p => p.Finding, StringComparer.Ordinal);
-        findingsByFile = findings.SelectMany(f => selection.ScoringFiles(f).Distinct(StringComparer.Ordinal)
-            .Select(file => (File: file, Finding: f))).ToLookup(p => p.File, p => p.Finding, StringComparer.Ordinal);
     }
 
     internal Result Build(string[] selectedFiles)
@@ -49,9 +46,8 @@ internal sealed class EntityReport
 
     private EntityScore FileScore(string file)
     {
-        var ids = typesByFile[file].ToHashSet(StringComparer.Ordinal);
-        var applicable = findingsByFile[file].Where(f => selection.ScoresFile(f, file, ids)).ToArray();
-        return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids.ToArray(), Findings = applicable });
+        var ids = typesByFile[file].ToArray();
+        return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids, Findings = selection.FindingsForFile(file, ids) });
     }
 
     private EntityScore Score(EntityAssessment entity)

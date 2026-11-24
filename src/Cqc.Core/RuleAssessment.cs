@@ -39,6 +39,13 @@ internal sealed record FamilyAssessment
     public Func<SelectedTypeEvidence, EntityScoringEvidence> Aggregate { get; init; } = evidence => evidence.Assess();
     public bool ShowOnlyTouchedFindingLocations { get; init; }
     public Func<string, FindingOrigin[]> FindingOrigins { get; init; } = _ => [];
+
+    internal FindingOrigin[] OriginsFor(Finding finding)
+    {
+        var known = FindingOrigins(finding.Id);
+        return known.Length != 0 ? known : finding.EntityIds
+            .SelectMany(id => finding.Locations.Select(location => new FindingOrigin(id, location))).ToArray();
+    }
 }
 
 internal sealed record EntityAssessment

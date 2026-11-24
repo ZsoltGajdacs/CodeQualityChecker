@@ -47,8 +47,14 @@ internal sealed class StaticComplexity(RuleContext context)
 
     private static IEnumerable<StructuralExecutable> ProductionExecutables(RuleContext context)
     {
-        var methods = ProductionRules.ProductionMethods(context).Select(method => method.Id).ToHashSet(StringComparer.Ordinal);
+        var methods = ProductionMethods(context).Select(method => method.Id).ToHashSet(StringComparer.Ordinal);
         return context.Index.Executables.Where(executable => executable.IsMethod ? methods.Contains(executable.Id)
             : context.Index.TypesById[executable.TypeId].Any(type => !type.IsTest));
+    }
+
+    internal static IEnumerable<MethodFact> ProductionMethods(RuleContext context)
+    {
+        var testTypes = context.Facts.Types.Where(type => type.IsTest).Select(type => type.Id).ToHashSet(StringComparer.Ordinal);
+        return context.Methods.Where(method => !method.IsTest && !method.IsFixture && !testTypes.Contains(method.TypeId));
     }
 }

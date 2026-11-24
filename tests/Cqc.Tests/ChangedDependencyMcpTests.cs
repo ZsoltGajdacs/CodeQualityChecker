@@ -102,6 +102,13 @@ public sealed class ChangedDependencyMcpTests
             item.GetProperty("entityIds").EnumerateArray().Any(id => id.GetString() == typeId));
         Assert.Equal(findingId, repositoryFinding.GetProperty("id").GetString());
         Assert.Equal(repositoryLocation, Assert.Single(Locations(repositoryFinding)));
+        foreach (var sibling in touched.Select(location => location.File).Distinct().Where(file => file != repositoryLocation.File))
+        {
+            var entity = Assert.Single(repository.GetProperty("entities").EnumerateArray(),
+                item => item.GetProperty("entityId").GetString() == "file:" + sibling);
+            Assert.Equal(10, entity.GetProperty("score").GetInt32());
+            Assert.Empty(entity.GetProperty("findingIds").EnumerateArray());
+        }
     }
 
     private static void AssertScores(JsonElement family, string typeId, IEnumerable<string> files, string? findingId)

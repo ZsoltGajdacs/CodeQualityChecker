@@ -67,7 +67,7 @@ final class SourceContexts {
 
     static String sourceRoot(Worker.Source source) {
         Path result = Path.of(source.file()).getParent();
-        var packageName = source.unit().getPackageDeclaration().map(p -> p.getNameAsString()).orElse("");
+        var packageName = AstIdentity.packageName(source.unit());
         int segments = packageName.isEmpty() ? 0 : packageName.split("\\.").length;
         for (int i = 0; i < segments && result != null; i++) result = result.getParent();
         return result == null ? "." : portable(result);

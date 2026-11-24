@@ -2,32 +2,36 @@ namespace Cqc.Core;
 
 internal static class StructuralDiagnostics
 {
-    internal static IEnumerable<Diagnostic> For(AnalysisFacts facts, ProjectSnapshot snapshot) =>
-        snapshot.SourceOnly ? SourceOnly(facts, snapshot) : EvidenceAware(facts);
-
-    private static IEnumerable<Diagnostic> SourceOnly(AnalysisFacts facts, ProjectSnapshot snapshot)
+    internal static IEnumerable<Diagnostic> For(AnalysisFacts facts, ProjectSnapshot snapshot)
     {
+        var reported = facts.Diagnostics.ToLookup(Key);
+        var gaps = facts.SyntaxGaps.SelectMany(gap => reported[GapKey(gap)].DefaultIfEmpty()
+            .Select(diagnostic => Describe(gap, diagnostic, snapshot.SourceOnly)));
+        if (!snapshot.SourceOnly)
+        {
+            var projected = facts.SyntaxGaps.Select(GapKey).ToHashSet();
+            return facts.Diagnostics.Where(diagnostic => !projected.Contains(Key(diagnostic))).Concat(gaps).Distinct();
+        }
         var languages = snapshot.SelectedFiles.Select(file => snapshot.SourceLanguages.GetValueOrDefault(file)).ToHashSet(StringComparer.Ordinal);
-        return facts.Diagnostics.Where(StructuralEvidence.IsAnalyzerFailure).Concat(facts.SyntaxGaps.Select(Describe))
+        return facts.Diagnostics.Where(StructuralEvidence.IsAnalyzerFailure).Concat(gaps)
             .Where(diagnostic => diagnostic.Language is null || languages.Contains(diagnostic.Language)).Distinct();
     }
 
-    private static IEnumerable<Diagnostic> EvidenceAware(AnalysisFacts facts)
+    private static Diagnostic Describe(SyntaxGap gap, Diagnostic? reported, bool sourceOnly)
     {
-        var gaps = facts.SyntaxGaps.ToLookup(GapKey);
-        var reported = facts.Diagnostics.Select(Key).ToHashSet();
-        return facts.Diagnostics.Select(diagnostic => WithDetails(diagnostic, gaps[Key(diagnostic)].FirstOrDefault()))
-            .Concat(facts.SyntaxGaps.Where(gap => !reported.Contains(GapKey(gap))).Select(Describe)).Distinct();
+        var diagnostic = reported ?? new(gap.Code, "Source structure could not be fully analyzed.", gap.File, gap.Language);
+        return diagnostic with
+        {
+            Code = sourceOnly ? gap.Code : diagnostic.Code,
+            Message = gap.Message ?? diagnostic.Message,
+            Location = diagnostic.Location ?? gap.Location,
+            Construct = diagnostic.Construct ?? gap.Construct
+        };
     }
 
-    private static Diagnostic WithDetails(Diagnostic diagnostic, SyntaxGap? gap) => gap is null ? diagnostic
-        : diagnostic with { Location = diagnostic.Location ?? gap.Location, Construct = diagnostic.Construct ?? gap.Construct };
+    private static (string Code, string? File, string? Language) Key(Diagnostic diagnostic) =>
+        (diagnostic.Code, diagnostic.File, diagnostic.Language);
 
-    private static Diagnostic Describe(SyntaxGap gap) => new(gap.Code, "Source structure could not be fully analyzed.",
-        gap.File, gap.Language) { Location = gap.Location, Construct = gap.Construct };
-
-    private static (string Code, string? File) Key(Diagnostic diagnostic) => (diagnostic.Code, diagnostic.File);
-
-    private static (string Code, string? File) GapKey(SyntaxGap gap) =>
-        (gap.DiagnosticCode ?? gap.Code, gap.File);
+    private static (string Code, string? File, string? Language) GapKey(SyntaxGap gap) =>
+        (gap.DiagnosticCode ?? gap.Code, gap.File, gap.Language);
 }

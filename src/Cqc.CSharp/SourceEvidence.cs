@@ -8,9 +8,11 @@ namespace Cqc.CSharp;
 /// <summary>Tracks syntax separately from each project's semantic context.</summary>
 internal static class SourceEvidence
 {
+    private sealed record UnmodeledExecutable(string Construct, SyntaxNode Node);
+
     internal static EvidenceState Type(BaseTypeDeclarationSyntax declaration, SourceAnalysisContext context)
     {
-        var syntax = context.Options.Complete && !Unmodeled(declaration)
+        var syntax = context.Options.Complete && !Unmodeled(declaration).Any()
             && !declaration.GetDiagnostics().Any(x => x.Severity == DiagnosticSeverity.Error);
         var semantic = !context.SourceOnly && !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
         return new(syntax, true, semantic, semantic, context.VerifiedContext, []);
@@ -23,29 +25,46 @@ internal static class SourceEvidence
 
     private static IEnumerable<SyntaxGap> Gaps(SyntaxTree tree, ParsedProject project, CancellationToken token)
     {
-        if (!project.Options.Complete) yield return Gap(tree.FilePath, "csharp.compile_configuration", project.ContextId);
-        if (tree.GetDiagnostics(token).Any(x => x.Severity == DiagnosticSeverity.Error))
-            yield return Gap(tree.FilePath, "csharp.parse", project.ContextId);
+        foreach (var diagnostic in project.Options.Diagnostics)
+            yield return new(tree.FilePath, diagnostic.Language ?? "csharp", project.ContextId, diagnostic.Code) { Message = diagnostic.Message };
+        foreach (var diagnostic in tree.GetDiagnostics(token).Where(item => item.Severity == DiagnosticSeverity.Error))
+            yield return new(tree.FilePath, "csharp", project.ContextId, "csharp.parse")
+            { Message = $"{diagnostic.Id}: {diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)}", Location = SourceLocation.Of(diagnostic.Location) };
         var root = tree.GetRoot(token);
-        if (root.DescendantNodes().OfType<GlobalStatementSyntax>().Any())
-            yield return Gap(tree.FilePath, "csharp.unmodeled_executable", project.ContextId);
-        if (root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().Any(Unmodeled))
-            yield return Gap(tree.FilePath, "csharp.unmodeled_executable", project.ContextId, false);
+        foreach (var statement in root.ChildNodes().OfType<GlobalStatementSyntax>())
+            yield return Gap(project.ContextId, new("top-level statement", statement), unknownEntities: true);
+        foreach (var executable in root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().SelectMany(Unmodeled))
+            yield return Gap(project.ContextId, executable, unknownEntities: false);
     }
 
-    private static SyntaxGap Gap(string file, string code, string context, bool unknownEntities = true) =>
-        new(file, "csharp", context, code) { UnknownEntities = unknownEntities };
-
-    private static bool Unmodeled(BaseTypeDeclarationSyntax declaration)
+    private static SyntaxGap Gap(string context, UnmodeledExecutable executable, bool unknownEntities)
     {
-        if (declaration is TypeDeclarationSyntax { ParameterList: not null }) return true;
-        return declaration.ChildNodes().Any(member => member switch
+        var location = SourceLocation.Of(executable.Node);
+        return new(location.File, "csharp", context, "csharp.unmodeled_executable")
         {
-            FieldDeclarationSyntax field => !field.Modifiers.Any(SyntaxKind.ConstKeyword)
-                && field.Declaration.Variables.Any(variable => variable.Initializer is not null),
-            EventFieldDeclarationSyntax field => field.Declaration.Variables.Any(variable => variable.Initializer is not null),
-            PropertyDeclarationSyntax { Initializer: not null } => true,
-            _ => false
-        });
+            UnknownEntities = unknownEntities, Location = location, Construct = executable.Construct,
+            Message = $"CQC cannot measure the {executable.Construct}."
+        };
     }
+
+    private static IEnumerable<UnmodeledExecutable> Unmodeled(BaseTypeDeclarationSyntax declaration)
+    {
+        if (declaration is TypeDeclarationSyntax { ParameterList: { } parameters })
+            yield return new("primary constructor", parameters);
+        foreach (var initializer in declaration.ChildNodes().SelectMany(Initializers))
+            yield return initializer;
+    }
+
+    private static IEnumerable<UnmodeledExecutable> Initializers(SyntaxNode member) => member switch
+    {
+        FieldDeclarationSyntax field when !field.Modifiers.Any(SyntaxKind.ConstKeyword) =>
+            Initializers(field.Declaration, "field initializer"),
+        EventFieldDeclarationSyntax field => Initializers(field.Declaration, "event initializer"),
+        PropertyDeclarationSyntax { Initializer: { } initializer } => [new("property initializer", initializer)],
+        _ => []
+    };
+
+    private static IEnumerable<UnmodeledExecutable> Initializers(VariableDeclarationSyntax declaration, string construct) =>
+        declaration.Variables.Select(variable => variable.Initializer).OfType<EqualsValueClauseSyntax>()
+            .Select(initializer => new UnmodeledExecutable(construct, initializer));
 }
