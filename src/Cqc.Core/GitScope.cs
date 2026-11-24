@@ -46,9 +46,11 @@ internal static class GitScope
         return files.Where(changed.Contains).ToArray();
     }
 
-    private static async Task<string> GitAsync(string root, string[] args, CancellationToken token)
+    internal static async Task<string> GitAsync(string root, string[] args, CancellationToken token) =>
+        OutputOrThrow(await ProcessRunner.RunAsync("git", args, root, token));
+
+    internal static string OutputOrThrow(CommandResult result)
     {
-        var result = await ProcessRunner.RunAsync("git", args, root, token);
         if (result.ExitCode != 0) throw new ArgumentException("Git scope unavailable: " + result.Error.Trim());
         return result.Output;
     }

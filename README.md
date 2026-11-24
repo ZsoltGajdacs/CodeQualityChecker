@@ -47,7 +47,7 @@ Use `check_code_quality` for the repository or `check_uncommitted_changes_qualit
 
 Both tools default to `execute: false`. They report static cyclomatic complexity and structural duplication using source and static project configuration. These checks include Java field expressions, initializer blocks, compact record constructors, and enum initialization. They skip saved build and coverage evidence and omit metrics that require it. The code family summary includes `scoredFileCount` and `unscoredFileCount` for selected production files and explicit source failures. A structural gap in a language’s duplication pool can withhold its numeric scores while preserving verified matches.
 
-The changes tool requires Git. It reads current working-tree content, including unstaged edits to a staged file, after applying ignore and generated-file exclusions. It excludes deleted files. On a clean checkout it returns zero files without building or testing. Findings can refer to unchanged counterpart files because checks use repository context.
+The changes tool requires Git. It scores methods and other executable constructs touched in the working-tree diff against `HEAD`, including staged and unstaged edits. Dependency findings use recorded reference locations. Java can retain a single location when the same dependency appears multiple times. New files and rename destinations are reviewed in full. Deleted files are excluded. The selected file list can include files with no applicable touched code. Duplicate findings can show unchanged counterparts as context, with deductions applied to touched members. On a clean checkout the tool returns zero files without building or testing.
 
 ### Explicit scope and execution
 

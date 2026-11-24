@@ -12,7 +12,7 @@ Use the plugin's CQC MCP tools. Tool prefixes vary by client. Identify the serve
 Establish the absolute repository root and the user's intended scope. Use `inspect_project` when module or language support is unclear. Report unsupported languages as unanalyzed.
 
 - For a repository review, use `check_code_quality`.
-- For “check my uncommitted changes”, use `check_uncommitted_changes_quality`. It selects staged, unstaged, and untracked source, applies normal exclusions, and reads the current working-tree contents. An empty selection means zero files. If Git scope fails, explain it. Use explicit paths only when they represent the requested selection.
+- For “check my uncommitted changes”, use `check_uncommitted_changes_quality`. It selects staged, unstaged, and untracked source, applies normal exclusions, and scores methods and other constructs touched in the current working-tree diff against `HEAD`. New files and rename destinations are reviewed in full. Git-selected files can have no applicable touched code. If Git scope fails, explain it. Use explicit paths only when they represent the requested selection.
 - For explicit paths, a Git comparison base, or a review that needs saved evidence or a specific family, use `check_all` or an individual family tool. Pass `scope: "paths"` with repository-relative `paths`, or `scope: "changed"` with `gitBase`. Choose `check_test_quality` for test structure, `check_duplication` for structural clones, or `check_dependencies` for semantic cycles, coupling, and configured boundaries.
 
 The two review tools take the same nested request with fixed scope.
@@ -26,7 +26,7 @@ The two review tools take the same nested request with fixed scope.
 }
 ```
 
-Default to `execute: false`. The fixed-scope tools use source and static project configuration for static complexity and duplication, skipping saved coverage and reference evidence. Present the results directly. The summary note about execution is informational. Findings can reference unchanged counterparts because the tools use repository context.
+Default to `execute: false`. The fixed-scope tools use source and static project configuration for static complexity and duplication, skipping saved coverage and reference evidence. Present the results directly. The summary note about execution is informational. Duplicate findings can reference unchanged counterparts. In an uncommitted review, deductions apply only to touched members and dependency findings use recorded reference locations. An analyzer that records one representative dependency location can miss an edit to another occurrence. Test helpers and fixtures contribute context for touched tests.
 
 For `.ts` and `.tsx`, use `check_dependencies` with `execute: false` for resolved module cycles and boundaries. The report's `class` kind represents a source module for TypeScript. Explain dependency blockers such as missing packages or ambiguous project configuration. TypeScript supports static complexity, duplication, and dependency analysis. Test quality and coverage are unavailable, and explicit execution applies only to supported Java and C# projects.
 

@@ -19,7 +19,8 @@ internal static class StructuralReview
         {
             Family = "code", Types = assessed, Findings = findings, Incomplete = unavailable.Count != 0,
             Blockers = id => blockers[id], StaticBlockers = id => blockers[id],
-            Metrics = id => complexity.Metrics(id)
+            Metrics = id => complexity.Metrics(id), Contributions = complexity.Contributions(sourceOnly: true),
+            SharedBlockers = complexity.SharedBlockers, SharedStaticBlockers = complexity.SharedBlockers
         });
         return WithFileCounts(report, unavailable);
     }

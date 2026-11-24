@@ -9,18 +9,33 @@ internal static class DependencyRules
         var evidence = new DependencyEvidence(context.Facts, context.Index);
         var types = context.Index.TypesById
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        var edges = context.Facts.Dependencies.Where(d => types.ContainsKey(d.From) && types.ContainsKey(d.To)
-            && d.From != d.To).DistinctBy(d => (d.From, d.To)).OrderBy(d => d.From, StringComparer.Ordinal)
-            .ThenBy(d => d.To, StringComparer.Ordinal).ToArray();
+        var edges = Edges(context, types);
         var findings = CycleFindings(types, edges).ToList();
         var components = types.ToDictionary(p => p.Key, p => Component(p.Value, config), StringComparer.Ordinal);
         findings.AddRange(ComponentCycles(edges, components, findings));
         findings.AddRange(BoundaryRules.Evaluate(edges, components, config));
-        var metrics = DependencyMetrics.Evaluate(types, edges, components);
+        var metrics = context.ChangedCode is null ? DependencyMetrics.Evaluate(types, edges, components) : null;
         var diagnostics = context.Facts.SemanticComplete ? Array.Empty<Diagnostic>() :
             [new Diagnostic("dependencies.incomplete", "Symbol resolution is incomplete. Resolve language diagnostics or execute a supported build before architecture scoring.")];
         return context.Finish(new() { Family = "dependencies", Types = context.Facts.Types, Findings = findings,
-            Blockers = id => evidence.Blockers(types[id]), Metrics = id => metrics[components[id]], Diagnostics = diagnostics });
+            Blockers = id => evidence.Blockers(types[id]), Metrics = id => metrics?[components[id]] ?? RuleContext.Metrics(), Diagnostics = diagnostics,
+            SharedBlockers = evidence.Blockers,
+            Contributions = context.ChangedCode is null ? [] : Contributions(context.Index, edges) });
+    }
+
+    private static IEnumerable<ScoringContribution> Contributions(FactIndex index, DependencyFact[] edges) =>
+        index.Executables.Select(executable => new ScoringContribution(executable.TypeId, executable.Location))
+            .Concat(edges.Select(edge => new ScoringContribution(edge.From, edge.Location)));
+
+    private static DependencyFact[] Edges(RuleContext context, Dictionary<string, TypeFact> types)
+    {
+        var references = context.Facts.Dependencies.Where(edge => edge.From != edge.To
+            && types.ContainsKey(edge.From) && types.ContainsKey(edge.To));
+        // A touched reference represents the same graph edge and lets the report retain its location.
+        if (context.ChangedDependencies is { } scope)
+            references = references.OrderByDescending(edge => scope.Includes(edge.From, edge.Location));
+        return references.DistinctBy(edge => (edge.From, edge.To)).OrderBy(edge => edge.From, StringComparer.Ordinal)
+            .ThenBy(edge => edge.To, StringComparer.Ordinal).ToArray();
     }
 
     private static IEnumerable<Finding> ComponentCycles(DependencyFact[] edges, Dictionary<string, string> components, List<Finding> existing)

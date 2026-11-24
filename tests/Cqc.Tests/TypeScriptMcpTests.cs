@@ -52,7 +52,7 @@ public sealed class TypeScriptMcpTests
         var changed = await McpTests.Read(client, "check_uncommitted_changes_quality", request, timeout.Token);
         Assert.Equal(2, changed.GetProperty("fileCount").GetInt32());
         var structural = await McpTests.Raw(client, McpTests.ReportId(changed), timeout.Token);
-        Assert.Single(Findings(structural, "code", "code.complexity"));
+        Assert.Empty(Findings(structural, "code", "code.complexity"));
         Assert.Equal(1, structural.GetProperty("results")[0].GetProperty("unscoredFileCount").GetInt32());
 
         var architecture = await McpTests.Read(client, "check_dependencies", request, timeout.Token);

@@ -14,7 +14,7 @@ public sealed class QualityTools(AnalysisService service, ReportStore reports)
     public Task<CallToolResult> CheckCodeQuality(QualityReviewRequest request, CancellationToken cancellationToken)
         => Review(request, "repository", cancellationToken);
 
-    [McpServerTool(Name = "check_uncommitted_changes_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Review staged, unstaged, and untracked source files using current working-tree contents and repository context. Source-only by default, with scored and unscored production file counts and diagnostics by scope. 10 is the desired score. execute=true permits project-controlled builds and tests in the checkout and evaluates all quality families.")]
+    [McpServerTool(Name = "check_uncommitted_changes_quality", UseStructuredContent = true, OutputSchemaType = typeof(ReportSummary)), Description("Score Git-touched methods and other source locations using current working-tree contents and repository context. Review new files in full. Source-only by default, with scored and unscored production file counts and diagnostics by scope. 10 is the desired score. execute=true permits project-controlled builds and tests in the checkout and evaluates all quality families.")]
     public Task<CallToolResult> CheckUncommittedChangesQuality(QualityReviewRequest request, CancellationToken cancellationToken)
         => Review(request, "changed", cancellationToken);
 

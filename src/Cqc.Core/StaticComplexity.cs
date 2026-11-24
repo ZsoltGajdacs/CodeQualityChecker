@@ -10,6 +10,20 @@ internal sealed class StaticComplexity(RuleContext context)
 
     internal string[] Blockers(TypeFact type) => context.Structure.Blockers(type, executables[type.Id]);
 
+    internal string[] SharedBlockers(TypeFact type) => context.Structure.Blockers(type, []);
+
+    internal IEnumerable<ScoringContribution> Contributions(bool sourceOnly) => executables.SelectMany(group => group)
+        .Where(executable => sourceOnly || !executable.IsMethod).Select(executable => new ScoringContribution(executable.TypeId, executable.Location)
+        {
+            Primary = sourceOnly,
+            Static = true,
+            Blockers = SyntaxBlockers(executable.Syntax),
+            StaticBlockers = SyntaxBlockers(executable.Syntax),
+            Metrics = new(StringComparer.Ordinal) { [MetricName(executable)] = executable.Complexity }
+        });
+
+    internal static string[] SyntaxBlockers(bool syntax) => syntax ? [] : ["syntax.incomplete"];
+
     internal IEnumerable<Finding> ExecutableFindings(QualityConfig config) =>
         executables.SelectMany(group => group).Where(executable => !executable.IsMethod)
             .Select(executable => Finding(executable, config)).OfType<Finding>();
@@ -32,12 +46,12 @@ internal sealed class StaticComplexity(RuleContext context)
     {
         var metrics = RuleContext.Metrics();
         foreach (var executable in executables[typeId].Where(e => includeMethods || !e.IsMethod))
-        {
-            var prefix = executable.IsMethod ? "method" : "executable";
-            metrics[$"{prefix}:{executable.Id}:complexity"] = executable.Complexity;
-        }
+            metrics[MetricName(executable)] = executable.Complexity;
         return metrics;
     }
+
+    private static string MetricName(StructuralExecutable executable) =>
+        $"{(executable.IsMethod ? "method" : "executable")}:{executable.Id}:complexity";
 
     internal static Finding? Finding(StructuralExecutable executable, QualityConfig config) =>
         executable.Complexity > config.ComplexityThreshold ? RuleContext.Finding(new()

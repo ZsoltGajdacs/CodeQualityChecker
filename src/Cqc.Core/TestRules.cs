@@ -24,13 +24,16 @@ internal static class TestRules
         var byType = assessments.ToLookup(a => a.Test.TypeId, StringComparer.Ordinal);
         var blockers = byType.ToDictionary(g => g.Key, g => g.SelectMany(a => a.Blockers)
             .Concat(context.Index.TypesById[g.Key].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
-        var incomplete = assessments.Where(a => !a.Complete).Select(a => a.Test.TypeId).ToHashSet(StringComparer.Ordinal);
         var metrics = assessments.GroupBy(a => a.Test.TypeId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
-        var diagnostics = incomplete.Count == 0 ? Array.Empty<Diagnostic>() :
+        var incomplete = assessments.Any(a => !a.Complete && (context.ChangedCode?.Includes(a.Test.Location) ?? true));
+        var diagnostics = !incomplete ? Array.Empty<Diagnostic>() :
             [new Diagnostic("tests.incomplete", "Some test/fixture/helper facts are unresolved. Resolve diagnostics before scoring affected test classes.")];
         return context.Finish(new() { Family = "tests", Types = context.TypesFor(tests), Findings = assessments.SelectMany(a => Findings(a, config)),
-            Blockers = id => blockers[id], Metrics = id => metrics[id], Diagnostics = diagnostics });
+            Blockers = id => blockers[id], Metrics = id => metrics[id], Diagnostics = diagnostics,
+            SharedBlockers = type => AssessmentEvidence.Syntax(type, []),
+            Contributions = assessments.Select(a => new ScoringContribution(a.Test.TypeId, a.Test.Location)
+            { Blockers = a.Blockers, Metrics = Metrics([a]) }) });
     }
 
     private static bool IsTestPath(string file) => file.Split('/').Any(part => part.Equals("test", StringComparison.OrdinalIgnoreCase)

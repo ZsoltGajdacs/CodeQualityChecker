@@ -8,7 +8,9 @@ internal static class DuplicationRules
         var eligible = context.Index.Executables.Where(executable => Eligible(executable, minLines, config.DuplicateMinNodes))
             .DistinctBy(executable => executable.Id, StringComparer.Ordinal).ToArray();
         var matches = new DuplicateCandidates(eligible, context.CancellationToken).Matches(config.DuplicateSimilarity).ToArray();
-        var findings = Findings(eligible, matches).ToArray();
+        var groups = Findings(eligible, matches).ToArray();
+        var findings = groups.Select(group => group.Finding).ToArray();
+        var origins = groups.ToDictionary(group => group.Finding.Id, group => group.Origins, StringComparer.Ordinal);
         var executablesByType = eligible.ToLookup(executable => executable.TypeId, StringComparer.Ordinal);
         var groupCounts = findings.SelectMany(finding => finding.EntityIds).ToLookup(id => id, StringComparer.Ordinal);
         var incompleteTypes = context.Facts.Types.Where(type => context.Structure.IncompleteLanguages.Contains(type.Language))
@@ -20,7 +22,20 @@ internal static class DuplicationRules
             Findings = findings,
             Incomplete = context.Structure.HasIncompleteSelectedLanguage,
             Blockers = id => incompleteTypes.Contains(id) ? ["structure.incomplete"] : [],
-            Metrics = id => Metrics(executablesByType[id], groupCounts[id].Count())
+            Metrics = id => Metrics(executablesByType[id], groupCounts[id].Count()),
+            Contributions = context.ChangedCode is null ? [] : Contributions(context.Index.Executables, eligible),
+            SharedBlockers = type => incompleteTypes.Contains(type.Id) ? ["structure.incomplete"] : [],
+            FindingOrigins = id => origins[id]
+        });
+    }
+
+    private static IEnumerable<ScoringContribution> Contributions(StructuralExecutable[] executables, StructuralExecutable[] eligible)
+    {
+        var candidates = eligible.ToHashSet();
+        return executables.Select(executable => new ScoringContribution(executable.TypeId, executable.Location)
+        {
+            DuplicateCandidate = candidates.Contains(executable)
+                ? executable.IsMethod ? DuplicateCandidateKind.Method : DuplicateCandidateKind.Executable : null
         });
     }
 
@@ -36,7 +51,7 @@ internal static class DuplicationRules
         => executable.Syntax && executable.DuplicationLines >= minLines
             && executable.NodeCount >= minNodes && executable.Fingerprints.Length > 0;
 
-    private static IEnumerable<Finding> Findings(StructuralExecutable[] executables, DuplicateMatch[] matches)
+    private static IEnumerable<LocatedFinding> Findings(StructuralExecutable[] executables, DuplicateMatch[] matches)
     {
         var byId = executables.ToDictionary(executable => executable.Id, StringComparer.Ordinal);
         var links = matches.Select(match => (match.Left.Id, match.Right.Id));
@@ -47,14 +62,15 @@ internal static class DuplicationRules
         return groups.Select((group, index) => GroupFinding(group, byId, minimums[index]));
     }
 
-    private static Finding GroupFinding(string[] group, Dictionary<string, StructuralExecutable> byId, double minimum)
+    private static LocatedFinding GroupFinding(string[] group, Dictionary<string, StructuralExecutable> byId, double minimum)
     {
         var members = group.Select(id => byId[id]).ToArray();
         var kind = members.All(executable => executable.IsMethod) ? "methods" : "executable bodies";
-        return RuleContext.Finding(new() { Rule = "duplication.group", Key = string.Join("|", group),
+        var finding = RuleContext.Finding(new() { Rule = "duplication.group", Key = string.Join("|", group),
             Message = FormattableString.Invariant($"Structural duplicate group with {group.Length} {kind}; minimum qualifying pair similarity {minimum:0.###}."),
             Advice = "Inspect all locations and extract shared behavior only when it improves cohesion; parameterized test cases may be intentional.",
             Entities = members.Select(executable => executable.TypeId), Locations = members.Select(executable => executable.Location) });
+        return new(finding, members.Select(executable => new FindingOrigin(executable.TypeId, executable.Location)).ToArray());
     }
 
 }

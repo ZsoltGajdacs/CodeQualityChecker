@@ -9,6 +9,7 @@ public sealed record EvaluationRequest
     public required string ConfigurationFingerprint { get; init; }
     public required string[] Families { get; init; }
     public CancellationToken CancellationToken { get; init; }
+    internal ChangedCodeScope? ChangedCode { get; init; }
 }
 
 /// <summary>Pure, deterministic quality rules shared by every language adapter.</summary>
@@ -17,7 +18,7 @@ public static class QualityEngine
     public static FamilyResult[] Evaluate(EvaluationRequest request)
     {
         request.CancellationToken.ThrowIfCancellationRequested();
-        var context = new RuleContext(request.Snapshot, request.Facts, request.CancellationToken);
+        var context = new RuleContext(request.Snapshot, request.Facts, request.CancellationToken) { ChangedCode = request.ChangedCode };
         if (request.Snapshot.SourceOnly) return StructuralReview.Evaluate(context, request.Config);
         return request.Families.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(family => family switch
         {

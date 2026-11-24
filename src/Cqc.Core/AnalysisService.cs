@@ -56,7 +56,9 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             Scope = request.Scope, AnalyzedFiles = snapshot.SelectedFiles, Modules = snapshot.Modules,
             Diagnostics = discoveryDiagnostics, SourceOnly = snapshot.SourceOnly
         };
-        if (mode != AnalysisMode.EvidenceAware && IsEmptyChangeSelection(request, snapshot)) return report;
+        var reviewChanges = mode != AnalysisMode.EvidenceAware && request.Scope == "changed";
+        if (reviewChanges && snapshot.SelectedFiles.Length == 0) return report;
+        var changedCode = reviewChanges ? await ChangedCodeScope.ReadAsync(snapshot, token) : null;
 
         using var artifacts = await BuildIfRequestedAsync(request, snapshot, diagnostics, token);
         await VerifyBuildSnapshot(request, config, snapshot, token);
@@ -71,9 +73,10 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
         var results = QualityEngine.Evaluate(new EvaluationRequest
         {
             Snapshot = snapshot, Facts = facts, Config = config, Evidence = coverage,
-            ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = token
+            ConfigurationFingerprint = configFingerprint, Families = families, CancellationToken = token, ChangedCode = changedCode
         });
-        await VerifySnapshot(request, config, snapshot, token);
+        var verified = await VerifySnapshot(request, config, snapshot, token);
+        await ChangedCodeScope.VerifyAsync(changedCode, verified, token);
         token.ThrowIfCancellationRequested();
         if (artifacts is not null && coverage is not null)
             await EvidenceStore.PublishRunAsync(snapshot.Root, artifacts, coverage, token);
@@ -83,9 +86,6 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             Diagnostics = DiagnosticScope.Classify(snapshot, diagnostics)
         };
     }
-
-    private static bool IsEmptyChangeSelection(AnalysisRequest request, ProjectSnapshot snapshot) =>
-        request.Scope == "changed" && snapshot.SelectedFiles.Length == 0;
 
     private static Diagnostic[] DiscoveryDiagnostics(ProjectSnapshot snapshot) => snapshot.SourceOnly
         ? snapshot.Diagnostics.Where(diagnostic => diagnostic.Code != "unsupported_integration").ToArray()
@@ -135,11 +135,13 @@ public sealed class AnalysisService(IEnumerable<ILanguageAnalyzer> analyzers)
             throw new InvalidOperationException("Source/build inputs changed during execution. Evidence is not accepted; rerun against a stable snapshot.");
     }
 
-    private async Task VerifySnapshot(AnalysisRequest request, QualityConfig config, ProjectSnapshot snapshot, CancellationToken token)
+    private async Task<ProjectSnapshot> VerifySnapshot(AnalysisRequest request, QualityConfig config, ProjectSnapshot snapshot,
+        CancellationToken token)
     {
         var after = await ProjectDiscovery.DiscoverAsync(request, config, token, Definitions);
         if (after.SourceFingerprint != snapshot.SourceFingerprint)
             throw new InvalidOperationException("Source/build inputs changed during analysis. No scores are accepted; rerun against a stable snapshot.");
+        return after;
     }
 
     private async Task<AnalysisFacts> CollectFacts(ProjectSnapshot snapshot, List<Diagnostic> diagnostics, CancellationToken token)

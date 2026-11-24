@@ -32,11 +32,8 @@ internal static class ProductionRules
             .Concat(context.Index.TypesById[id].SelectMany(t => AssessmentEvidence.Syntax(t, []))).Distinct().ToArray(), StringComparer.Ordinal);
         var staticBlockers = ids.ToDictionary(id => id,
             id => context.Index.TypesById[id].SelectMany(staticComplexity.Blockers).Distinct().ToArray(), StringComparer.Ordinal);
-        var missing = assessments.Where(a => !a.Complete).Select(a => a.Method.TypeId).ToHashSet(StringComparer.Ordinal);
         var metrics = assessments.GroupBy(a => a.Method.TypeId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, Metrics, StringComparer.Ordinal);
-        var diagnostics = missing.Count == 0 ? Array.Empty<Diagnostic>() :
-            [new Diagnostic("coverage.incomplete", "Combined scoring requires complete syntax, resolved method identities and source/configuration-matched coverage. Inspect entity blockers; execute=true can collect coverage but may not resolve every blocker.")];
         var executableFindings = staticComplexity.ExecutableFindings(config).ToArray();
         return context.Finish(new()
         {
@@ -44,9 +41,25 @@ internal static class ProductionRules
             StaticOnlyFindingIds = executableFindings.Select(finding => finding.Id).ToHashSet(StringComparer.Ordinal),
             PrimaryScoreApplies = id => byType.Contains(id) || !staticComplexity.HasExecutables(id),
             Blockers = id => blockers[id], StaticBlockers = id => staticBlockers[id],
-            Metrics = id => staticComplexity.Metrics(id, metrics.GetValueOrDefault(id)), Diagnostics = diagnostics
+            Metrics = id => staticComplexity.Metrics(id, metrics.GetValueOrDefault(id)),
+            Diagnostics = CoverageDiagnostics(assessments, context.ChangedCode),
+            Contributions = assessments.Select(Contribution).Concat(staticComplexity.Contributions(sourceOnly: false)),
+            SharedBlockers = type => AssessmentEvidence.Syntax(type, []), SharedStaticBlockers = staticComplexity.SharedBlockers
         });
     }
+
+    private static Diagnostic[] CoverageDiagnostics(IEnumerable<Assessment> assessments, ChangedCodeScope? scope) =>
+        assessments.Any(a => !a.Complete && (scope?.Includes(a.Method.Location) ?? true))
+            ? [new("coverage.incomplete", "Combined scoring requires complete syntax, resolved method identities and source/configuration-matched coverage. Inspect entity blockers; execute=true can collect coverage but may not resolve every blocker.")]
+            : [];
+
+    private static ScoringContribution Contribution(Assessment assessment) => new(assessment.Method.TypeId, assessment.Method.Location)
+    {
+        Static = true,
+        Blockers = assessment.Blockers,
+        StaticBlockers = StaticComplexity.SyntaxBlockers(AssessmentEvidence.Of(assessment.Method).Syntax),
+        Metrics = Metrics([assessment])
+    };
 
     internal static IEnumerable<MethodFact> ProductionMethods(RuleContext context)
     {

@@ -10,6 +10,22 @@ internal sealed record FindingDefinition
     public required IEnumerable<Location> Locations { get; init; }
 }
 
+internal sealed record FindingOrigin(string TypeId, Location Location);
+
+internal sealed record LocatedFinding(Finding Finding, FindingOrigin[] Origins);
+
+internal enum DuplicateCandidateKind { Executable, Method }
+
+internal sealed record ScoringContribution(string TypeId, Location Location)
+{
+    public bool Primary { get; init; } = true;
+    public bool Static { get; init; }
+    public string[] Blockers { get; init; } = [];
+    public string[] StaticBlockers { get; init; } = [];
+    public SortedDictionary<string, double?> Metrics { get; init; } = RuleContext.Metrics();
+    public DuplicateCandidateKind? DuplicateCandidate { get; init; }
+}
+
 internal sealed record FamilyAssessment
 {
     public required string Family { get; init; }
@@ -22,6 +38,10 @@ internal sealed record FamilyAssessment
     public bool Incomplete { get; init; }
     public Func<string, SortedDictionary<string, double?>> Metrics { get; init; } = _ => RuleContext.Metrics();
     public IEnumerable<Diagnostic> Diagnostics { get; init; } = [];
+    public IEnumerable<ScoringContribution> Contributions { get; init; } = [];
+    public Func<TypeFact, string[]> SharedBlockers { get; init; } = _ => [];
+    public Func<TypeFact, string[]> SharedStaticBlockers { get; init; } = _ => [];
+    public Func<string, FindingOrigin[]> FindingOrigins { get; init; } = _ => [];
 }
 
 internal sealed record EntityAssessment
@@ -31,5 +51,7 @@ internal sealed record EntityAssessment
     public required string File { get; init; }
     public required Finding[] Findings { get; init; }
     public required string[] TypeIds { get; init; }
-    public required SortedDictionary<string, double?> Metrics { get; init; }
 }
+
+internal sealed record EntityScoringEvidence(bool PrimaryApplies, bool StaticApplies,
+    IEnumerable<string> Blockers, IEnumerable<string> StaticBlockers, SortedDictionary<string, double?> Metrics);

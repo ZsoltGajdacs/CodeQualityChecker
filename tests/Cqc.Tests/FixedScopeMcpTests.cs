@@ -107,15 +107,16 @@ public sealed class FixedScopeMcpTests
     {
         using var workspace = FixtureWorkspace.Copy("mixed");
         await ChangedScopeTests.Initialize(workspace);
-        await MarkChanged(workspace, "csharp/Quality.Sample/Calculator.cs");
-        await MarkChanged(workspace, "java/src/main/java/demo/Calculator.java");
+        await MarkChanged(workspace, "csharp/Quality.Sample/Calculator.cs", "if (value > 0) return value + 1;");
+        await MarkChanged(workspace, "java/src/main/java/demo/Calculator.java", "if (value > 0) return value + 1;");
+        await MarkChanged(workspace, "csharp/Quality.Sample.Tests/CalculatorTests.cs", "calculator.Choose(0);");
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         await using var client = await McpTests.Connect(timeout.Token);
         var sourceRequest = new { projectRoot = workspace.Root };
         var before = await McpTests.Read(client, ChangesTool, sourceRequest, timeout.Token);
         var executed = await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root, execute = true }, timeout.Token);
         Assert.Equal(new[] { "code", "dependencies", "duplication", "tests" }, Families(executed, "families"));
-        Assert.Equal(2, executed.GetProperty("fileCount").GetInt32());
+        Assert.Equal(3, executed.GetProperty("fileCount").GetInt32());
         Assert.False(executed.TryGetProperty("analysisNote", out var note) && note.ValueKind == JsonValueKind.String);
         Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", "coverage.json")));
         Assert.Contains(Family(executed, "families", "code").GetProperty("scores").EnumerateArray(),
@@ -134,7 +135,7 @@ public sealed class FixedScopeMcpTests
             .Replace("OverComplexity9", "CloneLeft", StringComparison.Ordinal);
         await File.WriteAllTextAsync(path, staged);
         await workspace.Git("add", ClonePath);
-        await File.WriteAllTextAsync(path, original + "\n");
+        await File.WriteAllTextAsync(path, original.Replace("return doubled + 1;", "return doubled + 1; // Edited", StringComparison.Ordinal));
     }
 
     private static async Task AssertChangedClone(McpClient client, JsonElement summary, CancellationToken token)
@@ -212,6 +213,11 @@ public sealed class FixedScopeMcpTests
     private static IEnumerable<string?> Families(JsonElement report, string section) =>
         report.GetProperty(section).EnumerateArray().Select(entry => entry.GetProperty("family").GetString());
 
-    private static Task MarkChanged(FixtureWorkspace workspace, string file) =>
-        File.AppendAllTextAsync(Path.Combine(workspace.Root, file), "\n");
+    private static async Task MarkChanged(FixtureWorkspace workspace, string file, string statement)
+    {
+        var path = Path.Combine(workspace.Root, file);
+        var content = await File.ReadAllTextAsync(path);
+        await File.WriteAllTextAsync(path, content.Replace(statement, statement.Replace(";", " /* Edited */;", StringComparison.Ordinal),
+            StringComparison.Ordinal));
+    }
 }

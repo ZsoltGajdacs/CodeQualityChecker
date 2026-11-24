@@ -6,23 +6,28 @@ internal sealed class EntityReport
     private readonly IGrouping<string, TypeFact>[] types;
     private readonly Finding[] findings;
     private readonly FamilyAssessment assessment;
+    private readonly ChangedAssessment? changed;
     private readonly ILookup<string, string> typesByFile;
     private readonly ILookup<string, Finding> findingsByEntity;
     private readonly ILookup<string, Finding> findingsByFile;
     internal sealed record Result(EntityScore[] Entities, Finding[] Findings);
 
-    internal EntityReport(FamilyAssessment assessment)
+    internal EntityReport(FamilyAssessment assessment, ChangedAssessment? changed)
     {
         this.assessment = assessment;
-        types = assessment.Types.GroupBy(t => t.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).ToArray();
-        findings = assessment.Findings.DistinctBy(f => f.Id).OrderBy(f => f.Id, StringComparer.Ordinal).ToArray();
+        this.changed = changed;
+        types = (changed?.Types ?? assessment.Types).GroupBy(t => t.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).ToArray();
+        findings = (changed?.Findings ?? assessment.Findings).DistinctBy(f => f.Id).OrderBy(f => f.Id, StringComparer.Ordinal).ToArray();
         typesByFile = types.SelectMany(g => g.Select(t => t.Location.File).Distinct(StringComparer.Ordinal)
             .Select(file => (File: file, Id: g.Key))).ToLookup(p => p.File, p => p.Id, StringComparer.Ordinal);
         findingsByEntity = findings.SelectMany(f => f.EntityIds.Distinct(StringComparer.Ordinal)
             .Select(id => (Id: id, Finding: f))).ToLookup(p => p.Id, p => p.Finding, StringComparer.Ordinal);
-        findingsByFile = findings.SelectMany(f => f.Locations.Select(l => l.File).Distinct(StringComparer.Ordinal)
+        findingsByFile = findings.SelectMany(f => ScoringFiles(f).Distinct(StringComparer.Ordinal)
             .Select(file => (File: file, Finding: f))).ToLookup(p => p.File, p => p.Finding, StringComparer.Ordinal);
     }
+
+    private IEnumerable<string> ScoringFiles(Finding finding) => changed is null ? finding.Locations.Select(location => location.File)
+        : changed.Origins(finding).Select(origin => origin.Location.File);
 
     internal Result Build(string[] selectedFiles)
     {
@@ -42,15 +47,15 @@ internal sealed class EntityReport
     private EntityScore ClassScore(IGrouping<string, TypeFact> type) => Score(new()
     {
         Id = type.Key, Kind = "class", File = type.Select(t => t.Location.File).Order(StringComparer.Ordinal).First(),
-        TypeIds = [type.Key], Findings = findingsByEntity[type.Key].ToArray(),
-        Metrics = assessment.Metrics(type.Key)
+        TypeIds = [type.Key], Findings = findingsByEntity[type.Key].ToArray()
     });
 
     private EntityScore FileScore(string file)
     {
         var ids = typesByFile[file].ToHashSet(StringComparer.Ordinal);
-        var applicable = findingsByFile[file].Where(f => f.EntityIds.Any(ids.Contains)).ToArray();
-        return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids.ToArray(), Findings = applicable, Metrics = FileMetrics(ids) });
+        var applicable = findingsByFile[file].Where(f => changed is null ? f.EntityIds.Any(ids.Contains)
+            : changed.Origins(f).Any(origin => origin.Location.File == file && ids.Contains(origin.TypeId))).ToArray();
+        return Score(new() { Id = "file:" + file, Kind = "file", File = file, TypeIds = ids.ToArray(), Findings = applicable });
     }
 
     private SortedDictionary<string, double?> FileMetrics(IEnumerable<string> ids)
@@ -63,14 +68,21 @@ internal sealed class EntityReport
 
     private EntityScore Score(EntityAssessment entity)
     {
-        var keys = entity.TypeIds;
+        var evidence = changed?.For(entity) ?? WholeEntityEvidence(entity);
         var primary = entity.Findings.Where(finding => !assessment.StaticOnlyFindingIds.Contains(finding.Id));
-        var applicable = keys.Where(assessment.PrimaryScoreApplies).ToArray();
-        var result = applicable.Length == 0 ? new("notApplicable", null, [], [])
-            : AssessmentEvidence.Score(primary, applicable.SelectMany(assessment.Blockers));
-        var secondary = assessment.StaticBlockers is null ? null : AssessmentEvidence.Score(
-            entity.Findings.Where(f => f.Rule == "code.complexity"), keys.SelectMany(assessment.StaticBlockers));
-        return new(entity.Id, entity.Kind, entity.File, result.Status, result.Score, result.FindingIds, entity.Metrics)
+        var result = evidence.PrimaryApplies ? AssessmentEvidence.Score(primary, evidence.Blockers) : new("notApplicable", null, [], []);
+        var secondary = evidence.StaticApplies ? AssessmentEvidence.Score(
+            entity.Findings.Where(f => f.Rule == "code.complexity"), evidence.StaticBlockers) : null;
+        return new(entity.Id, entity.Kind, entity.File, result.Status, result.Score, result.FindingIds, evidence.Metrics)
         { Blockers = result.Blockers, StaticComplexity = secondary };
+    }
+
+    private EntityScoringEvidence WholeEntityEvidence(EntityAssessment entity)
+    {
+        var applicable = entity.TypeIds.Where(assessment.PrimaryScoreApplies).ToArray();
+        var staticBlockers = assessment.StaticBlockers;
+        var metrics = entity.Kind == "file" ? FileMetrics(entity.TypeIds) : assessment.Metrics(entity.Id);
+        return new(applicable.Length != 0, staticBlockers is not null, applicable.SelectMany(assessment.Blockers),
+            staticBlockers is null ? [] : entity.TypeIds.SelectMany(staticBlockers), metrics);
     }
 }
