@@ -24,7 +24,7 @@ public sealed class PartialDuplicationTests
             Executables = [new()
             {
                 Id = "Selected#initializer", TypeId = selected.Id, Language = selected.Language, Location = selected.Location,
-                Complexity = 1, Fingerprints = Fingerprints, NodeCount = 30
+                Complexity = 1, Fingerprints = Fingerprints, NodeCount = 30, DuplicationLines = 4
             }]
         };
         var family = Evaluate(facts, ["Selected.java", "Other.cs"], sourceOnly);
@@ -57,7 +57,7 @@ public sealed class PartialDuplicationTests
 
     private static MethodFact Method(TypeFact owner, EvidenceState evidence) =>
         new(owner.Id + ".work", owner.Id, owner.Language, owner.Location, 1, 15,
-            false, false, false, 0, [], Fingerprints, 30) { Evidence = evidence };
+            false, false, false, 0, [], Fingerprints, 30) { Evidence = evidence, DuplicationLines = 4 };
 
     private static FamilyResult Evaluate(AnalysisFacts facts, string[] selected, bool sourceOnly)
     {

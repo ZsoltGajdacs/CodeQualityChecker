@@ -1,5 +1,6 @@
 package cqc;
 
+import com.github.javaparser.Range;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.comments.Comment;
@@ -10,7 +11,10 @@ import java.util.function.Consumer;
 
 /** Finds initializer bodies and assigns nested executable nodes to their own source locations. */
 final class ExecutableDiscovery {
-    record Unit(String kind, Node body, List<Node> nodes) { }
+    record Unit(String kind, Body body) { }
+    record Body(Node root, List<Node> nodes, List<Range> excludedRanges) {
+        private void exclude(Node node) { node.getRange().ifPresent(excludedRanges::add); }
+    }
 
     private final Consumer<Unit> emit;
 
@@ -21,14 +25,14 @@ final class ExecutableDiscovery {
         if (type instanceof EnumDeclaration declaration) declaration.getEntries().forEach(this::enumConstant);
     }
 
-    List<Node> measure(Node body) { return measure(body, true); }
+    Body measure(Node body) { return measure(body, true); }
 
-    List<Node> measureCallable(Node body) { return measure(body, false); }
+    Body measureCallable(Node body) { return measure(body, false); }
 
-    private List<Node> measure(Node body, boolean separateLambdas) {
-        var owned = new ArrayList<Node>();
-        visit(body, owned, separateLambdas);
-        return owned;
+    private Body measure(Node root, boolean separateLambdas) {
+        var body = new Body(root, new ArrayList<>(), new ArrayList<>());
+        visit(root, body, separateLambdas);
+        return body;
     }
 
     private void initializer(BodyDeclaration<?> member) {
@@ -49,21 +53,28 @@ final class ExecutableDiscovery {
         constant.getClassBody().forEach(this::nestedMember);
     }
 
-    private void add(String kind, Node body) { emit.accept(new Unit(kind, body, measure(body))); }
+    private void add(String kind, Node body) { emit.accept(new Unit(kind, measure(body))); }
 
-    private void visit(Node node, List<Node> owned, boolean separateLambdas) {
-        if (node instanceof Comment || node instanceof TypeDeclaration<?>) return;
-        owned.add(node);
+    private void visit(Node node, Body body, boolean separateLambdas) {
+        if (node instanceof Comment) return;
+        if (node instanceof TypeDeclaration<?>) {
+            body.exclude(node);
+            return;
+        }
+        body.nodes().add(node);
         if (separateLambdas && node instanceof LambdaExpr lambda) {
+            body.exclude(lambda.getBody());
             add("lambda", lambda.getBody());
             return;
         }
-        node.getChildNodes().forEach(child -> visitChild(child, owned, separateLambdas));
+        node.getChildNodes().forEach(child -> visitChild(child, body, separateLambdas));
     }
 
-    private void visitChild(Node child, List<Node> owned, boolean separateLambdas) {
-        if (child instanceof BodyDeclaration<?> member) nestedMember(member);
-        else visit(child, owned, separateLambdas);
+    private void visitChild(Node child, Body body, boolean separateLambdas) {
+        if (child instanceof BodyDeclaration<?> member) {
+            body.exclude(member);
+            nestedMember(member);
+        } else visit(child, body, separateLambdas);
     }
 
     static boolean belongsToInitializer(TypeDeclaration<?> type) {

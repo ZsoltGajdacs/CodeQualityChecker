@@ -23,6 +23,9 @@ internal static class MethodFacts
             measurement.Complexity, measurement.Lines, TestRecognition.IsTest(symbol), TestRecognition.IsFixture(symbol, testType),
             TestRecognition.IsParameterized(symbol), resolution.Assertions, resolution.Calls,
             fingerprints, measurement.NodeCount, complete, CoverageSignature: context.SourceOnly ? null : name)
-        { ContextId = context.ContextId, QualifiedName = name, Evidence = evidence };
+        {
+            ContextId = context.ContextId, QualifiedName = name, Evidence = evidence,
+            DuplicationLines = DuplicationLineCount.Measure(MethodDeclarations.Body(declaration))
+        };
     }
 }

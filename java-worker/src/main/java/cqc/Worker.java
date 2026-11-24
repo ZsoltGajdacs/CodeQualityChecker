@@ -45,9 +45,9 @@ public final class Worker {
     record MethodFact(String id, String typeId, String language, Location location, int complexity,
         int executableLines, boolean isTest, boolean isFixture, boolean isParameterized,
         int assertions, String[] calls, String[] fingerprints, int nodeCount, boolean complete, String coverageSignature,
-        String contextId, String qualifiedName, EvidenceState evidence) { }
+        String contextId, String qualifiedName, EvidenceState evidence, int duplicationLines) { }
     record ExecutableFact(String id, String typeId, String language, Location location, int complexity,
-        String[] fingerprints, int nodeCount, String kind) { }
+        String[] fingerprints, int nodeCount, String kind, int duplicationLines) { }
     record AnalysisFacts(List<TypeFact> types, List<MethodFact> methods, List<DependencyFact> dependencies,
         List<Diagnostic> diagnostics, boolean semanticComplete, String schemaVersion, List<AnalysisContext> contexts, List<SyntaxGap> syntaxGaps,
         List<ExecutableFact> executables) { }

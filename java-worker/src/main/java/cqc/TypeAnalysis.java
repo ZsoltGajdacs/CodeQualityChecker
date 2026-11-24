@@ -89,9 +89,10 @@ final class TypeAnalysis {
 
     private static Worker.ExecutableFact executable(MethodAnalyzer.Owner owner, ExecutableDiscovery.Unit unit) {
         String file = owner.source().file();
-        String id = owner.id() + "." + unit.kind() + sourceKey(file, unit.body());
-        var metrics = MethodMeasurement.inspect(unit.nodes());
-        return new Worker.ExecutableFact(id, owner.id(), "java", location(file, unit.body()), metrics.complexity(),
-            StructuralFingerprint.createOwned(unit.nodes()), metrics.nodes(), unit.kind());
+        var body = unit.body();
+        String id = owner.id() + "." + unit.kind() + sourceKey(file, body.root());
+        var metrics = MethodMeasurement.inspect(body.nodes());
+        return new Worker.ExecutableFact(id, owner.id(), "java", location(file, body.root()), metrics.complexity(),
+            StructuralFingerprint.createOwned(body.nodes()), metrics.nodes(), unit.kind(), DuplicationLines.count(body));
     }
 }

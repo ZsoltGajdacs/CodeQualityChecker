@@ -82,7 +82,7 @@ public sealed class ReviewRegressionTests
         var methods = Enumerable.Range(0, 2000).Select(index => new MethodFact($"Type{index}.Run()", $"Type{index}", "csharp",
             new($"Part{index}.cs", 1, 10), 1, 10, false, false, false, 0, [],
             Enumerable.Range(0, 256).Select(node => $"fingerprint-{index}-{node}").ToArray(), 300)
-            { Evidence = evidence }).ToArray();
+            { Evidence = evidence, DuplicationLines = 10 }).ToArray();
         var types = methods.Select(method => new TypeFact(method.TypeId, "csharp", method.Location, false)
             { Evidence = evidence }).ToArray();
         var files = types.Select(type => type.Location.File).ToArray();

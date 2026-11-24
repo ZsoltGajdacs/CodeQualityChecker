@@ -219,7 +219,7 @@ public sealed class CoreEngineTests
     {
         options ??= new();
         return new(id, type, "csharp", new(type + ".cs", 2, 8), options.Complexity, options.Lines,
-            options.Test, false, false, options.Assertions, [], ["a", "b", "c"], 25) { Evidence = Verified };
+            options.Test, false, false, options.Assertions, [], ["a", "b", "c"], 25) { Evidence = Verified, DuplicationLines = 4 };
     }
     private static AnalysisFacts Facts(MethodFact[] methods, DependencyFact[]? edges = null) => new(
         methods.Select(m => new TypeFact(m.TypeId, m.Language, new(m.Location.File, 1, 20), false) { IsTest = methods.Any(t => t.TypeId == m.TypeId && t.IsTest), Evidence = Verified })

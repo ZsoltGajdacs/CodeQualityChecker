@@ -32,6 +32,8 @@ Use `execute: true` when the user requests execution and authorizes project-cont
 
 Optional `configPath` selects CQC configuration. Preserve the user's thresholds and exclusions. `timeoutSeconds` accepts 1–3600. With `execute: false`, `check_all` and the individual family tools can reuse matching local evidence and accept `reportPath` for a CQC coverage evidence file.
 
+Duplication checks require at least four lines of body code. Signatures, comments, blank lines, brace-only lines, and separately analyzed nested bodies are excluded from the count. A project can raise the minimum with `duplicateMinLines`. Node-count and similarity thresholds also apply.
+
 When diagnostics identify a legacy reference manifest or changed or missing build outputs, explain which assessments lack evidence. The current manifests verify Maven classpath entries and .NET assemblies in their existing locations. Refresh them through an authorized `execute: true` run when the requested assessment needs that evidence.
 
 ## Retrieve the completed report

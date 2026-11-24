@@ -116,7 +116,7 @@ public sealed class AssessmentEvidenceTests
     private static AnalysisFacts Facts(EvidenceState evidence)
     {
         var method = new MethodFact("A.run()", "A", "java", new("A.java", 2, 9), 9, 6,
-            false, false, false, 0, [], ["body"], 25) { Evidence = evidence };
+            false, false, false, 0, [], ["body"], 25) { Evidence = evidence, DuplicationLines = 6 };
         var type = new TypeFact("A", "java", new("A.java", 1, 10), false) { Evidence = evidence };
         return new([type], [method], [], [], false);
     }

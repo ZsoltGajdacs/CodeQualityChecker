@@ -4,7 +4,8 @@ internal static class DuplicationRules
 {
     public static FamilyResult Evaluate(RuleContext context, QualityConfig config)
     {
-        var eligible = context.Index.Executables.Where(executable => Eligible(executable, config))
+        var minLines = Math.Max(QualityConfig.MinimumDuplicateLines, config.DuplicateMinLines);
+        var eligible = context.Index.Executables.Where(executable => Eligible(executable, minLines, config.DuplicateMinNodes))
             .DistinctBy(executable => executable.Id, StringComparer.Ordinal).ToArray();
         var matches = new DuplicateCandidates(eligible, context.CancellationToken).Matches(config.DuplicateSimilarity).ToArray();
         var findings = Findings(eligible, matches).ToArray();
@@ -31,9 +32,9 @@ internal static class DuplicationRules
             ["duplicateGroups"] = groups
         };
 
-    private static bool Eligible(StructuralExecutable executable, QualityConfig config)
-        => executable.Syntax && executable.Location.EndLine - executable.Location.StartLine + 1 >= config.DuplicateMinLines
-            && executable.NodeCount >= config.DuplicateMinNodes && executable.Fingerprints.Length > 0;
+    private static bool Eligible(StructuralExecutable executable, int minLines, int minNodes)
+        => executable.Syntax && executable.DuplicationLines >= minLines
+            && executable.NodeCount >= minNodes && executable.Fingerprints.Length > 0;
 
     private static IEnumerable<Finding> Findings(StructuralExecutable[] executables, DuplicateMatch[] matches)
     {

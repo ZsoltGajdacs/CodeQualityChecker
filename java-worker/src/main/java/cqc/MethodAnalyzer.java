@@ -13,9 +13,9 @@ final class MethodAnalyzer {
     record Owner(Worker.Source source, String id) { }
     private record ResolvedMethod(String id, MethodResolution.Identity identity, MethodResolution.Calls calls, String signature) { }
     private record CallableSource(Node declaration, MethodRoles roles) { }
-    private record Measurement(MethodMeasurement.Metrics metrics, String[] fingerprints) {
-        static Measurement of(List<Node> nodes, String[] fingerprints) {
-            return new Measurement(MethodMeasurement.inspect(nodes), fingerprints);
+    private record Measurement(MethodMeasurement.Metrics metrics, String[] fingerprints, int duplicationLines) {
+        static Measurement of(ExecutableDiscovery.Body body, String[] fingerprints) {
+            return new Measurement(MethodMeasurement.inspect(body.nodes()), fingerprints, DuplicationLines.count(body));
         }
     }
 
@@ -24,21 +24,21 @@ final class MethodAnalyzer {
         resolution = new MethodResolution(reporter, symbols);
     }
 
-    Worker.MethodFact analyze(Owner owner, CallableDeclaration<?> declaration, List<Node> nodes) {
-        var method = methodIdentity(owner.source(), declaration, nodes);
-        var fingerprints = StructuralFingerprint.create(declaration, nodes);
-        return methodFact(owner, new CallableSource(declaration, roles(declaration)), method, Measurement.of(nodes, fingerprints));
+    Worker.MethodFact analyze(Owner owner, CallableDeclaration<?> declaration, ExecutableDiscovery.Body body) {
+        var method = methodIdentity(owner.source(), declaration, body.nodes());
+        var fingerprints = StructuralFingerprint.create(declaration, body.nodes());
+        return methodFact(owner, new CallableSource(declaration, roles(declaration)), method, Measurement.of(body, fingerprints));
     }
 
-    Worker.MethodFact analyzeCompact(Owner owner, RecordDeclaration record, CompactConstructorDeclaration constructor, List<Node> nodes) {
+    Worker.MethodFact analyzeCompact(Owner owner, RecordDeclaration record, CompactConstructorDeclaration constructor, ExecutableDiscovery.Body body) {
         var source = owner.source();
         var identity = resolution.compactIdentity(source, record, sourceOnly);
-        var calls = sourceOnly ? MethodResolution.Calls.NOT_ATTEMPTED : resolution.calls(source, nodes.stream());
+        var calls = sourceOnly ? MethodResolution.Calls.NOT_ATTEMPTED : resolution.calls(source, body.nodes().stream());
         String signature = sourceOnly ? null : MethodResolution.compactCoverageSignature(record);
         String id = SymbolContexts.qualify(source.context().id(), identity.name());
         if (sourceOnly) id += sourceKey(source.file(), constructor);
         var method = new ResolvedMethod(id, identity, calls, signature);
-        var measurement = Measurement.of(nodes, StructuralFingerprint.createOwned(nodes));
+        var measurement = Measurement.of(body, StructuralFingerprint.createOwned(body.nodes()));
         return methodFact(owner, new CallableSource(constructor, MethodRoles.CONSTRUCTOR), method, measurement);
     }
 
@@ -62,7 +62,8 @@ final class MethodAnalyzer {
         var evidence = new Worker.EvidenceState(true, identity.complete(), calls.complete(), !sourceOnly, context.verified(), context.blockers());
         return new Worker.MethodFact(method.id(), owner.id(), "java", location(source.file(), callable.declaration()), metrics.complexity(),
             metrics.lines(), roles.test(), roles.fixture(), roles.parameterized(), calls.assertions(), calls.ids(), measurement.fingerprints(),
-            metrics.nodes(), identity.complete() && calls.complete() && context.verified(), method.signature(), context.id(), identity.name(), evidence);
+            metrics.nodes(), identity.complete() && calls.complete() && context.verified(), method.signature(), context.id(), identity.name(), evidence,
+            measurement.duplicationLines());
     }
 
     private ResolvedMethod methodIdentity(Worker.Source source, CallableDeclaration<?> declaration, List<Node> nodes) {

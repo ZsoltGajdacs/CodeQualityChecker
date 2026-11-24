@@ -30,6 +30,7 @@ public sealed record MethodFact(
     public string? ContextId { get; init; }
     public string? QualifiedName { get; init; }
     public EvidenceState? Evidence { get; init; }
+    public int? DuplicationLines { get; init; }
 }
 public sealed record TypeFact(string Id, string Language, Location Location, bool IsAbstract)
 {
@@ -77,11 +78,13 @@ public sealed record AnalysisRequest
 
 public sealed record QualityConfig
 {
+    internal const int MinimumDuplicateLines = 4;
+
     public int ComplexityThreshold { get; init; } = 8;
     public double CrapThreshold { get; init; } = 30;
     public int TestLinesThreshold { get; init; } = 50;
     public double DuplicateSimilarity { get; init; } = .82;
-    public int DuplicateMinLines { get; init; } = 4;
+    public int DuplicateMinLines { get; init; } = MinimumDuplicateLines;
     public int DuplicateMinNodes { get; init; } = 20;
     public SortedDictionary<string, string[]> Components { get; init; } = new(StringComparer.Ordinal);
     public SortedDictionary<string, string[]> AllowedDependencies { get; init; } = new(StringComparer.Ordinal);

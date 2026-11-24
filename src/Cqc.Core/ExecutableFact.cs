@@ -10,4 +10,5 @@ public sealed record ExecutableFact
     public int Complexity { get; init; }
     public string[] Fingerprints { get; init; } = [];
     public int NodeCount { get; init; }
+    public int? DuplicationLines { get; init; }
 }

@@ -36,6 +36,7 @@ internal sealed record StructuralExecutable
     public int Complexity { get; init; }
     public string[] Fingerprints { get; init; } = [];
     public int NodeCount { get; init; }
+    public int? DuplicationLines { get; init; }
     public bool Syntax { get; init; }
     public bool IsMethod { get; init; }
 
@@ -44,13 +45,14 @@ internal sealed record StructuralExecutable
         {
             Id = method.Id, TypeId = method.TypeId, Language = method.Language, Location = method.Location,
             Complexity = method.Complexity, Fingerprints = method.Fingerprints, NodeCount = method.NodeCount,
-            Syntax = AssessmentEvidence.Of(method).Syntax, IsMethod = true
+            DuplicationLines = method.DuplicationLines, Syntax = AssessmentEvidence.Of(method).Syntax, IsMethod = true
         };
 
     internal static StructuralExecutable FromInitializer(ExecutableFact executable) =>
         new()
         {
             Id = executable.Id, TypeId = executable.TypeId, Language = executable.Language, Location = executable.Location,
-            Complexity = executable.Complexity, Fingerprints = executable.Fingerprints, NodeCount = executable.NodeCount, Syntax = true
+            Complexity = executable.Complexity, Fingerprints = executable.Fingerprints, NodeCount = executable.NodeCount,
+            DuplicationLines = executable.DuplicationLines, Syntax = true
         };
 }
