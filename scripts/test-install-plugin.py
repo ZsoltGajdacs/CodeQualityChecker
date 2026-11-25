@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Exercise installer entrypoints with real generation and disposable build/client CLIs."""
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -43,6 +45,29 @@ if [[ "${CQC_TEST_BUILD_FAIL:-}" == 1 ]]; then exit 19; fi
 mkdir -p dist/cqc-osx-arm64
 printf '#!/bin/sh\\nexit 0\\n' > dist/cqc-osx-arm64/cqc
 chmod +x dist/cqc-osx-arm64/cqc
+'''
+FAKE_RELEASE_DOWNLOAD = '''import os, shutil, sys
+from pathlib import Path
+arguments = sys.argv[1:]
+url = arguments[-1]
+repository = 'https://github.com/ZsoltGajdacs/CodeQualityChecker/releases'
+raw = 'https://raw.githubusercontent.com/ZsoltGajdacs/CodeQualityChecker'
+checkout = Path(os.environ['CQC_TEST_ROOT'])
+if url == f'{repository}/latest':
+    print(f'{repository}/tag/v1.2.3', end='')
+elif url == f'{raw}/master/install.sh':
+    print((checkout / 'install.sh').read_text(), end='')
+elif url.startswith(f'{raw}/v1.2.3/'):
+    source = checkout / url.removeprefix(f'{raw}/v1.2.3/')
+    if source.name == os.environ.get('CQC_TEST_MISSING_ASSET'):
+        sys.exit(22)
+    output = arguments[arguments.index('--output') + 1]
+    shutil.copyfile(source, output)
+else:
+    asset = url.removeprefix(f'{repository}/download/v1.2.3/')
+    assert asset in ('cqc-osx-arm64.tar.gz', 'cqc-osx-arm64.tar.gz.sha256'), url
+    output = arguments[arguments.index('--output') + 1]
+    shutil.copyfile(checkout.parent / asset, output)
 '''
 
 
@@ -122,6 +147,96 @@ class InstallerTests(unittest.TestCase):
                 expected = self.repository / 'dist/cqc-osx-arm64/cqc'
                 server = json.loads(configuration.read_text())['mcpServers']['cqc']
                 self.assertEqual(server['command'], str(expected))
+
+    def install_release(self, selection):
+        return subprocess.run([self.repository / 'install.sh'],
+                              input=selection, cwd=self.directory, env=self.environment,
+                              capture_output=True, text=True, timeout=30)
+
+    def prepare_release(self):
+        shutil.copy2(ROOT / 'install.sh', self.repository)
+        self.write_executable(self.bin / 'uname', '#!/bin/sh\necho Darwin arm64\n')
+        self.write_executable(self.bin / 'curl', '#!' + sys.executable + '\n' + FAKE_RELEASE_DOWNLOAD)
+        package = self.directory / 'cqc-osx-arm64'
+        self.write_executable(package / 'cqc', '#!/bin/sh\nexit 0\n')
+        archive = self.directory / 'cqc-osx-arm64.tar.gz'
+        with tarfile.open(archive, 'w:gz') as release:
+            release.add(package, arcname=package.name)
+        checksum = archive.with_suffix('.gz.sha256')
+        checksum.write_text(f'{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n')
+        return checksum
+
+    def install_from_readme(self):
+        home = self.directory / 'standalone home'
+        home.mkdir(exist_ok=True)
+        self.environment['HOME'] = str(home)
+        command = (ROOT / 'README.md').read_text().split('```sh\n', 1)[1].split('```', 1)[0]
+        result = subprocess.run(['/bin/zsh', '-f', '-c', command], input='1 2\n', cwd=home,
+                                text=True, capture_output=True, env=self.environment, timeout=30)
+        return result, home / 'Library/Application Support/CodeQualityChecker'
+
+    def test_readme_command_installs_runtime_and_both_plugins_without_checkout(self):
+        self.prepare_release()
+        result, installation = self.install_from_readme()
+        self.assert_success(result)
+        self.assertFalse((self.repository / 'dist').exists())
+        executable = installation / 'dist/release/cqc-osx-arm64/cqc'
+        self.assertTrue(os.access(executable, os.X_OK))
+        for client in CLIENTS:
+            [entry] = [record for record in self.operations() if record['client'] == client
+                       and record['args'][:3] == ['plugin', 'marketplace', 'add']]
+            marketplace = Path(entry['args'][-1])
+            self.assertTrue(marketplace.is_relative_to(installation))
+            config = json.loads((marketplace / 'plugins/cqc/.mcp.json').read_text())
+            self.assertEqual(config['mcpServers']['cqc']['command'], str(executable))
+
+    def test_readme_command_preserves_runtime_if_a_tagged_helper_download_fails(self):
+        self.prepare_release()
+        executable = (self.directory / 'standalone home/Library/Application Support/'
+                      'CodeQualityChecker/dist/release/cqc-osx-arm64/cqc')
+        self.write_executable(executable, '#!/bin/sh\nexit 42\n')
+        self.environment['CQC_TEST_MISSING_ASSET'] = 'package-plugins.py'
+        result, _ = self.install_from_readme()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Could not download scripts/package-plugins.py from v1.2.3.', result.stderr)
+        self.assertEqual(executable.read_text(), '#!/bin/sh\nexit 42\n')
+        self.assertEqual(self.operations(), [])
+
+    def test_release_multiselect_replaces_runtime_and_installs_selected_clients(self):
+        self.prepare_release()
+        runtime = self.repository / 'dist/release/cqc-osx-arm64'
+        for selection, clients in [('1', {'claude'}), ('2', {'codex'}), ('2,1', set(CLIENTS))]:
+            with self.subTest(selection=selection):
+                self.clear_log()
+                self.write_executable(runtime / 'cqc', '#!/bin/sh\nexit 42\n')
+                obsolete = runtime / 'obsolete-worker'
+                obsolete.touch()
+                previous = {client: set(self.configs(client)) for client in clients}
+                self.assert_success(self.install_release(f'3\n{selection}\n'))
+                self.assertFalse(obsolete.exists())
+                self.assertEqual((runtime / 'cqc').read_text(), '#!/bin/sh\nexit 0\n')
+                self.assertEqual({entry['client'] for entry in self.operations()}, clients)
+                for client in clients:
+                    added, = set(self.configs(client)) - previous[client]
+                    server = json.loads(added.read_text())['mcpServers']['cqc']
+                    self.assertEqual(server['command'], str(runtime / 'cqc'))
+
+    def test_release_bad_checksum_preserves_runtime_and_client_settings(self):
+        checksum = self.prepare_release()
+        checksum.write_text(f'{"0" * 64}  cqc-osx-arm64.tar.gz\n')
+        executable = self.repository / 'dist/release/cqc-osx-arm64/cqc'
+        self.write_executable(executable, '#!/bin/sh\nexit 42\n')
+        result = self.install_release('1 2\n')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('checksum', result.stderr)
+        self.assertEqual(executable.read_text(), '#!/bin/sh\nexit 42\n')
+        self.assertEqual(self.operations(), [])
+
+    def test_release_empty_selection_cancels(self):
+        self.prepare_release()
+        self.assert_success(self.install_release('\n'))
+        self.assertFalse((self.repository / 'dist').exists())
+        self.assertEqual(self.operations(), [])
 
     def test_shared_wrapper_refreshes_both_clients_with_one_build(self):
         executable = self.repository / 'dist/cqc-osx-arm64/cqc'

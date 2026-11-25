@@ -7,6 +7,8 @@ description: Review Java, C#, TypeScript, and React source with the CQC MCP tool
 
 Use the plugin's CQC MCP tools. Tool prefixes vary by client. Identify the server by `inspect_project` and `get_report_page`. If it connects but a review tool named below is missing, report that the configured server may be out of date. If the server is unavailable, report the connection failure and the configured executable prerequisite. Installation and client configuration changes require a user request.
 
+On macOS Apple Silicon, the README's install command downloads the latest CQC release and refreshes the Claude Code or Codex plugins selected at its prompt. Use `./install.sh` inside a checkout to use that checkout's plugin files.
+
 ## Choose the scope and checks
 
 Establish the absolute repository root and the user's intended scope. Use `inspect_project` when module or language support is unclear. Report unsupported languages as unanalyzed.

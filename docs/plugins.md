@@ -1,6 +1,19 @@
 # Local Claude Code and Codex plugins
 
-The `cqc` plugins (version `0.3.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v3 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. The installer scripts build that installation by default. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
+The `cqc` plugins (version `0.3.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v3 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
+
+## Install the latest release
+
+Use the [README install command](../README.md#install-on-macos-apple-silicon) to install CQC under `~/Library/Application Support/CodeQualityChecker`. It downloads the plugin files from the same release tag as the runtime. Python 3.9 or later and the selected client CLIs must be on `PATH`. Enter `1` for Claude Code, `2` for Codex, or `1 2` for both. Press Enter on an empty prompt to cancel.
+
+Run `./install.sh` from a checkout to use its plugin files and keep the installation under that checkout's `dist/` directory. Both modes verify the release archive against its SHA-256 checksum before replacing the runtime. Keep the installation directory in place because client registrations use absolute paths. Rerun the same command to update and restart the selected clients.
+
+For a manual setup, extract the [release archive](https://github.com/ZsoltGajdacs/CodeQualityChecker/releases/latest) into a permanent directory and keep the server, workers, and bundled runtimes together. The executable serves MCP over stdio and writes logs to stderr. For example, add this to your Codex MCP configuration:
+
+```toml
+[mcp_servers.cqc]
+command = "/absolute/path/cqc-osx-arm64/cqc"
+```
 
 ## Generate
 
