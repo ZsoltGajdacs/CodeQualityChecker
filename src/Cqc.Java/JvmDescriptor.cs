@@ -30,7 +30,7 @@ internal static class JvmDescriptor
     {
         var end = descriptor.IndexOf(';', index);
         if (end < 0) throw new InvalidDataException("Invalid JVM object descriptor.");
-        var type = descriptor[index..end].Replace('/', '.').Replace('$', '.');
+        var type = descriptor[index..end].Replace('/', '.');
         index = end + 1;
         return type;
     }

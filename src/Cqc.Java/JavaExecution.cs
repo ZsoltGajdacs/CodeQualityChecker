@@ -97,10 +97,16 @@ public sealed class JavaExecution : ILanguageExecution
     private static bool IsRegularOutput(string path) =>
         File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
 
-    public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods)
+    public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods) =>
+        ReadCoverage(build, methods, null);
+
+    internal MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods, ICollection<Diagnostic>? diagnostics)
     {
         var facts = methods.ToArray();
-        return build.Reports.SelectMany(report => JavaCoverageReader.ReadJava(report, OwnedMethods(build, report, facts)))
+        return build.Reports.SelectMany(report => JavaCoverageReader.ReadJava(report, OwnedMethods(build, report, facts),
+                signature => diagnostics?.Add(new("java.coverage_signature_ambiguous",
+                    $"Multiple authored methods match JaCoCo signature {signature}.", build.ReportModules.GetValueOrDefault(report), Language)
+                    { Construct = signature })))
             .GroupBy(method => method.MethodId, StringComparer.Ordinal).Where(group => group.Count() == 1)
             .Select(group => group.Single()).OrderBy(method => method.MethodId, StringComparer.Ordinal).ToArray();
     }

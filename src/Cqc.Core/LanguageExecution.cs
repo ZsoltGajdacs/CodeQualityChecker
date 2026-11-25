@@ -16,4 +16,6 @@ public interface ILanguageExecution
     string? CoverageIdentityVersion => null;
     Task<LanguageBuildResult> ExecuteAsync(ProjectSnapshot snapshot, string runDirectory, CancellationToken cancellationToken);
     MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods);
+    MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods, ICollection<Diagnostic> diagnostics) =>
+        ReadCoverage(build, methods);
 }

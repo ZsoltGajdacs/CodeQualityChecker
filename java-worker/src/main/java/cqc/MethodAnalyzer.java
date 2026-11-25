@@ -34,7 +34,7 @@ final class MethodAnalyzer {
         var source = owner.source();
         var identity = resolution.compactIdentity(source, record, sourceOnly);
         var calls = sourceOnly ? MethodResolution.Calls.NOT_ATTEMPTED : resolution.calls(source, body.nodes().stream());
-        String signature = sourceOnly ? null : MethodResolution.compactCoverageSignature(record);
+        String signature = sourceOnly ? null : JvmCoverageSignature.of(record);
         String id = SymbolContexts.qualify(source.context().id(), identity.name());
         if (sourceOnly) id += sourceKey(source.file(), constructor);
         var method = new ResolvedMethod(id, identity, calls, signature);
@@ -75,6 +75,6 @@ final class MethodAnalyzer {
         }
         var identity = resolution.identity(source.file(), typeName, declaration);
         String id = SymbolContexts.qualify(source.context().id(), identity.name());
-        return new ResolvedMethod(id, identity, resolution.calls(source, nodes.stream()), MethodResolution.coverageSignature(declaration));
+        return new ResolvedMethod(id, identity, resolution.calls(source, nodes.stream()), JvmCoverageSignature.of(declaration));
     }
 }

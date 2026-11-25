@@ -342,6 +342,32 @@ class Generic<T> {
         self.assertEqual("Generic.accept(java.util.List<java.lang.String>,T)", method["qualifiedName"])
         self.assertEqual("Generic.accept(java.util.List,java.lang.Object)", method["coverageSignature"])
 
+    def test_jvm_coverage_alias_erases_bounds_and_includes_only_required_constructor_parameters(self):
+        facts = self.analyze({"Signatures.java": """import java.util.List;
+class Signatures<T extends Number> {
+    <U extends T, V extends List<String>> void generic(V value, U[] array, U... extra) { }
+    void nested(Inner owner, java.util.Map.Entry<String, Integer> entry) { }
+    enum Mode {
+        FIRST(1), SECOND("second", 1, 2);
+        Mode(int value) { }
+        Mode(String name, int order, int value) { }
+    }
+    class Inner { Inner(int value) { } }
+    static class Nested { Nested(Signatures<?> owner, int value) { } }
+}
+"""})
+        aliases = {method["qualifiedName"]: method["coverageSignature"] for method in facts["methods"]}
+        self.assertEqual("Signatures.generic(java.util.List,java.lang.Number[],java.lang.Number[])",
+                         aliases["Signatures.generic(V,U[],U[])"])
+        self.assertEqual("Signatures.nested(Signatures$Inner,java.util.Map$Entry)",
+                         aliases["Signatures.nested(Signatures.Inner,java.util.Map.Entry<java.lang.String, java.lang.Integer>)"])
+        self.assertEqual("Signatures$Mode..ctor(java.lang.String,int,int)", aliases["Signatures.Mode..ctor(int)"])
+        self.assertEqual("Signatures$Mode..ctor(java.lang.String,int,java.lang.String,int,int)",
+                         aliases["Signatures.Mode..ctor(java.lang.String,int,int)"])
+        self.assertEqual("Signatures$Inner..ctor(Signatures,int)", aliases["Signatures.Inner..ctor(int)"])
+        self.assertEqual("Signatures$Nested..ctor(Signatures,int)",
+                         aliases["Signatures.Nested..ctor(Signatures<?>,int)"])
+
     def test_static_imported_fields_have_semantic_dependency_edges(self):
         facts = self.analyze({
             "demo/Values.java": "package demo; public class Values { public static int VALUE = 3; }",

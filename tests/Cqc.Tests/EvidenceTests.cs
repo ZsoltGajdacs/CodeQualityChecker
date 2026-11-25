@@ -60,6 +60,33 @@ public sealed class EvidenceTests
     }
 
     [Fact]
+    public void JavaCoverageDoesNotUseALegacyAliasWhenTheBinarySignatureIsAmbiguous()
+    {
+        using var fixture = FixtureWorkspace.Empty();
+        var report = Path.Combine(fixture.Root, "jacoco.xml");
+        File.WriteAllText(report, """
+            <report><class name="Demo/Outer$Inner">
+              <method name="&lt;init&gt;" desc="(LDemo/Outer;I)V"><counter type="LINE" covered="1" missed="0"/></method>
+            </class></report>
+            """);
+        var legacy = Fact("java:Demo.Outer.Inner..ctor(int)");
+        var first = Fact("main:first") with { CoverageSignature = "Demo.Outer$Inner..ctor(Demo.Outer,int)" };
+        var second = first with { Id = "main:second" };
+        Assert.Equal(legacy.Id, Assert.Single(JavaCoverageReader.ReadJava(report, [legacy])).MethodId);
+        Assert.Equal(first.Id, Assert.Single(JavaCoverageReader.ReadJava(report, [legacy, first])).MethodId);
+        var build = new LanguageBuildResult("java", [report], new())
+        { ReportModules = new() { [report] = "demo/pom.xml" } };
+        ILanguageExecution analyzer = new JavaAnalyzer();
+        var diagnostics = new List<Diagnostic>();
+        var methods = new[] { legacy, first, second }.Select(fact => fact with { ContextId = "demo/pom.xml#main" });
+        Assert.Empty(analyzer.ReadCoverage(build, methods, diagnostics));
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("java.coverage_signature_ambiguous", diagnostic.Code);
+        Assert.Equal("demo/pom.xml", diagnostic.File);
+        Assert.Equal(first.CoverageSignature, diagnostic.Construct);
+    }
+
+    [Fact]
     public void OpenCoverUnionsComplementaryBranchesAndMapsGenericSourcePoints()
     {
         var first = Path.GetTempFileName();

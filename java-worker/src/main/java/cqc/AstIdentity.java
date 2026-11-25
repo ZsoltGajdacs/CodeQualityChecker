@@ -9,6 +9,14 @@ import java.util.stream.Collectors;
 
 final class AstIdentity {
     static String typeName(TypeDeclaration<?> type) {
+        return typeName(type, ".");
+    }
+
+    static String binaryTypeName(TypeDeclaration<?> type) {
+        return typeName(type, "$");
+    }
+
+    private static String typeName(TypeDeclaration<?> type, String delimiter) {
         var parts = new ArrayList<String>();
         Node current = type;
         while (current != null) {
@@ -16,7 +24,7 @@ final class AstIdentity {
             current = current.getParentNode().orElse(null);
         }
         Collections.reverse(parts);
-        String name = String.join(".", parts);
+        String name = String.join(delimiter, parts);
         String namespace = type.findCompilationUnit().map(AstIdentity::packageName).orElse("");
         return namespace.isEmpty() ? name : namespace + "." + name;
     }

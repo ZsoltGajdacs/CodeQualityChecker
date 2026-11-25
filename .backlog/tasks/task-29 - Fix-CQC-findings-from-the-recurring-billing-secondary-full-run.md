@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-11-25T14:40:00Z'
+updated_date: '2026-11-25T14:45:00Z'
 labels: []
 dependencies: []
 type: bug
@@ -35,3 +36,9 @@ CQC defects in report 7decfa72. Billing is the acceptance checkout. Work on mast
 4. Resolve TypeScript assets and runtime subpaths.
 5. Improve report diagnostics and verify the package on Billing.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Slice 1 committed as cb58dfe. Old worker reproduced generated builder, getter-chain and assertion failures in the new reactor fixture. Updated worker passed 32 Python worker tests and 7 Maven integration tests. CodeScene gate passed. Verified precedence does not repair JavaParser lexical calls to generated members on the current authored type; measure that residual in Billing.
+<!-- SECTION:NOTES:END -->

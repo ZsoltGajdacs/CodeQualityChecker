@@ -17,7 +17,7 @@ internal sealed class CoverageCollection(IEnumerable<ILanguageAnalyzer> adapters
     {
         var drivers = adapters.OfType<ILanguageExecution>().ToDictionary(x => x.Language, StringComparer.Ordinal);
         if (input.Artifacts is not { } artifacts) return await ReadCachedAsync(input, drivers.Values, diagnostics, token);
-        return BuildEvidence(input, artifacts, drivers);
+        return BuildEvidence(input, artifacts, drivers, diagnostics);
     }
 
     private static async Task<CoverageEvidence?> ReadCachedAsync(CoverageInput input, IEnumerable<ILanguageExecution> drivers,
@@ -30,10 +30,11 @@ internal sealed class CoverageCollection(IEnumerable<ILanguageAnalyzer> adapters
         return MatchIdentities(cached, drivers, diagnostics);
     }
 
-    private static CoverageEvidence BuildEvidence(CoverageInput input, BuildArtifacts artifacts, Dictionary<string, ILanguageExecution> drivers)
+    private static CoverageEvidence BuildEvidence(CoverageInput input, BuildArtifacts artifacts,
+        Dictionary<string, ILanguageExecution> drivers, ICollection<Diagnostic> diagnostics)
     {
         var entries = artifacts.Results.SelectMany(build =>
-                drivers[build.Language].ReadCoverage(build, input.Facts.Methods.Where(method => method.Language == build.Language)))
+                drivers[build.Language].ReadCoverage(build, input.Facts.Methods.Where(method => method.Language == build.Language), diagnostics))
             .GroupBy(method => method.MethodId).Where(group => group.Count() == 1).Select(group => group.Single())
             .OrderBy(method => method.MethodId, StringComparer.Ordinal).ToArray();
         var versions = artifacts.ToolVersions;

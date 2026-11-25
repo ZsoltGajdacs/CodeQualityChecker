@@ -10,6 +10,30 @@ public sealed class MavenContextExecutionTests
 {
     [Fact]
     [Trait("Category", "Execution")]
+    public async Task ExecutionMapsJvmDescriptorsToTheOriginalMethodIds()
+    {
+        using var workspace = FixtureWorkspace.Copy("maven-generated");
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var result = await service.AnalyzeAsync(
+            new() { ProjectRoot = workspace.Root, Execute = true }, ["code"], CancellationToken.None);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
+        var evidence = EvidenceStore.Read(await workspace.ReadBundleEntryAsync("coverage.json"));
+        var signatures = new[]
+        {
+            "measure(V,U[],U[])", "Mode..ctor(int)", "Mode..ctor(java.lang.String,int,int)",
+            "Inner..ctor(int)", "Nested..ctor(sample.service.JvmAliases<?>,int)"
+        };
+        foreach (var signature in signatures)
+        {
+            var method = Assert.Single(evidence.Methods, method =>
+                method.MethodId == "java:service/pom.xml#main::sample.service.JvmAliases." + signature);
+            Assert.True(method.CoveredLines > 0, method.MethodId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Execution")]
     public async Task ExecutionResolvesGeneratedMembersThroughMavenOutputs()
     {
         using var workspace = FixtureWorkspace.Copy("maven-generated");

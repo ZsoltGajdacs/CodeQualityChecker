@@ -23,6 +23,9 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
     public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods)
         => new JavaExecution().ReadCoverage(build, methods);
 
+    public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods, ICollection<Diagnostic> diagnostics)
+        => new JavaExecution().ReadCoverage(build, methods, diagnostics);
+
     public async Task<AnalysisFacts> AnalyzeAsync(ProjectSnapshot snapshot, CancellationToken cancellationToken)
     {
         if (!snapshot.Files.Any(path => path.EndsWith(".java", StringComparison.OrdinalIgnoreCase)))

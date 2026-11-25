@@ -36,14 +36,6 @@ final class MethodResolution {
         return typeName + "." + name + "(" + parameters + ")";
     }
 
-    static String coverageSignature(CallableDeclaration<?> declaration) {
-        try {
-            String parameters = declaration.getParameters().stream().map(p -> p.getType().resolve().erasure().describe() + (p.isVarArgs() ? "[]" : "")).collect(Collectors.joining(","));
-            String name = declaration instanceof ConstructorDeclaration ? ".ctor" : declaration.getNameAsString();
-            return owner(declaration).map(AstIdentity::typeName).orElseThrow() + "." + name + "(" + parameters + ")";
-        } catch (RuntimeException exception) { return null; }
-    }
-
     Identity compactIdentity(Worker.Source source, RecordDeclaration record, boolean sourceOnly) {
         if (!sourceOnly) {
             try { return new Identity(compactSignature(record, parameter -> parameter.getType().resolve().describe()), true); }
@@ -52,11 +44,6 @@ final class MethodResolution {
             }
         }
         return new Identity(compactSignature(record, parameter -> parameter.getType().asString()), false);
-    }
-
-    static String compactCoverageSignature(RecordDeclaration record) {
-        try { return compactSignature(record, parameter -> parameter.getType().resolve().erasure().describe()); }
-        catch (RuntimeException exception) { return null; }
     }
 
     private static String compactSignature(RecordDeclaration record, Function<Parameter, String> parameterType) {
