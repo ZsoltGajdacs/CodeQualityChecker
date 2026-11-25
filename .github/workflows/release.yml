@@ -1,0 +1,109 @@
+name: Release CQC
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: release-master
+  queue: max
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ !github.event.deleted }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Choose release tag
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published_tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false).tag_name')
+          python3 scripts/next-release-tag.py "$published_tags" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and draft release
+        id: draft
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if ! git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+              push origin "refs/tags/$RELEASE_TAG"
+          fi
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+
+          is_draft=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$RELEASE_TAG\").draft")
+          case "$is_draft" in
+            false)
+              echo "Release $RELEASE_TAG is already published."
+              exit 0
+              ;;
+            "")
+              gh release create "$RELEASE_TAG" --draft --verify-tag --generate-notes
+              ;;
+            true) ;;
+            *) echo "Multiple releases found for $RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          echo "build=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check out tagged source
+        if: steps.draft.outputs.build == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git switch --detach "refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - uses: actions/setup-dotnet@v6
+        if: steps.draft.outputs.build == 'true'
+        with:
+          global-json-file: scripts/global.json
+
+      - uses: actions/setup-node@v6
+        if: steps.draft.outputs.build == 'true'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pinned JetBrains Runtime SDK
+        if: steps.draft.outputs.build == 'true'
+        env:
+          JBR_SDK: jbrsdk_jcef-25.0.2-osx-aarch64-b300.57
+          JBR_SHA512: 72a4cd19d18dae268f9d2b6046a08c9367aba80484554d2bb9aa9399037bf2c91b92333bf4e2955c943d74f6b4cf16be2a1c72333642a0273e1ee40d03c4f80f
+        run: |
+          archive="$RUNNER_TEMP/$JBR_SDK.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://cache-redirector.jetbrains.com/intellij-jbr/$JBR_SDK.tar.gz" --output "$archive"
+          printf '%s  %s\n' "$JBR_SHA512" "$archive" | shasum -a 512 --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "JAVA_HOME=$RUNNER_TEMP/$JBR_SDK/Contents/Home" >> "$GITHUB_ENV"
+
+      - name: Build and smoke-test the Apple Silicon package
+        if: steps.draft.outputs.build == 'true'
+        run: ./scripts/package-macos.sh
+
+      - name: Publish release with executable archive and checksum
+        if: steps.draft.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          gh release upload "$RELEASE_TAG" --clobber \
+            dist/cqc-osx-arm64.tar.gz dist/cqc-osx-arm64.tar.gz.sha256
+          gh release edit "$RELEASE_TAG" --draft=false --verify-tag --latest="$RELEASE_LATEST"

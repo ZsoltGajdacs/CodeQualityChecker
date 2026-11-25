@@ -27,6 +27,16 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 When changing tooling, review the relevant agent skills against the updated tool behavior, inputs, outputs, and workflows. Update any affected skill in the same change so its guidance and examples stay accurate. The Claude Code and Codex plugins share the canonical skill in [`plugins/skills/cqc-review/SKILL.md`](plugins/skills/cqc-review/SKILL.md).
 
+## Commit messages and releases
+
+Use Conventional Commits for new commits. Write the subject as `type(scope): summary` with an optional scope and an imperative summary. Keep each commit focused. Add a body when the reason for the change or the verification needs explanation.
+
+- Use `fix: correct review scoring` for a patch and `feat: add a language analyzer` for a minor release.
+- Use `!` before the colon, as in `feat(mcp)!: change the report schema`, or add a `BREAKING CHANGE: <description>` footer for a major release. Describe the migration in the commit body when consumers need to take action.
+- Use the type that describes maintenance work, such as `docs`, `ci`, `chore`, `refactor`, or `test`. A push with no minor or major signal gets a patch release.
+
+For a squash merge, put the intended type and any breaking-change marker in the commit that lands on `master`. Use a Conventional Commit PR title when GitHub uses it as the squash subject. The release workflow starts at `v0.3.0` and then applies the highest bump among commits since the previous tag. It creates the tag and release automatically.
+
 ## CodeScene
 
 After changing code, run `code_health_review` on the changed files. If Code Health drops, fix the issues, run the review again, and use `code_health_score` to confirm the result. Before finishing, run `pre_commit_code_health_safeguard` and only stop when it passes.
