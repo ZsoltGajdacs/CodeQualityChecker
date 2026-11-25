@@ -40,18 +40,32 @@ prepare_standalone_installer() {
     local installers="$root/installers"
     local staged_installer="$staging/installer"
     local source="https://raw.githubusercontent.com/ZsoltGajdacs/CodeQualityChecker/$tag"
-    local file
+    local project_skill=plugins/skills/check-project/SKILL.md
+    local legacy_skill=plugins/skills/cqc-review/SKILL.md
+    local status file
     local files=(
         scripts/install-plugin.sh
         scripts/install-plugin.py
         scripts/package-plugins.py
         plugins/claude/.claude-plugin/plugin.json
         plugins/codex/.codex-plugin/plugin.json
-        plugins/skills/cqc-review/SKILL.md
     )
 
     installer_root="$installers/$tag"
     [[ ! -L "$installers" && ! -L "$installer_root" ]] || fail 'The plugin installer path contains a symbolic link.'
+    # The launcher on master can run before a release with the split skills is published.
+    if [[ -d "$installer_root" ]]; then
+        [[ -f "$installer_root/$legacy_skill" ]] && status=404 || status=200
+    else
+        status=$(curl "${curl_options[@]}" --silent --no-show-error --head \
+            --output /dev/null --write-out '%{http_code}' "$source/$project_skill") ||
+            [[ "$status" == 404 ]] || fail "Could not locate $project_skill in $tag."
+    fi
+    if [[ "$status" == 404 ]]; then
+        files+=("$legacy_skill")
+    else
+        files+=("$project_skill" plugins/skills/check-uncommitted/SKILL.md plugins/skills/review-report.md)
+    fi
     if [[ -d "$installer_root" ]]; then
         for file in "${files[@]}"; do
             [[ -s "$installer_root/$file" ]] || fail "Missing plugin installer file: $installer_root/$file"

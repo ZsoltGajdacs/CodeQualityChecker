@@ -59,6 +59,9 @@ elif url == f'{raw}/master/install.sh':
     print((checkout / 'install.sh').read_text(), end='')
 elif url.startswith(f'{raw}/v1.2.3/'):
     source = checkout / url.removeprefix(f'{raw}/v1.2.3/')
+    if '--head' in arguments:
+        print('200' if source.is_file() else '404', end='')
+        sys.exit(0 if source.is_file() else 22)
     if source.name == os.environ.get('CQC_TEST_MISSING_ASSET'):
         sys.exit(22)
     output = arguments[arguments.index('--output') + 1]
@@ -189,6 +192,36 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue(marketplace.is_relative_to(installation))
             config = json.loads((marketplace / 'plugins/cqc/.mcp.json').read_text())
             self.assertEqual(config['mcpServers']['cqc']['command'], str(executable))
+            self.assertEqual(
+                {path.parent.name for path in marketplace.glob('plugins/cqc/skills/*/SKILL.md')},
+                {'check-project', 'check-uncommitted'})
+
+    def test_readme_command_installs_and_reuses_cached_legacy_tagged_plugins(self):
+        self.prepare_release()
+        skills = self.repository / 'plugins/skills'
+        shutil.rmtree(skills)
+        legacy_skill = skills / 'cqc-review/SKILL.md'
+        legacy_skill.parent.mkdir(parents=True)
+        legacy_skill.write_text('---\nname: cqc-review\ndescription: Review code with CQC.\n---\n')
+        tagged_installer = self.scripts / 'install-plugin.py'
+        source = tagged_installer.read_text()
+        tagged_installer.write_text(source.replace(
+            "('check-project/SKILL.md', 'check-uncommitted/SKILL.md', 'review-report.md')",
+            "('cqc-review/SKILL.md',)"))
+
+        for _ in range(2):
+            self.clear_log()
+            result, _ = self.install_from_readme()
+            self.assert_success(result)
+            additions = [entry for entry in self.operations()
+                         if entry['args'][:3] == ['plugin', 'marketplace', 'add']]
+            self.assertCountEqual([entry['client'] for entry in additions], CLIENTS)
+            for entry in additions:
+                packaged = Path(entry['args'][-1]) / 'plugins/cqc/skills/cqc-review/SKILL.md'
+                self.assertEqual(packaged.read_text(), legacy_skill.read_text())
+
+            # Force the second run to use the files cached by the first download.
+            self.environment['CQC_TEST_MISSING_ASSET'] = 'package-plugins.py'
 
     def test_readme_command_preserves_runtime_if_a_tagged_helper_download_fails(self):
         self.prepare_release()

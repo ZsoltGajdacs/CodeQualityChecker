@@ -31,8 +31,12 @@ def verify_unsupported(session, root):
 
 def verify_client(marketplace, root):
     plugin = marketplace / 'plugins/cqc'
-    canonical = ROOT / 'plugins/skills/cqc-review/SKILL.md'
-    assert (plugin / 'skills/cqc-review/SKILL.md').read_bytes() == canonical.read_bytes()
+    canonical = ROOT / 'plugins/skills'
+    packaged = plugin / 'skills'
+    paths = {'check-project/SKILL.md', 'check-uncommitted/SKILL.md', 'review-report.md'}
+    assert {str(path.relative_to(packaged)) for path in packaged.rglob('*') if path.is_file()} == paths
+    for path in paths:
+        assert (packaged / path).read_bytes() == (canonical / path).read_bytes(), path
     server = json.loads((plugin / '.mcp.json').read_text())['mcpServers']['cqc']
     session = SMOKE['McpSession'](Path(server['command']).parent, server=server)
     try:

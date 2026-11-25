@@ -29,18 +29,24 @@ class PackagingTests(unittest.TestCase):
                                '--output', str(output or self.output)],
                               capture_output=True, text=True)
 
-    def test_space_path_is_directly_launchable_and_skill_is_shared(self):
+    def test_space_path_is_directly_launchable_and_skills_are_shared(self):
         result = self.generate()
         self.assertEqual(result.returncode, 0, result.stderr)
-        canonical = ROOT / 'plugins/skills/cqc-review/SKILL.md'
+        canonical = ROOT / 'plugins/skills'
+        skills = {'check-project', 'check-uncommitted'}
         for client in ('claude', 'codex'):
             plugin = self.output / client / 'plugins/cqc'
             server = json.loads((plugin / '.mcp.json').read_text())['mcpServers']['cqc']
             process = subprocess.run([server['command'], *server.get('args', [])],
                                      capture_output=True, text=True, check=True)
             self.assertEqual(process.stdout, 'server started')
-            self.assertEqual((plugin / 'skills/cqc-review/SKILL.md').read_bytes(),
-                             canonical.read_bytes())
+            packaged = plugin / 'skills'
+            self.assertEqual({path.parent.name for path in packaged.glob('*/SKILL.md')}, skills)
+            for skill in skills:
+                path = Path(skill) / 'SKILL.md'
+                self.assertEqual((packaged / path).read_bytes(), (canonical / path).read_bytes())
+            self.assertEqual((packaged / 'review-report.md').read_bytes(),
+                             (canonical / 'review-report.md').read_bytes())
         self.assertEqual(sorted(self.executable.parent.iterdir()), [self.executable])
 
     def test_invalid_executable_leaves_no_output(self):

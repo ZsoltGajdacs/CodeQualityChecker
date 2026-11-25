@@ -1,6 +1,6 @@
 # Local Claude Code and Codex plugins
 
-The `cqc` plugins (version `0.3.0`) connect to a local macOS Apple Silicon CQC installation and provide the shared `cqc-review` skill. Inspection/check tools return schema-v3 summaries; `get_report_page` retrieves details without repeating analysis. This is a clean replacement of the previous response format. Plugin packages contain configuration and instructions; the separate MCP directory contains the server and runtimes. Keep the complete MCP directory in place.
+The `cqc` plugins connect to a local macOS Apple Silicon CQC installation and provide two shared skills. `check-project` reviews the whole repository. `check-uncommitted` reviews staged, unstaged, and untracked changes. Inspection and check tools return schema-v3 summaries. `get_report_page` retrieves details without repeating analysis. Keep the complete MCP directory in place so the server can find its bundled runtimes.
 
 ## Install the latest release
 
@@ -26,7 +26,7 @@ python3 scripts/package-plugins.py \
 
 The default output is `dist/cqc-plugins/`, with independent `claude/` and `codex/` local marketplace directories. Use `--output dist/cqc-plugins-next` for another generation. Output must be a new or empty directory strictly inside this repository's `dist/`; existing nonempty directories are preserved. Symlinked input/output paths are rejected; pass the real installation path. Executable existence and permission are checked during generation; use the smoke check below to verify that its runtime files are usable.
 
-Each generated plugin contains its client manifest, `.mcp.json`, and a copy of the canonical `plugins/skills/cqc-review` skill. The MCP command is the executable's absolute path, launched directly without a shell. Paths containing spaces work. Generation does not launch CQC, install software, download files, or edit client settings. Generated JSON contains a machine-specific path; regenerate it for another machine.
+Each generated plugin contains its client manifest, `.mcp.json`, and a copy of the shared `plugins/skills/` directory. The MCP command is the executable's absolute path, launched directly without a shell. Paths containing spaces work. Generation does not launch CQC, install software, download files, or edit client settings. Generated JSON contains a machine-specific path; regenerate it for another machine.
 
 ## Install locally
 
@@ -43,7 +43,7 @@ To refresh a single client, run its wrapper:
 /absolute/path/to/CodeQualityChecker/scripts/install-codex-plugin.sh
 ```
 
-With no arguments, each installer builds and smoke-tests the self-contained MCP once. Fresh plugin marketplaces are generated beneath `dist/`, and the selected clients' CQC registrations are refreshed. The generated `.mcp.json` keeps the absolute executable path in this checkout. Keep the generated marketplace directories at their registered locations. Restart the refreshed clients to load the updated executable and skill.
+With no arguments, each installer builds and smoke-tests the self-contained MCP once. Fresh plugin marketplaces are generated beneath `dist/`, and the selected clients' CQC registrations are refreshed. The generated `.mcp.json` keeps the absolute executable path in this checkout. Keep the generated marketplace directories at their registered locations. Restart the refreshed clients to load the updated executable and skills.
 
 Building requires macOS Apple Silicon, the pinned .NET SDK, Maven, Python 3.9+, and `JAVA_HOME` set to the pinned JBR SDK, as described in [distribution prerequisites](distribution.md). The target client CLI must be on `PATH`. No toolchains are automatically installed. Build and generation failures stop before changing client settings.
 
@@ -69,7 +69,7 @@ claude plugin install cqc@cqc-local-claude
 claude plugin details cqc@cqc-local-claude
 ```
 
-Restart Claude Code after installation or update. The skill is available as `/cqc:cqc-review`, and normal skill discovery can select it for relevant review requests. For a temporary session without persistent installation, use `claude --plugin-dir /absolute/path/to/CodeQualityChecker/dist/cqc-plugins/claude/plugins/cqc`.
+Restart Claude Code after installation or update. Type `/cqc:check-` and select `/cqc:check-uncommitted` or `/cqc:check-project`. For a temporary session without persistent installation, use `claude --plugin-dir /absolute/path/to/CodeQualityChecker/dist/cqc-plugins/claude/plugins/cqc`.
 
 Codex:
 
@@ -79,13 +79,13 @@ codex plugin add cqc@cqc-local-codex
 codex plugin list
 ```
 
-Restart Codex, including the desktop app if used, and open a new chat so plugin skills and MCP tools load. Select the CodeQualityChecker plugin or ask to use its `cqc-review` skill. Local plugin support depends on client version; verification used Codex CLI 0.166.0 and Claude Code 2.1.306. Client formats follow the [Codex packaging guide](https://developers.openai.com/plugins/build/plugins) and [Claude plugin reference](https://code.claude.com/docs/en/plugins-reference).
+Restart Codex, including the desktop app if used, and open a new chat so plugin skills and MCP tools load. Type `$cqc:check-` and choose `cqc:check-uncommitted` or `cqc:check-project` in the skill picker. Local plugin support depends on client version. Client formats follow the [Codex packaging guide](https://developers.openai.com/plugins/build/plugins) and [Claude plugin reference](https://code.claude.com/docs/en/plugins-reference).
 
-The skill supports review-only requests and requested fixes with rechecks. Source-only analysis is the default. Project-controlled restores, builds, and tests require user authorization; source-only support remains useful when execution prerequisites are unavailable. Scores are separate CQC scores, not CodeScene Code Health, and missing coverage remains incomplete rather than receiving a perfect score.
+Each skill can be submitted on its own for a source-only review and also supports requested fixes with rechecks. Project-controlled restores, builds, and tests require user authorization. CQC reports scores separately by family and leaves missing coverage incomplete.
 
 ## Update, relocate, or remove
 
-Keep the generated marketplace directories available at their registered locations. Rerun an installer to rebuild and refresh its plugin, or use `--mcp-dir` after moving a prebuilt MCP installation. The installer removes only that client's matching CQC plugin/catalog before adding the prepared package, ensuring cached copies pick up the new command and skill. Restart the client afterward. Moving only the plugin directory does not update the absolute CQC command. For manual installation, uninstall/remove the old local marketplace before adding the newly generated output.
+Keep the generated marketplace directories available at their registered locations. Rerun an installer to rebuild and refresh its plugin, or use `--mcp-dir` after moving a prebuilt MCP installation. The installer removes only that client's matching CQC plugin/catalog before adding the prepared package, ensuring cached copies pick up the new command and skills. Restart the client afterward. Moving only the plugin directory does not update the absolute CQC command. For manual installation, uninstall/remove the old local marketplace before adding the newly generated output.
 
 Remove Claude's local installation:
 

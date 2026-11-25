@@ -11,11 +11,11 @@ cqc_installer=$(curl -fsSL https://raw.githubusercontent.com/ZsoltGajdacs/CodeQu
   /bin/bash -c "$cqc_installer" cqc-install --standalone
 ```
 
-Choose `1` for Claude Code, `2` for Codex, or `1 2` for both. The installer verifies the latest GitHub release and installs CQC and its review skill. You need Python 3.9+ and the selected client CLIs on `PATH`. Run the same command to update, then restart the selected clients. [View the installer](install.sh) · [Installation options](docs/plugins.md)
+Choose `1` for Claude Code, `2` for Codex, or `1 2` for both. The installer verifies the latest GitHub release and installs CQC and its two check skills. You need Python 3.9+ and the selected client CLIs on `PATH`. Run the same command to update, then restart the selected clients. [View the installer](install.sh) · [Installation options](docs/plugins.md)
 
 ## Use CQC
 
-Ask your client to review the repository or your uncommitted changes with CQC. Reviews default to source analysis. TypeScript and React support complexity, duplication, and dependency checks. Supported Java and C# projects can also run builds and tests when you explicitly enable execution. [Evidence and execution](docs/evidence.md)
+In Claude Code, type `/cqc:check-` and choose `/cqc:check-uncommitted` for your changes or `/cqc:check-project` for the whole repository. In Codex, type `$cqc:check-` and select the matching skill. Both checks run with no arguments and default to source analysis. TypeScript and React support complexity, duplication, and dependency checks. Supported Java and C# projects can also run builds and tests when you explicitly enable execution. [Evidence and execution](docs/evidence.md)
 
 | MCP tool | Purpose |
 | --- | --- |

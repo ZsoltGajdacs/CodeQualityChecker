@@ -14,6 +14,7 @@ import time
 TOOLS = {'inspect_project', 'check_code_quality', 'check_test_quality',
          'check_duplication', 'check_dependencies', 'check_all', 'get_report_page',
          'check_uncommitted_changes_quality'}
+SKILLS = {'check-project', 'check-uncommitted'}
 
 
 def command(arguments, environment, cwd):
@@ -91,14 +92,16 @@ def verify_codex_inventory(environment, cwd):
             'capabilities': {'experimentalApi': True}})
         server.send({'method': 'initialized'})
         groups = server.request('skills/list', {'cwds': [str(cwd)], 'forceReload': True})
-        skills = [skill for group in groups['data'] for skill in group['skills']]
-        assert any(skill['name'] == 'cqc:cqc-review' and skill['enabled']
-                   and skill.get('pluginId') == 'cqc@cqc-local-codex' for skill in skills), groups
+        skills = [skill for group in groups['data'] for skill in group['skills']
+                  if skill.get('pluginId') == 'cqc@cqc-local-codex']
+        names = {skill['name'] for skill in skills}
+        assert names == {f'cqc:{name}' for name in SKILLS}, skills
+        assert all(skill['enabled'] for skill in skills), skills
         inventory = server.request('mcpServerStatus/list', {'detail': 'full'})
         cqc = next(item for item in inventory['data'] if item['name'] == 'cqc')
         assert not cqc.get('toolsError'), cqc
         assert set(cqc['tools']) == TOOLS, cqc
-        return {'skill': 'cqc:cqc-review', 'tools': sorted(cqc['tools'])}
+        return {'skills': sorted(names), 'tools': sorted(cqc['tools'])}
     finally:
         server.close()
 
@@ -125,11 +128,11 @@ def verify_claude(packages, root, cwd):
     assert installed['enabled'] and installed['version'] == packaged_version(packages, 'claude'), installed
     assert 'cqc' in installed['mcpServers'], installed
     details = command(['claude', 'plugin', 'details', 'cqc@cqc-local-claude'], environment, cwd)
-    assert 'cqc-review' in details, details
+    assert all(name in details for name in SKILLS) and 'cqc-review' not in details, details
     health = command(['claude', 'mcp', 'list'], environment, cwd)
     assert 'plugin:cqc:cqc:' in health and 'Connected' in health, health
     return {'client': version, 'pluginVersion': installed['version'],
-            'skill': 'cqc-review', 'mcpHealth': health.strip()}
+            'skills': sorted(f'cqc:{name}' for name in SKILLS), 'mcpHealth': health.strip()}
 
 
 def main():

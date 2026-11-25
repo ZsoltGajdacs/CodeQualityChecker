@@ -25,7 +25,7 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 ## Agent skills
 
-When changing tooling, review the relevant agent skills against the updated tool behavior, inputs, outputs, and workflows. Update any affected skill in the same change so its guidance and examples stay accurate. The Claude Code and Codex plugins share the canonical skill in [`plugins/skills/cqc-review/SKILL.md`](plugins/skills/cqc-review/SKILL.md).
+When changing tooling, review the relevant agent skills against the updated tool behavior, inputs, outputs, and workflows. Update any affected skill in the same change so its guidance and examples stay accurate. The Claude Code and Codex plugins share the canonical skills and reporting guidance in [`plugins/skills/`](plugins/skills/).
 
 ## Commit messages and releases
 

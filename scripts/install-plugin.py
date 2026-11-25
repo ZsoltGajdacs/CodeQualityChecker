@@ -74,9 +74,10 @@ def validate_package(root, client, packaging):
     if manifest['name'] != 'cqc':
         raise ValueError('Expected plugin identity cqc')
     validate_mcp(plugin, packaging)
-    skill = plugin / 'skills/cqc-review/SKILL.md'
-    if not skill.is_file():
-        raise ValueError(f'Missing generated skill: {skill}')
+    for relative in ('check-project/SKILL.md', 'check-uncommitted/SKILL.md', 'review-report.md'):
+        skill = plugin / 'skills' / relative
+        if not skill.is_file():
+            raise ValueError(f'Missing generated skill file: {skill}')
     return marketplace.resolve(strict=True)
 
 
