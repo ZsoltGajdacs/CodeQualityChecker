@@ -13,6 +13,11 @@
       <version>1.0</version>
     </dependency>
     <dependency>
+      <groupId>cqc.fixtures.generated</groupId>
+      <artifactId>upstream</artifactId>
+      <version>1.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>5.13.4</version>

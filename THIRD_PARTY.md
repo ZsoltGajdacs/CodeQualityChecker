@@ -19,6 +19,7 @@ The 0BSD reference license states copyright © 2026 Robert C. Martin and permits
 | .NET runtime, Microsoft.Extensions, Roslyn | MIT; runtime and NuGet notices |
 | JavaParser / symbol solver | Apache-2.0 or LGPL-3.0 dual license; use Apache-2.0 option |
 | Gson | Apache-2.0 |
+| JaCoCo core and report | EPL-2.0; bundled dependency notices under `legal/java/` |
 | JavaParser transitives (Guava, Javassist and annotations) | Their embedded Maven/JAR license metadata and notices |
 | Node.js runtime | Bundled distribution license and third-party notices in `legal/node/LICENSE` |
 | TypeScript compiler | Apache-2.0 and third-party notices in `legal/typescript/` |

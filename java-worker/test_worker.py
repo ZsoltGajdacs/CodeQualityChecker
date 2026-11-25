@@ -2,10 +2,12 @@
 import json
 import io
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -533,6 +535,115 @@ record Pair(List<String> values, String... labels) {
         self.assertEqual(1, process.returncode)
         self.assertEqual("", process.stdout)
         self.assertIn("Unsupported snapshot schemaVersion", process.stderr)
+
+
+class CoverageWorkerTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.classes = self.root / "classes"
+        self.report = self.root / "merged.xml"
+        source = self.root / "Example.java"
+        source.write_text("class Example { int choose(boolean first) { return first ? 1 : 2; } }")
+        writer = self.root / "WriteProbes.java"
+        writer.write_text("""package cqc;
+import java.nio.file.*;
+import java.util.Arrays;
+import org.jacoco.core.data.ExecutionData;
+import org.jacoco.core.internal.data.CRC64;
+import org.jacoco.core.tools.ExecFileLoader;
+class WriteProbes {
+    public static void main(String[] args) throws Exception {
+        var bytes = Files.readAllBytes(Path.of(args[0]));
+        var data = new ExecutionData(CRC64.classId(bytes), "Example", ProbeLayout.count(bytes) + Integer.parseInt(args[2]));
+        Arrays.fill(data.getProbes(), true);
+        var loader = new ExecFileLoader();
+        loader.getExecutionDataStore().put(data);
+        loader.save(Path.of(args[1]).toFile(), false);
+    }
+}
+""")
+        subprocess.run(["javac", "-cp", str(JAR), "-d", str(self.classes), str(source), str(writer)], check=True)
+
+    def data(self, name, extra_probes=0):
+        output = self.root / (name + ".exec")
+        subprocess.run(["java", "-cp", f"{JAR}{os.pathsep}{self.classes}", "cqc.WriteProbes",
+                        str(self.classes / "Example.class"), str(output), str(extra_probes)], check=True)
+        return output
+
+    def check(self, inputs, *, local_report=False):
+        request = {
+            "owners": [{"module": "api/pom.xml", "classes": str(self.classes), "localReport": local_report,
+                        "report": str(self.report)}],
+            "inputs": inputs,
+        }
+        process = subprocess.run(["java", "-cp", str(JAR), "cqc.CoverageMain"], input=json.dumps(request), text=True,
+                                 capture_output=True, timeout=30, check=True)
+        return json.loads(process.stdout)
+
+    @staticmethod
+    def input(module, data, **details):
+        return {"module": module, "data": str(data), "agentVersion": "0.8.15",
+                "visibleModules": ["api/pom.xml"], **details}
+
+    def class_archive(self, name, entry="Example.class"):
+        path = self.root / name
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.write(self.classes / "Example.class", entry)
+        return path
+
+    def test_valid_downstream_probes_survive_corrupt_incompatible_and_unsupported_inputs(self):
+        corrupt = self.root / "corrupt.exec"
+        corrupt.write_bytes(b"not JaCoCo")
+        valid = self.data("valid")
+        result = self.check([
+            self.input("good/pom.xml", valid, agentVersion="0.8.14"),
+            self.input("wrong-probe-count/pom.xml", self.data("mismatch", extra_probes=1)),
+            self.input("corrupt/pom.xml", corrupt),
+            self.input("future-version/pom.xml", valid, agentVersion="0.8.16"),
+        ])
+        self.assertEqual(["api/pom.xml"], result["reports"])
+        self.assertEqual({"java.coverage_exec_invalid", "java.coverage_probe_mismatch", "java.coverage_agent_unsupported"},
+                         {diagnostic["code"] for diagnostic in result["diagnostics"]})
+        branch = ET.parse(self.report).find(".//method[@name='choose']/counter[@type='BRANCH']")
+        self.assertEqual({"type": "BRANCH", "missed": "0", "covered": "2"}, branch.attrib)
+
+    def test_competing_versioned_class_is_ambiguous(self):
+        jar_path = self.class_archive("competing.jar", "META-INF/versions/17/Example.class")
+        result = self.check([self.input("client/pom.xml", self.data("same"), competingPaths=[str(jar_path)])])
+        self.assertEqual([], result["reports"])
+        self.assertFalse(self.report.exists())
+        self.assertEqual(["java.coverage_owner_ambiguous"], [diagnostic["code"] for diagnostic in result["diagnostics"]])
+
+    def test_jar_only_reactor_owner_is_attributable(self):
+        jar_path = self.class_archive("api.jar")
+        result = self.check([self.input("client/pom.xml", self.data("jar-only"), competingPaths=[str(jar_path)],
+                                       productionPaths={"api/pom.xml": [str(jar_path)]})])
+        self.assertEqual(["api/pom.xml"], result["reports"])
+        self.assertEqual([], result["diagnostics"])
+
+    def test_another_owners_shaded_archive_remains_a_competitor(self):
+        jar_path = self.class_archive("api.jar")
+        shaded = self.class_archive("other.jar")
+        result = self.check([self.input("client/pom.xml", self.data("shaded"), competingPaths=[str(jar_path), str(shaded)],
+                                       productionPaths={"api/pom.xml": [str(jar_path)], "other/pom.xml": [str(shaded)]})])
+        self.assertEqual([], result["reports"])
+        self.assertEqual(["java.coverage_owner_ambiguous"], [diagnostic["code"] for diagnostic in result["diagnostics"]])
+        self.assertIn(str(shaded), result["diagnostics"][0]["message"])
+
+    def test_versioned_entry_alone_does_not_prove_production_ownership(self):
+        jar_path = self.class_archive("api.jar", "META-INF/versions/17/Example.class")
+        result = self.check([self.input("client/pom.xml", self.data("nonmatching"), competingPaths=[str(jar_path)],
+                                       productionPaths={"api/pom.xml": [str(jar_path)]})])
+        self.assertEqual([], result["reports"])
+        self.assertEqual(["java.coverage_class_mismatch"], [diagnostic["code"] for diagnostic in result["diagnostics"]])
+
+    def test_overlay_leaves_local_report_to_the_caller_when_local_probes_are_missing(self):
+        result = self.check([self.input("client/pom.xml", self.data("downstream"))], local_report=True)
+        self.assertEqual([], result["reports"])
+        self.assertFalse(self.report.exists())
+        self.assertEqual(["java.coverage_local_unavailable"], [diagnostic["code"] for diagnostic in result["diagnostics"]])
 
 
 if __name__ == "__main__":

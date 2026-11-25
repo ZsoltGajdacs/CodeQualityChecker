@@ -19,7 +19,8 @@ internal sealed record MavenMetadata
         return new() { Pom = Required(project, "pom"),
             MainOutput = Required(project, "mainOutput"), TestOutput = Required(project, "testOutput"),
             Coverage = coverage is null ? null : new(
-                (string?)coverage.Attribute("version"), (string?)coverage.Attribute("report"), (string?)coverage.Attribute("reason")),
+                (string?)coverage.Attribute("version"), (string?)coverage.Attribute("report"), (string?)coverage.Attribute("reason"))
+                { Data = (string?)coverage.Attribute("data") },
             Artifacts = project.Elements("artifact").Select(artifact => new MavenArtifact(artifact.Value, artifact.Attribute("sourceSet")?.Value
                 ?? throw new InvalidOperationException("Missing artifact source set."))).ToArray(),
             SourceSets = project.Elements("context").Select(context => new MavenSourceSet(
@@ -34,7 +35,10 @@ internal sealed record MavenMetadata
 
 internal sealed record MavenArtifact(string Path, string SourceSet);
 internal sealed record MavenSourceSet(string Name, string[] SourceRoots, string[] Classpath);
-internal sealed record MavenCoverage(string? Version, string? Report, string? Reason);
+internal sealed record MavenCoverage(string? Version, string? Report, string? Reason)
+{
+    internal string? Data { get; init; }
+}
 
 internal static class MavenCollector
 {

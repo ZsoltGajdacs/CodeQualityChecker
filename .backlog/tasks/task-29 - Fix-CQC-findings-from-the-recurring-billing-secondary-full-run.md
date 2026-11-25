@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-11-25T14:40:00Z'
-updated_date: '2026-11-25T14:45:00Z'
+updated_date: '2026-11-25T14:57:00Z'
 labels: []
 dependencies: []
 type: bug
@@ -20,7 +20,7 @@ CQC defects in report 7decfa72. Billing is the acceptance checkout. Work on mast
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Verified Maven contexts resolve generated Java members and report unresolved references precisely.
+- [x] #1 Verified Maven contexts resolve generated Java members and report unresolved references precisely.
 - [ ] #2 JVM signatures and downstream JaCoCo probes produce correct module-owned coverage.
 - [ ] #3 TypeScript resolves supported assets and runtime subpaths while preserving genuine blockers.
 - [ ] #4 Report pagination filters diagnostics and separates scored, incomplete and not applicable entities.
@@ -41,4 +41,6 @@ CQC defects in report 7decfa72. Billing is the acceptance checkout. Work on mast
 
 <!-- SECTION:NOTES:BEGIN -->
 Slice 1 committed as cb58dfe. Old worker reproduced generated builder, getter-chain and assertion failures in the new reactor fixture. Updated worker passed 32 Python worker tests and 7 Maven integration tests. CodeScene gate passed. Verified precedence does not repair JavaParser lexical calls to generated members on the current authored type; measure that residual in Billing.
+
+Slice 2 committed as ebe00b0. Worker regression reproduced incorrect erasure before the fix. 33 worker tests, Maven fixture tests and 27 focused .NET integration/evidence tests passed. CodeScene gate passed. Same-source Billing cached probe resolved all 95 ErrorLogFactory calls, reduced unresolved calls to 15,794 and raised scored test entities from 85 to 182, with duplication unchanged at 484.
 <!-- SECTION:NOTES:END -->

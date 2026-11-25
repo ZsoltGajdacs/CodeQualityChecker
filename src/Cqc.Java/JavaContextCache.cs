@@ -15,32 +15,20 @@ internal sealed class JavaContextCache(ProjectSnapshot snapshot)
 
     internal Task StageAsync(string runDirectory, MavenMetadata[] modules, CancellationToken token)
     {
-        var owners = OutputOwners(modules);
+        var owners = new MavenOutputOwnership(snapshot.Root, modules);
         var contexts = modules.SelectMany(module => module.SourceSets.Select(source => Context(module, source, owners, token)))
             .OrderBy(context => context.Id, StringComparer.Ordinal).ToArray();
         var manifest = new JavaContextManifest("3", snapshot.SourceFingerprint, contexts);
         return EvidenceStore.WriteJsonAsync(new DirectoryInfo(runDirectory), FileName, manifest, token);
     }
 
-    private Dictionary<string, string> OutputOwners(MavenMetadata[] modules)
-    {
-        var owners = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var module in modules)
-        {
-            var pom = Relative(module.Pom);
-            owners[MavenPaths.Canonical(module.MainOutput)] = pom + "#main";
-            owners[MavenPaths.Canonical(module.TestOutput)] = pom + "#test";
-            foreach (var artifact in module.Artifacts) owners[MavenPaths.Canonical(artifact.Path)] = pom + "#" + artifact.SourceSet;
-        }
-        return owners;
-    }
-
-    private JavaContext Context(MavenMetadata module, MavenSourceSet source, Dictionary<string, string> owners, CancellationToken token)
+    private JavaContext Context(MavenMetadata module, MavenSourceSet source, MavenOutputOwnership owners, CancellationToken token)
     {
         var pom = Relative(module.Pom);
         var id = pom + "#" + source.Name;
-        var reachable = source.Classpath.Select(MavenPaths.Canonical).Where(owners.ContainsKey).Select(path => owners[path])
-            .Where(owner => owner != id).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var reachable = owners.References(source).SelectMany(reference => reference.Contexts)
+            .Where(owner => owner != id && (source.Name == "test" || owner != pom + "#test"))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var roots = source.SourceRoots.Where(Directory.Exists).Select(Relative)
             .Where(root => !root.Split('/').Contains("target", StringComparer.Ordinal))
             .Where(root => snapshot.Files.Any(file => root == "." || file.StartsWith(root.TrimEnd('/') + "/", StringComparison.Ordinal)))

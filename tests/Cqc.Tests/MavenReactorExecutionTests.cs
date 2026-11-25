@@ -106,7 +106,7 @@ public sealed class MavenReactorExecutionTests
 
     [Fact]
     [Trait("Category", "Execution")]
-    public async Task SkippedProjectAgentProducesModuleDiagnosticWithoutFallback()
+    public async Task SkippedProjectAgentKeepsDownstreamEvidenceWithoutInstrumentingLocalTests()
     {
         using var workspace = FixtureWorkspace.Copy("maven-reactor");
         var pom = Path.Combine(workspace.Root, "group", "pom.xml");
@@ -118,10 +118,11 @@ public sealed class MavenReactorExecutionTests
         var result = await service.AnalyzeAsync(new() { ProjectRoot = workspace.Root, Execute = true, TimeoutSeconds = 300 },
             ["code"], CancellationToken.None);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed");
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "java.coverage_missing"
-            && diagnostic.File == "group/api/pom.xml" && diagnostic.Message.Contains("skip", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "java.coverage_missing"
+            && diagnostic.File == "group/api/pom.xml");
         var entities = Assert.Single(result.Results).Entities;
-        Assert.Null(Assert.Single(entities, item => item.EntityId.EndsWith("::example.api.Value", StringComparison.Ordinal)).Score);
+        Assert.NotNull(Assert.Single(entities, item => item.EntityId.EndsWith("::example.api.Value", StringComparison.Ordinal)).Score);
+        Assert.Null(Assert.Single(entities, item => item.EntityId.EndsWith("::example.api.LocalValue", StringComparison.Ordinal)).Score);
         Assert.NotNull(Assert.Single(entities, item => item.EntityId.EndsWith("::example.service.Service", StringComparison.Ordinal)).Score);
         Assert.NotNull(Assert.Single(entities, item => item.EntityId.EndsWith("::independent.Other", StringComparison.Ordinal)).Score);
     }

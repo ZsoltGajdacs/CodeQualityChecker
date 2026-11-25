@@ -114,7 +114,7 @@ for jar in sorted(Path('java-worker/target/dependency').glob('*.jar')):
             path = Path(name)
             if path.is_absolute() or '..' in path.parts:
                 continue
-            if path.name.lower().startswith(('license', 'notice', 'copying')) or path.name == 'pom.xml':
+            if path.name.lower().startswith(('license', 'notice', 'copying')) or path.name in ('about.html', 'pom.xml'):
                 target = destination / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(archive.read(name))

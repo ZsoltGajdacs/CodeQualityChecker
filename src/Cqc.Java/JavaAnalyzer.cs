@@ -30,20 +30,13 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
     {
         if (!snapshot.Files.Any(path => path.EndsWith(".java", StringComparison.OrdinalIgnoreCase)))
             return new([], [], [], [], true);
-        var jar = FindWorker();
-        if (jar is null)
-            return JavaWorkerFacts.Unavailable("java.worker_missing", "Build java-worker with Maven or install the packaged server containing java-worker.jar.");
-        var bundled = Path.Combine(AppContext.BaseDirectory, "runtime", "bin", "java");
         var version = snapshot.SourceOnly ? SourceOnlySchemaVersion : Wire.SchemaVersion;
         try
         {
-            var command = new ProcessCommand
-            {
-                Executable = File.Exists(bundled) ? bundled : "java",
-                Arguments = ["-jar", jar],
-                Directory = snapshot.Root,
-                Input = JsonSerializer.Serialize(snapshot with { SchemaVersion = version }, Wire.Json)
-            };
+            var command = JavaWorkerCommand.Create(snapshot.Root,
+                JsonSerializer.Serialize(snapshot with { SchemaVersion = version }, Wire.Json));
+            if (command is null)
+                return JavaWorkerFacts.Unavailable("java.worker_missing", "Build java-worker with Maven or install the packaged server containing java-worker.jar.");
             var result = await ProcessRunner.RunAsync(command, cancellationToken);
             if (result.ExitCode != 0)
                 return JavaWorkerFacts.Unavailable("java.worker_failed", "Java analyzer failed: " + result.Error.Trim());
@@ -53,6 +46,24 @@ public sealed class JavaAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILangu
         {
             return JavaWorkerFacts.Unavailable("java.worker_failed", exception.Message);
         }
+    }
+
+}
+
+internal static class JavaWorkerCommand
+{
+    internal static ProcessCommand? Create(string root, string input, string? entryPoint = null)
+    {
+        var jar = FindWorker();
+        if (jar is null) return null;
+        var bundled = Path.Combine(AppContext.BaseDirectory, "runtime", "bin", "java");
+        return new()
+        {
+            Executable = File.Exists(bundled) ? bundled : "java",
+            Arguments = entryPoint is null ? ["-jar", jar] : ["-cp", jar, entryPoint],
+            Directory = root,
+            Input = input
+        };
     }
 
     private static string? FindWorker()

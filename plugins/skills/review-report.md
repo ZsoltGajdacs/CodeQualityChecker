@@ -14,6 +14,8 @@ Duplication checks require at least four lines of body code. Signatures, comment
 
 When diagnostics identify a legacy reference manifest or changed or missing build outputs, explain which assessments lack evidence. The current manifests verify Maven classpath entries and .NET assemblies in their existing locations. Refresh them through an authorized `execute: true` run when the requested assessment needs that evidence.
 
+Maven execution collects coverage from a module's own tests and from downstream tests in the same reactor when their JaCoCo execution data matches the module's compiled classes. A valid local report remains available if downstream data cannot be used. Explain missing coverage using the module and class attribution in the diagnostics.
+
 ## Retrieve the completed report
 
 Inspection and check responses contain schema-v3 summaries in `structuredContent`, including the report ID, expiry, fingerprints, counts, family statuses, score distributions, and diagnostic code counts. Use `get_report_page` to retrieve the relevant details before making location-specific claims or applying changes.

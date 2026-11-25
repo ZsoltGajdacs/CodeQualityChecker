@@ -13,44 +13,44 @@ public sealed class JavaExecution : ILanguageExecution
         var modules = snapshot.Modules.Where(module => module.Language == Language).ToArray();
         if (modules.Any(module => !module.Supported))
             throw new InvalidOperationException("Java execution requires supported Maven modules.");
-        var versions = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["metadata"] = "4" };
+        var versions = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["metadata"] = "5" };
         var runner = new JavaBuildRunner(snapshot.Root, runDirectory, versions);
-        var metadata = new List<CollectedModule>();
+        var reactors = new List<CollectedMavenModule[]>();
         foreach (var module in MavenBuildRoots.Select(modules, snapshot.Root))
         {
             var output = await runner.BuildAsync(module, cancellationToken);
-            metadata.AddRange(ReadMetadata(output));
+            reactors.Add(ReadMetadata(output).ToArray());
         }
-        var contexts = metadata.GroupBy(item => MavenPaths.Relative(snapshot.Root, item.Metadata.Pom), StringComparer.Ordinal)
+        var contexts = reactors.SelectMany(reactor => reactor)
+            .GroupBy(item => MavenPaths.ProjectRelative(snapshot.Root, item.Metadata.Pom), StringComparer.Ordinal)
             .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
         await new JavaContextCache(snapshot).StageAsync(runDirectory, contexts.Values.Select(item => item.Metadata).ToArray(), cancellationToken);
         foreach (var (module, context) in contexts)
             if (context.Metadata.Coverage?.Version is { } version)
                 versions["jacoco:" + module] = version;
         var reports = CollectReports(contexts);
+        var combined = await new MavenReactorCoverage(snapshot.Root).MergeAsync(reactors, contexts, reports, cancellationToken);
         return new(Language, reports.Keys.ToArray(), versions)
         {
-            Diagnostics = CollectionDiagnostics(snapshot, contexts, reports),
+            Diagnostics = [.. combined, .. CollectionDiagnostics(snapshot, contexts, reports)],
             ReportModules = reports,
             ReferenceManifestName = JavaContextCache.FileName
         };
     }
 
-    private sealed record CollectedModule(MavenMetadata Metadata, string Output);
-
-    private static IEnumerable<CollectedModule> ReadMetadata(string reactorDirectory)
+    private static IEnumerable<CollectedMavenModule> ReadMetadata(string reactorDirectory)
     {
         foreach (var directory in Directory.EnumerateDirectories(reactorDirectory, "module-*").Order(StringComparer.Ordinal))
         {
             if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) continue;
             var path = Path.Combine(directory, "metadata.xml");
-            if (IsRegularOutput(path)) yield return new(MavenMetadata.Read(path), directory);
+            if (CollectedMavenModule.IsRegularOutput(path)) yield return new(MavenMetadata.Read(path), directory);
         }
     }
 
-    private static SortedDictionary<string, string> CollectReports(Dictionary<string, CollectedModule> contexts)
+    private static SortedDictionary<string, string> CollectReports(Dictionary<string, CollectedMavenModule> contexts)
     {
-        var reports = contexts.Select(item => (Module: item.Key, Report: OwnedReport(item.Value)))
+        var reports = contexts.Select(item => (Module: item.Key, Report: item.Value.LocalCoverage))
             .Where(item => item.Report is not null)
             .GroupBy(item => item.Report!, StringComparer.Ordinal)
             .Where(group => group.Count() == 1)
@@ -58,7 +58,7 @@ public sealed class JavaExecution : ILanguageExecution
         return new(reports, StringComparer.Ordinal);
     }
 
-    private static Diagnostic[] CollectionDiagnostics(ProjectSnapshot snapshot, Dictionary<string, CollectedModule> contexts,
+    private static Diagnostic[] CollectionDiagnostics(ProjectSnapshot snapshot, Dictionary<string, CollectedMavenModule> contexts,
         SortedDictionary<string, string> reports)
     {
         var diagnostics = new List<Diagnostic>();
@@ -85,17 +85,6 @@ public sealed class JavaExecution : ILanguageExecution
         return snapshot.Files.Any(file => file.EndsWith(".java", StringComparison.OrdinalIgnoreCase)
             && roots.Any(root => file.StartsWith(root.TrimEnd('/') + "/", StringComparison.Ordinal)));
     }
-
-    private static string? OwnedReport(CollectedModule module)
-    {
-        if (module.Metadata.Coverage?.Report is not { } report || !Path.IsPathFullyQualified(report)) return null;
-        var path = Path.Combine(module.Output, "jacoco.xml");
-        if (!IsRegularOutput(path)) return null;
-        return MavenPaths.Canonical(report) == MavenPaths.Canonical(path) ? path : null;
-    }
-
-    private static bool IsRegularOutput(string path) =>
-        File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0;
 
     public MethodCoverage[] ReadCoverage(LanguageBuildResult build, IEnumerable<MethodFact> methods) =>
         ReadCoverage(build, methods, null);

@@ -6,6 +6,7 @@
   <packaging>pom</packaging>
   <modules>
     <module>api</module>
+    <module>upstream</module>
     <module>service</module>
   </modules>
   <properties>
