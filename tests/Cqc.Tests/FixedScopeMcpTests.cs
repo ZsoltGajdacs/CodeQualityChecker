@@ -117,7 +117,7 @@ public sealed class FixedScopeMcpTests
         var sourceRequest = new { projectRoot = workspace.Root };
         var before = await McpTests.Read(client, ChangesTool, sourceRequest, timeout.Token);
         var executed = await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root, execute = true }, timeout.Token);
-        Assert.Equal(new[] { "code", "dependencies", "duplication", "tests" }, Families(executed, "families"));
+        Assert.Equal(new[] { "code", "dependencies", "duplication", "hotspots", "tests" }, Families(executed, "families"));
         Assert.Equal(3, executed.GetProperty("fileCount").GetInt32());
         Assert.False(executed.TryGetProperty("analysisNote", out var note) && note.ValueKind == JsonValueKind.String);
         Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
@@ -186,7 +186,7 @@ public sealed class FixedScopeMcpTests
     private static void AssertSourceSummary(JsonElement summary)
     {
         Assert.Equal(AnalysisNote, summary.GetProperty("analysisNote").GetString());
-        Assert.Equal(new[] { "code", "duplication" }, Families(summary, "families"));
+        Assert.Equal(new[] { "code", "duplication", "hotspots" }, Families(summary, "families"));
         var code = Family(summary, "families", "code");
         Assert.False(code.TryGetProperty("scores", out _));
         Assert.NotEmpty(code.GetProperty("staticComplexityScores").EnumerateArray());

@@ -1,6 +1,6 @@
-# Ruleset 2
+# Ruleset 3
 
-**10 is the desired score.** Each distinct finding below deducts one point. Scores are `max(0, 10 - deductions)`, separately for every applicable family and class/file. Class scores include all partial declarations; file scores use the deduplicated union of findings located in that file. Scores never average healthy methods against problematic methods. Every deduction retains its locations and advice, including after a score reaches zero.
+**10 is the desired score.** Each distinct finding below deducts one point. These scores are `max(0, 10 - deductions)`, separately for every applicable family and class/file. Class scores include all partial declarations. File scores use the deduplicated union of findings located in that file. Scores never average healthy methods against problematic methods. Every deduction retains its locations and advice, including after a score reaches zero.
 
 | Rule ID | Default condition |
 | --- | --- |
@@ -28,6 +28,22 @@ Dependency metrics include component fan-in/out, instability, abstractness, abso
 The default complexity finding boundary matches the observed Java/C# Code Health cutoff: complexity 8 is accepted and complexity 9 is flagged. `complexityThreshold` is the maximum permitted complexity, so explicit overrides retain their existing meaning (for example, 10 flags 11 and above). CQC scores remain its own one-point deduction model.
 
 Changing the effective default changes the configuration fingerprint. Coverage collected under the previous default must be refreshed with explicit execution, or supplied with matching provenance. The scoring algorithm and ruleset version remain unchanged; the configuration fingerprint identifies the changed policy.
+
+## Change hotspots
+
+The `hotspots` family subtracts three capped penalties from 10 and rounds to two decimal places. Each penalty starts at zero at the lower threshold and rises linearly to its cap at the upper threshold.
+
+| Measurement | Lower threshold | Upper threshold | Maximum penalty |
+| --- | ---: | ---: | ---: |
+| Commits editing the class's files in 12 months | 10 | 30 | 5 |
+| Parameters in the widest constructor | 4 | 10 | 3 |
+| Physical class lines | 400 | 800 | 2 |
+
+The history window ends at the pinned local HEAD's committer timestamp. The check walks its first-parent chain and compares merge commits to their first parent. It follows committed renames detected by Git. File creation and pure renames contribute zero. Classes in the same file share its edit history. A partial class counts each commit once across its declarations and sums their physical line spans. A working-tree path absent from HEAD starts with zero edits.
+
+Current source defines class length and constructor arity. Physical lines include blank and comment lines inside the declaration. Constructor arity includes data arguments and service dependencies. C# primary constructors and Java record components contribute to arity. TypeScript hotspots analyze authored classes and skip ambient declarations and conventional test files.
+
+A file receives the lowest score among its selected classes and is incomplete if any of them is unscored. A score below 7 produces the advisory `hotspots.change` and its three measurements. Missing or shallow Git history and incomplete class syntax produce incomplete results. The `hotspotHistory` report field records the HEAD SHA and UTC date window when available.
 
 ## Configuration
 

@@ -62,7 +62,7 @@ def run(output):
         for client in ('claude', 'codex'):
             verify_client(output / client, root)
             assert SMOKE['digest_sources'](root) == original, 'Source-only analysis changed fixtures'
-            print(f'PASS: {client}: eight real tools, bounded pages, Java/C#/TypeScript, unchanged inputs')
+            print(f'PASS: {client}: nine real tools, bounded pages, Java/C#/TypeScript, unchanged inputs')
 
 
 if __name__ == '__main__':

@@ -42,6 +42,7 @@ public sealed record TypeFact(string Id, string Language, Location Location, boo
     public EvidenceState? Evidence { get; init; }
 }
 public sealed record DependencyFact(string From, string To, Location Location);
+public sealed record ClassDeclarationFact(string Id, string Language, Location Location, int ConstructorParameters, bool Complete);
 public sealed record AnalysisFacts(
     TypeFact[] Types, MethodFact[] Methods, DependencyFact[] Dependencies,
     Diagnostic[] Diagnostics, bool SemanticComplete, string SchemaVersion = Wire.SchemaVersion)
@@ -49,6 +50,7 @@ public sealed record AnalysisFacts(
     public AnalysisContext[] Contexts { get; init; } = [];
     public SyntaxGap[] SyntaxGaps { get; init; } = [];
     public ExecutableFact[] Executables { get; init; } = [];
+    public ClassDeclarationFact[] ClassDeclarations { get; init; } = [];
 }
 public sealed record ProjectModule(string Language, string Path, string Integration, bool Supported);
 public sealed record ProjectSnapshot(

@@ -8,6 +8,7 @@ internal sealed record FindingDefinition
     public required string Advice { get; init; }
     public required IEnumerable<string> Entities { get; init; }
     public required IEnumerable<Location> Locations { get; init; }
+    public int Deduction { get; init; } = 1;
 }
 
 internal sealed record FindingOrigin(string TypeId, Location Location, Location? TouchRange = null);
@@ -37,6 +38,8 @@ internal sealed record FamilyAssessment
     public IEnumerable<ScoringContribution> Contributions { get; init; } = [];
     public Func<TypeFact, ChangedCodeScope, bool> IncludeTouchedDeclaration { get; init; } = (_, _) => false;
     public Func<SelectedTypeEvidence, EntityScoringEvidence> Aggregate { get; init; } = evidence => evidence.Assess();
+    public Func<EntityAssessment, double>? CalculatePrimaryScore { get; init; }
+    public Func<SyntaxGap, bool> IncludesSyntaxGap { get; init; } = _ => true;
     public bool ShowOnlyTouchedFindingLocations { get; init; }
     public Func<string, FindingOrigin[]> FindingOrigins { get; init; } = _ => [];
 

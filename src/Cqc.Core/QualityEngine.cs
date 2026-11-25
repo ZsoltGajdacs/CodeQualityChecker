@@ -10,6 +10,7 @@ public sealed record EvaluationRequest
     public required string[] Families { get; init; }
     public CancellationToken CancellationToken { get; init; }
     internal ChangedCodeScope? ChangedCode { get; init; }
+    internal GitHotspotEvidence? HotspotEvidence { get; init; }
 }
 
 /// <summary>Pure, deterministic quality rules shared by every language adapter.</summary>
@@ -26,7 +27,9 @@ public static class QualityEngine
             "tests" => TestRules.Evaluate(context, request.Config),
             "duplication" => DuplicationRules.Evaluate(context, request.Config),
             "dependencies" => DependencyRules.Evaluate(context, request.Config),
+            "hotspots" => HotspotRules.Evaluate(context, request.HotspotEvidence),
             _ => throw new ArgumentException($"Unknown check family: {family}", nameof(request))
-        }).Where(family => !request.Snapshot.SourceOnly || family.Status != "notApplicable").ToArray();
+        }).Where(family => !request.Snapshot.SourceOnly || request.Families.Length == 1
+            || family.Status != "notApplicable").ToArray();
     }
 }

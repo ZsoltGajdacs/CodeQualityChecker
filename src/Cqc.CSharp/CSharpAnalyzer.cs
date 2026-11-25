@@ -30,7 +30,8 @@ public sealed class CSharpAnalyzer : ILanguageAnalyzer, ILanguageExecution, ILan
             InternalDependencies(collector), diagnostics, semanticComplete)
         {
             Contexts = projects.Select(project => project.Context).ToArray(),
-            SyntaxGaps = gaps
+            SyntaxGaps = gaps,
+            ClassDeclarations = collector.ClassDeclarations.ToArray()
         };
     }
 

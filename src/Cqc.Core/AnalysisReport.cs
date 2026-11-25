@@ -33,10 +33,14 @@ public sealed record AnalysisResponse
     public string[] AnalyzedFiles { get; init; } = [];
     public ProjectModule[] Modules { get; init; } = [];
     public FamilyResult[] Results { get; init; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HotspotHistory? HotspotHistory { get; init; }
     public Diagnostic[] Diagnostics { get; init; } = [];
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SourceOnly { get; init; }
+    [JsonIgnore]
+    public bool SupportsProjectExecution { get; init; } = true;
 }
 
 public sealed record InspectionResponse(string SchemaVersion, string Message, ProjectSnapshot Project, Diagnostic[] Prerequisites);

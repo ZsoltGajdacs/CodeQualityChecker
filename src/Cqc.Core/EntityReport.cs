@@ -55,6 +55,8 @@ internal sealed class EntityReport
         var evidence = selection.For(entity);
         var primary = entity.Findings.Where(finding => !assessment.StaticOnlyFindingIds.Contains(finding.Id));
         var result = evidence.PrimaryApplies ? AssessmentEvidence.Score(primary, evidence.Blockers) : new("notApplicable", null, [], []);
+        if (result.Score is not null && assessment.CalculatePrimaryScore is { } calculate)
+            result = result with { Score = calculate(entity) };
         var secondary = evidence.StaticApplies ? AssessmentEvidence.Score(
             entity.Findings.Where(f => f.Rule == "code.complexity"), evidence.StaticBlockers) : null;
         return new(entity.Id, entity.Kind, entity.File, result.Status, result.Score, result.FindingIds, evidence.Metrics)

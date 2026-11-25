@@ -10,10 +10,12 @@ internal static class SourceEvidence
 {
     private sealed record UnmodeledExecutable(string Construct, SyntaxNode Node);
 
-    internal static EvidenceState Type(BaseTypeDeclarationSyntax declaration, SourceAnalysisContext context)
+    internal static bool HasCompleteSyntax(BaseTypeDeclarationSyntax declaration, SourceAnalysisContext context) =>
+        context.Options.Complete && !declaration.GetDiagnostics().Any(x => x.Severity == DiagnosticSeverity.Error);
+
+    internal static EvidenceState Type(BaseTypeDeclarationSyntax declaration, SourceAnalysisContext context, bool syntaxComplete)
     {
-        var syntax = context.Options.Complete && !Unmodeled(declaration).Any()
-            && !declaration.GetDiagnostics().Any(x => x.Severity == DiagnosticSeverity.Error);
+        var syntax = syntaxComplete && !Unmodeled(declaration).Any();
         var semantic = !context.SourceOnly && !context.Model.GetDiagnostics(declaration.Span, context.Token).Any(x => x.Severity == DiagnosticSeverity.Error);
         return new(syntax, true, semantic, semantic, context.VerifiedContext, []);
     }

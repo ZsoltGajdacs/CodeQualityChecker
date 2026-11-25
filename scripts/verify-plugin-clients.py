@@ -12,7 +12,7 @@ import time
 
 
 TOOLS = {'inspect_project', 'check_code_quality', 'check_test_quality',
-         'check_duplication', 'check_dependencies', 'check_all', 'get_report_page',
+         'check_duplication', 'check_dependencies', 'check_hotspots', 'check_all', 'get_report_page',
          'check_uncommitted_changes_quality'}
 SKILLS = {'check-project', 'check-uncommitted'}
 

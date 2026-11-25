@@ -57,9 +57,16 @@ function expressionBody(name, expression) {
     return { name, kind: 'initializer', span: expression, body: expression };
 }
 
-export function executables(file, source) {
-    const bodies = [];
+function constructorArity(node) {
+    const implementations = node.members.filter(member => ts.isConstructorDeclaration(member) && hasBody(member));
+    return implementations.reduce((maximum, constructor) => Math.max(maximum, constructor.parameters.length), 0);
+}
+
+export function collectStructure(file, source, complete) {
+    const executables = [];
+    const classDeclarations = [];
     const labels = new Map();
+    const production = !source.isDeclarationFile && !/(?:^|\/)__tests__\/|\.(?:test|spec)\.tsx?$/i.test(file);
     function unique(owner, name) {
         const key = owner ? owner + '/' + name : name;
         const occurrence = (labels.get(key) ?? 0) + 1;
@@ -67,25 +74,29 @@ export function executables(file, source) {
         return occurrence === 1 ? key : key + '~' + occurrence;
     }
     function add(id, kind, span, roots) {
-        bodies.push({ id: file + '#' + id, typeId: file, kind, language, location: span, ...measure(roots, source) });
+        executables.push({ id: file + '#' + id, typeId: file, kind, language, location: span, ...measure(roots, source) });
     }
     function walk(node, owner) {
         if (isTypeOnly(node)) return;
         if (ts.isClassLike(node) || ts.isModuleDeclaration(node)) {
             owner = unique(owner, label(node.name) ?? 'anonymous');
         }
+        if (production && ts.isClassLike(node)) {
+            classDeclarations.push({ id: file + '#' + owner, language, location: nodeLocation(file, source, node),
+                constructorParameters: constructorArity(node), complete });
+        }
         const body = ownedBody(node);
         if (body) {
             owner = unique(owner, body.name);
-            add(owner, body.kind, nodeLocation(file, source, body.span), [body.body]);
+            if (complete) add(owner, body.kind, nodeLocation(file, source, body.span), [body.body]);
         }
         ts.forEachChild(node, child => walk(child, owner));
     }
     const statements = source.statements.filter(moduleStatement);
-    if (statements.length > 0) {
+    if (complete && statements.length > 0) {
         const span = location(file, source, statements[0].getStart(source), statements.at(-1).getEnd());
         add('!module', 'moduleBody', span, statements);
     }
     walk(source, '');
-    return bodies;
+    return { executables, classDeclarations };
 }

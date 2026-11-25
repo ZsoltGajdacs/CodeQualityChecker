@@ -46,6 +46,7 @@ internal sealed class LanguageFactCollection(ILanguageAnalyzer[] adapters, Langu
     {
         Contexts = results.SelectMany(result => result.Contexts).ToArray(),
         SyntaxGaps = results.SelectMany(result => result.SyntaxGaps).ToArray(),
-        Executables = results.SelectMany(result => result.Executables).ToArray()
+        Executables = results.SelectMany(result => result.Executables).ToArray(),
+        ClassDeclarations = results.SelectMany(result => result.ClassDeclarations).ToArray()
     };
 }

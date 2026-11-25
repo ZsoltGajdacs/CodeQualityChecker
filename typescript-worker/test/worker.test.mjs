@@ -99,6 +99,27 @@ test('evaluated class declaration expressions are independently measured', t => 
     ]);
 });
 
+test('class facts retain implementation constructor arity and physical declaration spans', t => {
+    const input = fixture(t, { 'classes.ts': [
+        'declare class Ambient { constructor(a: string); }',
+        'class Service {',
+        '    constructor(a: string);',
+        '    constructor(a: string, b: string, c: string);',
+        '    constructor(a: string, ...remaining: string[]) {}',
+        '    make() { return class Local { constructor(a: string) {} }; }',
+        '}',
+        'class Sibling {}'
+    ].join('\n'), 'classes.test.ts': 'class TestHelper {}' });
+    const facts = analyze({ ...input, sourceOnly: true });
+    assert.deepEqual(facts.classDeclarations.map(({ id, constructorParameters, location, complete }) =>
+        [id, constructorParameters, location.startLine, location.endLine, complete]), [
+        ['classes.ts#Service', 2, 2, 7, true],
+        ['classes.ts#Service/make/Local', 1, 6, 6, true],
+        ['classes.ts#Sibling', 0, 8, 8, true]
+    ]);
+    assert.equal(facts.types.length, input.files.length);
+});
+
 test('clone measurements normalize renamed values and exclude declaration lines and braces', t => {
     function body(fn, name, literal) {
         return [

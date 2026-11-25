@@ -90,7 +90,9 @@ public sealed class TouchedCodeMcpTests
         await using var client = await McpTests.Connect(timeout.Token);
         var summary = await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root }, timeout.Token);
         Assert.Equal(1, summary.GetProperty("fileCount").GetInt32());
-        Assert.Empty(summary.GetProperty("families").EnumerateArray());
+        string[] expected = editBetweenMethods ? ["hotspots"] : [];
+        Assert.Equal(expected, summary.GetProperty("families").EnumerateArray()
+            .Select(family => family.GetProperty("family").GetString()));
     }
 
     [Fact]

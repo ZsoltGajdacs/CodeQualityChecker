@@ -10,6 +10,7 @@ public sealed record ProcessCommand
     public required string Directory { get; init; }
     public string? Input { get; init; }
     public string[] RemoveEnvironmentVariables { get; init; } = [];
+    internal IReadOnlyDictionary<string, string>? EnvironmentOverrides { get; init; }
 }
 
 public static class ProcessRunner
@@ -24,6 +25,8 @@ public static class ProcessRunner
             RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = command.Input is not null, UseShellExecute = false };
         foreach (var argument in command.Arguments) start.ArgumentList.Add(argument);
         foreach (var name in command.RemoveEnvironmentVariables) start.Environment.Remove(name);
+        if (command.EnvironmentOverrides is { } overrides)
+            foreach (var entry in overrides) start.Environment[entry.Key] = entry.Value;
         using var process = Process.Start(start) ?? throw new IOException($"Unable to start {command.Executable}.");
         var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var error = process.StandardError.ReadToEndAsync(cancellationToken);

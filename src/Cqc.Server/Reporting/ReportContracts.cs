@@ -64,6 +64,8 @@ public sealed record ReportSummary
     public required int RemainingDiagnosticGroups { get; init; }
     public required string Kind { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HotspotHistory? HotspotHistory { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AnalysisNote { get; init; }
     public string SchemaVersion => "3";
     public string Message => Wire.Target;

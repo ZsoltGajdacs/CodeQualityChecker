@@ -80,7 +80,7 @@ def initialize(session):
     session.send({'jsonrpc': '2.0', 'method': 'notifications/initialized'})
     tools = session.request('tools/list', {})['tools']
     expected = FIXED_REVIEW_TOOLS | {'inspect_project', 'check_test_quality',
-                                    'check_duplication', 'check_dependencies', 'check_all', 'get_report_page'}
+                                    'check_duplication', 'check_dependencies', 'check_hotspots', 'check_all', 'get_report_page'}
     assert {tool['name'] for tool in tools} == expected
     return [tool for tool in tools if tool['name'] != 'get_report_page']
 
@@ -110,8 +110,10 @@ def retrieve_full(session, summary):
 
 def invoke(session, tool, root):
     assert '10 is the desired score.' in tool['description']
-    response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': {
-        'projectRoot': str(root), 'execute': False}}})
+    request = {'projectRoot': str(root)}
+    if tool['name'] != 'check_hotspots':
+        request['execute'] = False
+    response = session.request('tools/call', {'name': tool['name'], 'arguments': {'request': request}})
     summary = structured(response)
     verify_summary_schema(tool, summary)
     result = retrieve_full(session, summary)
@@ -119,9 +121,21 @@ def invoke(session, tool, root):
     if tool['name'] in FIXED_REVIEW_TOOLS:
         verify_source_review(tool['name'], summary, result)
     if tool['name'] == 'check_all':
-        code = next(family for family in summary['families'] if family['family'] == 'code')
-        assert any(bucket['score'] is None for bucket in code['scores']), code
+        verify_missing_coverage(summary)
+    if tool['name'] == 'check_hotspots':
+        verify_hotspots(summary, result)
     return result
+
+
+def verify_missing_coverage(summary):
+    code = next(family for family in summary['families'] if family['family'] == 'code')
+    assert any(bucket['score'] is None for bucket in code['scores']), code
+
+
+def verify_hotspots(summary, result):
+    assert summary['hotspotHistory'] == result['hotspotHistory']
+    assert [family['family'] for family in result['results']] == ['hotspots']
+    assert any(entity['score'] == 10 for entity in result['results'][0]['entities'])
 
 
 def verify_summary_schema(tool, summary):
@@ -147,7 +161,7 @@ def verify_source_review(tool, summary, result):
     assert summary['scope'] == result['scope'] == expected_scope
     assert summary['fileCount'] > 0, summary
     assert summary['analysisNote'] == 'Running with `execute: true` may reveal additional findings.'
-    assert {family['family'] for family in result['results']} <= {'code', 'duplication'}
+    assert {family['family'] for family in result['results']} == {'code', 'duplication', 'hotspots'}
     families = {family['family']: family for family in summary['families']}
     duplication = families['duplication']
     assert duplication['scores'], duplication
@@ -167,6 +181,8 @@ def verify_source_production(code, production):
 
 def initialize_git(root):
     subprocess.run(['/usr/bin/git', 'init', '--quiet', str(root)], check=True, capture_output=True)
+    subprocess.run(['/usr/bin/git', '-c', 'user.name=CQC Tests', '-c', 'user.email=tests@example.invalid',
+                    'commit', '--allow-empty', '-qm', 'fixture'], cwd=root, check=True, capture_output=True)
 
 
 def verify_languages(result):
@@ -250,7 +266,7 @@ def run(package):
             assert digest_sources(root) == original, 'Analysis-only changed fixture files'
         finally:
             session.close()
-    print('PASS: eight packaged MCP tools, bounded reports, Java/C#/TypeScript without host runtimes.')
+    print('PASS: nine packaged MCP tools, bounded reports, Java/C#/TypeScript without host runtimes.')
 
 
 if __name__ == '__main__':

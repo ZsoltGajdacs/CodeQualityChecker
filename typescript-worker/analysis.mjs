@@ -5,7 +5,7 @@ import { dependencies } from './dependencies.mjs';
 import { canonical, loadProjects, projectOwner, toContext } from './projects.mjs';
 import { referenceOutputs } from './reference-outputs.mjs';
 import { ResolutionHost } from './resolution-host.mjs';
-import { executables } from './structure.mjs';
+import { collectStructure } from './structure.mjs';
 import { language, location } from './syntax.mjs';
 
 export function analyze(snapshot) {
@@ -28,6 +28,7 @@ export function analyze(snapshot) {
         diagnostics: diagnostics.concat(facts.flatMap(fact => fact.diagnostics)),
         contexts, syntaxGaps: facts.flatMap(fact => fact.gaps),
         executables: facts.flatMap(fact => fact.executables),
+        classDeclarations: facts.flatMap(fact => fact.classDeclarations),
         semanticComplete: !sourceOnly && contexts.every(context => context.verified)
             && types.every(type => type.evidence.dependencies)
     };
@@ -60,7 +61,7 @@ function analyzeFile(file, absolute, workspace) {
     return {
         file, contextId, gaps, diagnostics, edges: resolved.edges,
         location: location(file, source, 0, source.end),
-        executables: gaps.length ? [] : executables(file, source)
+        ...collectStructure(file, source, gaps.length === 0)
     };
 }
 

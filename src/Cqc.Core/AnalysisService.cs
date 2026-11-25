@@ -42,6 +42,12 @@ public sealed class AnalysisService
     public Task<AnalysisResponse> ReviewAsync(AnalysisRequest request, CancellationToken cancellationToken)
         => AnalyzeAsync(request, AnalysisPolicy.ForReview(request), cancellationToken);
 
+    public Task<AnalysisResponse> AnalyzeAllAsync(AnalysisRequest request, CancellationToken cancellationToken)
+        => AnalyzeAsync(request, AnalysisPolicy.ForAll(request), cancellationToken);
+
+    public async Task<AnalysisResponse> AnalyzeHotspotsAsync(AnalysisRequest request, CancellationToken cancellationToken)
+        => (await AnalyzeAsync(request, AnalysisPolicy.ForHotspots(), cancellationToken)) with { SupportsProjectExecution = false };
+
     private async Task<AnalysisResponse> AnalyzeAsync(AnalysisRequest request, AnalysisPolicy policy, CancellationToken cancellationToken)
     {
         using var timeout = Timeout(request, cancellationToken);
@@ -67,7 +73,7 @@ public sealed class AnalysisService
             Diagnostics = discoveryDiagnostics, SourceOnly = snapshot.SourceOnly
         };
         if (policy.ReviewTouchedCode && snapshot.SelectedFiles.Length == 0) return report;
-        var changedCode = policy.ReviewTouchedCode ? await ChangedCodeScope.ReadAsync(snapshot, token) : null;
+        var (changedCode, history) = await CaptureGitEvidenceAsync(snapshot, policy, token);
 
         using var artifacts = policy.Executes ? await BuildAsync(snapshot, diagnostics, token) : null;
         if (policy.Executes) await VerifyBuildSnapshot(request, config, snapshot, token);
@@ -83,7 +89,8 @@ public sealed class AnalysisService
         var results = QualityEngine.Evaluate(new EvaluationRequest
         {
             Snapshot = snapshot, Facts = facts, Config = config, Evidence = coverage,
-            ConfigurationFingerprint = configFingerprint, Families = policy.Families, CancellationToken = token, ChangedCode = changedCode
+            ConfigurationFingerprint = configFingerprint, Families = policy.Families, CancellationToken = token,
+            ChangedCode = changedCode, HotspotEvidence = history
         });
         var verified = await VerifySnapshot(request, config, snapshot, token);
         await ChangedCodeScope.VerifyAsync(changedCode, verified, token);
@@ -93,8 +100,18 @@ public sealed class AnalysisService
         return report with
         {
             Results = results.Select(family => family with { Diagnostics = DiagnosticScope.Classify(snapshot, family.Diagnostics) }).ToArray(),
-            Diagnostics = DiagnosticScope.Classify(snapshot, diagnostics)
+            Diagnostics = DiagnosticScope.Classify(snapshot, diagnostics),
+            HotspotHistory = history?.Window
         };
+    }
+
+    private static async Task<(ChangedCodeScope? ChangedCode, GitHotspotEvidence? History)> CaptureGitEvidenceAsync(
+        ProjectSnapshot snapshot, AnalysisPolicy policy, CancellationToken token)
+    {
+        var changedCode = policy.ReviewTouchedCode ? await ChangedCodeScope.ReadAsync(snapshot, token) : null;
+        var history = policy.IncludesHotspots && snapshot.SelectedFiles.Length != 0
+            ? await GitHotspotHistory.ReadAsync(snapshot, changedCode, token) : null;
+        return (changedCode, history);
     }
 
     private static Diagnostic[] DiscoveryDiagnostics(ProjectSnapshot snapshot) => snapshot.SourceOnly

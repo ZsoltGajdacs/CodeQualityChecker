@@ -21,6 +21,7 @@ internal sealed class ChangedCodeScope
         && (file.WholeFile || file.Hunks.Any(hunk => hunk.Touches(location)));
 
     internal bool IsWholeFile(string file) => files.TryGetValue(file, out var change) && change.WholeFile;
+    internal string? Revision => revision;
 
     internal static async Task VerifyAsync(ChangedCodeScope? scope, ProjectSnapshot snapshot, CancellationToken token)
     {
@@ -33,7 +34,7 @@ internal sealed class ChangedCodeScope
 
     internal static async Task<ChangedCodeScope> ReadAsync(ProjectSnapshot snapshot, CancellationToken token)
     {
-        var head = await ReadHeadAsync(snapshot, token);
+        var head = await LocalGit.ReadHeadAsync(snapshot, token);
         var changes = snapshot.SelectedFiles.ToDictionary(path => path, _ => ChangedFile.New, StringComparer.Ordinal);
         if (head is null || changes.Count == 0) return new(head, changes);
 
@@ -42,12 +43,6 @@ internal sealed class ChangedCodeScope
             changes[path] = new(false, await ReadHunksAsync(snapshot, head, path, token));
 
         return new(head, changes);
-    }
-
-    private static async Task<string?> ReadHeadAsync(ProjectSnapshot snapshot, CancellationToken token)
-    {
-        var result = await ProcessRunner.RunAsync("git", ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], snapshot.Root, token);
-        return result.ExitCode == 1 ? null : GitScope.OutputOrThrow(result).Trim();
     }
 
     private static async Task<HashSet<string>> ReadBaselinePathsAsync(ProjectSnapshot snapshot, string head, CancellationToken token)

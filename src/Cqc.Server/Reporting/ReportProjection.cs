@@ -8,12 +8,13 @@ internal static class ReportProjection
     {
         AnalysisResponse analysis => new()
         {
-            ReportId = id, ExpiresAt = expiry, SourceFingerprint = analysis.SourceFingerprint,
+            ReportId = id, ExpiresAt = expiry, SourceFingerprint = analysis.SourceFingerprint, HotspotHistory = analysis.HotspotHistory,
             ConfigurationFingerprint = analysis.ConfigurationFingerprint, Scope = analysis.Scope,
             FileCount = analysis.AnalyzedFiles.Length, ModuleCount = analysis.Modules.Length,
             Families = analysis.Results.Select(family => Family(family, analysis.SourceOnly)).ToArray(),
             Diagnostics = Counts(ReportDiagnostics.For(analysis).Select(row => row.Diagnostic)),
-            AnalysisNote = analysis.SourceOnly ? "Running with `execute: true` may reveal additional findings." : null,
+            AnalysisNote = analysis.SourceOnly && analysis.SupportsProjectExecution
+                ? "Running with `execute: true` may reveal additional findings." : null,
             RemainingDiagnosticGroups = Remaining(ReportDiagnostics.For(analysis).Select(row => row.Diagnostic)), Kind = "analysis"
         },
         InspectionResponse inspection => new()

@@ -13,6 +13,7 @@ import static cqc.AstIdentity.*;
 public final class Worker {
     private static final Gson JSON = new GsonBuilder().serializeNulls().create();
     private final List<TypeFact> types = new ArrayList<>();
+    private final List<ClassDeclarationFact> classDeclarations = new ArrayList<>();
     private final List<MethodFact> methods = new ArrayList<>();
     private final List<ExecutableFact> executables = new ArrayList<>();
     private final List<DependencyFact> dependencies = new ArrayList<>();
@@ -40,6 +41,7 @@ public final class Worker {
         Location location, String construct) { }
     record TypeFact(String id, String language, Location location, boolean isAbstract, boolean isTest, boolean complete,
         String contextId, String qualifiedName, String namespaceName, EvidenceState evidence) { }
+    record ClassDeclarationFact(String id, String language, Location location, int constructorParameters, boolean complete) { }
     record DependencyFact(String from, String to, Location location) { }
     record MethodFact(String id, String typeId, String language, Location location, int complexity,
         int executableLines, boolean isTest, boolean isFixture, boolean isParameterized,
@@ -49,7 +51,7 @@ public final class Worker {
         String[] fingerprints, int nodeCount, String kind, int duplicationLines) { }
     record AnalysisFacts(List<TypeFact> types, List<MethodFact> methods, List<DependencyFact> dependencies,
         List<Diagnostic> diagnostics, boolean semanticComplete, String schemaVersion, List<AnalysisContext> contexts, List<SyntaxGap> syntaxGaps,
-        List<ExecutableFact> executables) { }
+        List<ExecutableFact> executables, List<ClassDeclarationFact> classDeclarations) { }
     record Source(String file, CompilationUnit unit, ContextManifest.Context context) { }
 
     public static void main(String[] args) {
@@ -75,6 +77,7 @@ public final class Worker {
             for (var type : source.unit().findAll(TypeDeclaration.class)) {
                 var result = analyzer.analyze(source, type);
                 types.add(result.type());
+                result.classDeclaration().ifPresent(classDeclarations::add);
                 methods.addAll(result.methods());
                 dependencies.addAll(result.dependencies());
                 executables.addAll(result.executables());
@@ -82,7 +85,8 @@ public final class Worker {
         sortResults();
         boolean complete = syntaxGaps.isEmpty() && types.stream().allMatch(TypeFact::complete) && methods.stream().allMatch(MethodFact::complete);
         return new AnalysisFacts(types, methods, dependencies, orderedDiagnostics(), complete, input.schemaVersion(),
-            parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(), syntaxGaps, executables);
+            parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(),
+            syntaxGaps, executables, classDeclarations);
     }
 
     private void sortResults() {

@@ -10,7 +10,7 @@ namespace Cqc.Tests;
 public sealed class McpTests
 {
     [Fact]
-    public async Task StdioServerPublishesSummariesAndRetrievesAllEightTools()
+    public async Task StdioServerPublishesSummariesAndRetrievesAllNineTools()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var workspace = FixtureWorkspace.Empty();
@@ -19,7 +19,7 @@ public sealed class McpTests
             "namespace Demo; public class Example { public int Sum(int a, int b) { return a + b; } }");
         await using var client = await Connect(timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(new[] { "check_all", "check_code_quality", "check_dependencies", "check_duplication", "check_test_quality",
+        Assert.Equal(new[] { "check_all", "check_code_quality", "check_dependencies", "check_duplication", "check_hotspots", "check_test_quality",
             "check_uncommitted_changes_quality", "get_report_page", "inspect_project" }, tools.Select(t => t.Name).Order(StringComparer.Ordinal));
         var pageRequest = Assert.Single(tools, tool => tool.Name == "get_report_page").JsonSchema
             .GetProperty("properties").GetProperty("request");

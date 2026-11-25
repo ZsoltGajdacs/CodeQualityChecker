@@ -4,8 +4,8 @@ internal enum EvidenceMode { SourceOnly, Cached, Execute }
 
 internal sealed class AnalysisPolicy
 {
-    private static readonly string[] StructuralFamilies = ["code", "duplication"];
-    private static readonly string[] ReviewFamilies = ["code", "tests", "duplication", "dependencies"];
+    private static readonly string[] StructuralFamilies = ["code", "duplication", "hotspots"];
+    private static readonly string[] ReviewFamilies = [.. StructuralFamilies, "tests", "dependencies"];
 
     private AnalysisPolicy(string[] families, EvidenceMode evidence, bool reviewTouchedCode)
     {
@@ -19,9 +19,14 @@ internal sealed class AnalysisPolicy
     internal bool ReviewTouchedCode { get; }
     internal bool SourceOnly => Evidence == EvidenceMode.SourceOnly;
     internal bool Executes => Evidence == EvidenceMode.Execute;
+    internal bool IncludesHotspots => Families.Contains("hotspots", StringComparer.Ordinal);
 
     internal static AnalysisPolicy ForChecks(AnalysisRequest request, string[] families) =>
         new(families, request.Execute ? EvidenceMode.Execute : EvidenceMode.Cached, false);
+
+    internal static AnalysisPolicy ForAll(AnalysisRequest request) => ForChecks(request, ReviewFamilies);
+
+    internal static AnalysisPolicy ForHotspots() => new(["hotspots"], EvidenceMode.SourceOnly, false);
 
     internal static AnalysisPolicy ForReview(AnalysisRequest request) =>
         request.Execute

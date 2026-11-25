@@ -6,7 +6,7 @@ The processing pipeline is:
 
 1. Validate the request/configuration and discover every supported source/module.
 2. Capture source/build-input and configuration fingerprints.
-3. Optionally execute project tools in the checkout and capture reference/coverage evidence.
+3. Collect pinned local Git history when hotspots are requested. Optionally execute project tools in the checkout and capture reference/coverage evidence.
 4. Parse the full repository through each applicable language adapter.
 5. Qualify identities with a language prefix and merge immutable facts.
 6. Evaluate shared rules with full repository context.
@@ -17,7 +17,7 @@ Repository context remains available for cross-file dependencies, clone groups, 
 
 The C# adapter groups files by project and builds a Roslyn compilation for each group. Supported project references link the compilations in dependency order. The symbol identity component maps resolved symbols back to their owning projects so helpers and type edges can cross project boundaries. Loose files use their own context. External reference metadata and incomplete analysis diagnostics are scoped by project.
 
-The TypeScript adapter emits one source-module entity per authored `.ts` or `.tsx` file, represented by the existing `class` report kind. The worker supplies executable ranges and structural fingerprints for functions, components, hooks, class members, nested callbacks, and module-level code. Compiler resolution supplies module edges for imports and re-exports, including type-only imports and literal dynamic imports. The shared engines calculate complexity, duplication, and dependency scores.
+The TypeScript adapter emits one source-module entity per authored `.ts` or `.tsx` file for complexity, duplication, and dependencies. It also supplies authored class declarations for hotspot scoring. The worker supplies executable ranges and structural fingerprints for functions, components, hooks, class members, nested callbacks, and module-level code. Compiler resolution supplies module edges for imports and re-exports, including type-only imports and literal dynamic imports.
 
 ## MCP report delivery
 
@@ -34,6 +34,7 @@ Implement `ILanguageAnalyzer` with `Language` and `AnalyzeAsync(ProjectSnapshot,
 An adapter returns `AnalysisFacts`:
 
 - `TypeFact`: qualified identity, language, declaration location, abstraction/test classification, and completeness (including declarations without methods).
+- `ClassDeclarationFact`: production class identity, location, constructor arity, and completeness for hotspot scoring.
 - `MethodFact`: overload-safe identity, declaring type, range, complexity, executable lines, test/fixture/parameterized flags, assertions, resolved helper call IDs, normalized fingerprints/node count, completeness, and optional language-specific coverage signature.
 - `DependencyFact`: resolved source type relationship and evidence location.
 - `Diagnostic`: stable code, actionable message, optional file and language.
@@ -63,6 +64,6 @@ For fixed source/build inputs, configuration, evidence, and tool versions, findi
 
 ## Evidence and responsibility boundaries (ruleset 3)
 
-Adapters extract syntax measurements independently from semantic resolution and attach explicit evidence to facts. Core selects assessment evidence for the requested scope. Each family owns applicability, blockers, and metrics for that selection. Entity reporting renders and orders the resulting class and file scores. No family inherits a blanket type-completeness gate. `CoverageCollection` owns coverage provenance and report conversion. `EvidenceStore` publishes the staged coverage and reference manifests in a single atomic bundle. Static complexity shares complexity finding IDs with the combined assessment.
+Adapters extract syntax measurements independently from semantic resolution and attach explicit evidence to facts. Core selects assessment evidence for the requested scope. Each family owns applicability, blockers, and metrics for that selection. Entity reporting renders and orders the resulting class and file scores. `GitHotspotHistory` collects local history before rule evaluation. The hotspot family owns its weighted score and uses the shared entity projection. `CoverageCollection` owns coverage provenance and report conversion. `EvidenceStore` publishes the staged coverage and reference manifests in a single atomic bundle. Static complexity shares complexity finding IDs with the combined assessment.
 
 The Maven metadata extension observes evaluated projects in explicitly authorized Maven builds. `JavaBuildRunner` owns invocation. `JavaContextCache` stages ordered manifests that identify the existing binaries by path and hash. The worker separates manifest validation, artifact loading, fallback discovery and conflict detection from parser-context setup. Symbol ownership is canonicalized against reachable module/source-set contexts; explicit qualified names remain available for component patterns. Source-only fallback never establishes verified semantic evidence.

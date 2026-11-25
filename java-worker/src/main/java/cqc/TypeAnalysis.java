@@ -10,7 +10,8 @@ final class TypeAnalysis {
     private final SymbolContexts symbols;
     private final MethodAnalyzer methods;
     private final boolean sourceOnly;
-    record Result(Worker.TypeFact type, List<Worker.MethodFact> methods, List<Worker.DependencyFact> dependencies, List<Worker.ExecutableFact> executables) { }
+    record Result(Worker.TypeFact type, List<Worker.MethodFact> methods, List<Worker.DependencyFact> dependencies,
+        List<Worker.ExecutableFact> executables, Optional<Worker.ClassDeclarationFact> classDeclaration) { }
     record Edges(List<Worker.DependencyFact> facts, boolean complete) { }
     private static final Edges NO_EDGES = new Edges(List.of(), false);
 
@@ -33,7 +34,21 @@ final class TypeAnalysis {
         discovery.discover(type, nested);
         var fact = typeFact(owner, type, edges.complete() && !nested);
         var callableFacts = nested ? List.<Worker.MethodFact>of() : methods(owner, type, discovery);
-        return new Result(fact, callableFacts, edges.facts(), executables);
+        return new Result(fact, callableFacts, edges.facts(), executables, classDeclaration(type, fact));
+    }
+
+    private static Optional<Worker.ClassDeclarationFact> classDeclaration(TypeDeclaration<?> type, Worker.TypeFact fact) {
+        if (fact.isTest() || !isClass(type)) return Optional.empty();
+        int recordArity = type instanceof RecordDeclaration record ? record.getParameters().size() : 0;
+        int constructorArity = type.getConstructors().stream().mapToInt(constructor -> constructor.getParameters().size())
+            .max().orElse(0);
+        String id = SymbolContexts.qualify(fact.contextId(), fact.qualifiedName()) + sourceKey(fact.location().file(), type);
+        return Optional.of(new Worker.ClassDeclarationFact(id, fact.language(), fact.location(),
+            Math.max(recordArity, constructorArity), true));
+    }
+
+    private static boolean isClass(TypeDeclaration<?> type) {
+        return type instanceof RecordDeclaration || type instanceof ClassOrInterfaceDeclaration declaration && !declaration.isInterface();
     }
 
     private Worker.TypeFact typeFact(MethodAnalyzer.Owner owner, TypeDeclaration<?> type, boolean dependencies) {

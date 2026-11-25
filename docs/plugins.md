@@ -114,7 +114,7 @@ claude plugin validate --strict dist/cqc-plugins/claude
 python3 scripts/verify-plugin-clients.py dist/cqc-plugins
 ```
 
-The packaging tests verify path handling and output protection. The MCP smoke test starts the real server using both generated configurations, discovers eight tools, and exercises Java, C#, and TypeScript/React fixtures. It checks raw pages, bounded messages, missing Java/C# coverage, resolved TypeScript dependencies, unsupported source handling, and unchanged fixture bytes. It also compares the generated skill with its canonical source.
+The packaging tests verify path handling and output protection. The MCP smoke test starts the real server using both generated configurations, discovers nine tools, and exercises Java, C#, and TypeScript/React fixtures. It checks raw pages, bounded messages, hotspot scores, missing Java/C# coverage, resolved TypeScript dependencies, unsupported source handling, and unchanged fixture bytes. It also compares the generated skill with its canonical source.
 
 The installer tests exercise the public entrypoints in a disposable checkout with build/client command stand-ins and the real package generator. They verify default build order, the configured MCP path, prebuilt overrides, refresh, and failures before settings changes. Client refresh commands run from a neutral temporary directory. Claude user marketplace declarations are checked in user settings, since its cached marketplace inventory can also contain project registrations.
 
