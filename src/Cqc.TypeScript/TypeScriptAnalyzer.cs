@@ -61,7 +61,7 @@ public sealed class TypeScriptAnalyzer : ILanguageAnalyzer, ILanguageDiscovery
     private static AnalysisFacts AddUnavailableChecks(AnalysisFacts facts, bool sourceOnly) => sourceOnly ? facts : facts with
     {
         Diagnostics = facts.Diagnostics.Append(new Diagnostic("typescript.test_coverage_unavailable",
-            "TypeScript test-quality scoring and coverage collection are unavailable.", Language: LanguageName)).ToArray()
+            "The TypeScript integration supports static complexity, duplication and dependencies. Test execution, test-quality scoring and coverage collection are unavailable.", Language: LanguageName)).ToArray()
     };
 
     private static AnalysisFacts Unavailable(string code, string message) =>

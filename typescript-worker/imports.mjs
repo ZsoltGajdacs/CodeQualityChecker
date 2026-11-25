@@ -2,11 +2,11 @@ import ts from 'typescript';
 
 const jsxKinds = new Set([ts.SyntaxKind.JsxElement, ts.SyntaxKind.JsxSelfClosingElement, ts.SyntaxKind.JsxFragment]);
 
-const operands = new Map([
-    [ts.SyntaxKind.ImportDeclaration, node => node.moduleSpecifier],
-    [ts.SyntaxKind.ExportDeclaration, node => node.moduleSpecifier],
-    [ts.SyntaxKind.ExternalModuleReference, node => node.expression],
-    [ts.SyntaxKind.ImportType, node => ts.isLiteralTypeNode(node.argument) ? node.argument.literal : undefined]
+const syntaxImports = new Map([
+    [ts.SyntaxKind.ImportDeclaration, [node => node.moduleSpecifier, importTypesOnly]],
+    [ts.SyntaxKind.ExportDeclaration, [node => node.moduleSpecifier, node => node.isTypeOnly || namedTypesOnly(node.exportClause)]],
+    [ts.SyntaxKind.ExternalModuleReference, [node => node.expression, node => node.parent.isTypeOnly]],
+    [ts.SyntaxKind.ImportType, [node => ts.isLiteralTypeNode(node.argument) ? node.argument.literal : undefined, () => true]]
 ]);
 
 function implicitImport(node, source, options) {
@@ -32,8 +32,21 @@ export function imports(source, options, checker) {
 }
 
 function syntaxRequest(node) {
-    const operand = operands.get(node.kind)?.(node);
-    return operand && request(operand);
+    const syntax = syntaxImports.get(node.kind);
+    if (!syntax) return;
+    const [operandOf, typesOnly] = syntax;
+    const operand = operandOf(node);
+    if (!operand) return;
+    return { ...request(operand), typeOnly: typesOnly(node) };
+}
+
+function importTypesOnly({ importClause }) {
+    if (!importClause) return false;
+    return importClause.isTypeOnly || !importClause.name && namedTypesOnly(importClause.namedBindings);
+}
+
+function namedTypesOnly(bindings) {
+    return !!bindings?.elements?.length && bindings.elements.every(element => element.isTypeOnly);
 }
 
 function callRequest(node, checker) {

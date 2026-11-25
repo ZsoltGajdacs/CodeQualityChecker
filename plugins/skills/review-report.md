@@ -10,6 +10,8 @@ Use `inspect_project` when module or language support is unclear and more detail
 
 For a requested `.ts` or `.tsx` dependency check, use `check_dependencies` with `execute: false` for resolved module cycles and boundaries. The report's `class` kind represents a TypeScript source module. Explain dependency blockers such as missing packages or ambiguous project configuration. TypeScript supports static complexity, duplication, and dependency analysis. Test quality and coverage are unavailable for TypeScript.
 
+For TypeScript bundler projects, existing CSS, PNG, SVG and `?url` assets can resolve without contributing source dependency edges. A missing recognized asset remains unresolved even if a wildcard declaration supplies its type. Treat `typescript.configuration_deprecation` for `baseUrl` as an advisory and check for separate blocking configuration diagnostics.
+
 Duplication checks require at least four lines of body code. Signatures, comments, blank lines, brace-only lines, and separately analyzed nested bodies are excluded from the count. A project can raise the minimum with `duplicateMinLines`. Node-count and similarity thresholds also apply.
 
 When diagnostics identify a legacy reference manifest or changed or missing build outputs, explain which assessments lack evidence. The current manifests verify Maven classpath entries and .NET assemblies in their existing locations. Refresh them through an authorized `execute: true` run when the requested assessment needs that evidence.

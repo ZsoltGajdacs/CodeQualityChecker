@@ -1,6 +1,9 @@
 import ts from 'typescript';
+import { assetSpecifier, verifiesAsset } from './asset-resolution.mjs';
 import { imports } from './imports.mjs';
+import { resolveModule } from './module-resolution.mjs';
 import { canonical } from './projects.mjs';
+import { verifiesRuntimeImport } from './runtime-resolution.mjs';
 import { language, nodeLocation } from './syntax.mjs';
 
 export function dependencies(file, source, project, workspace) {
@@ -22,10 +25,20 @@ function resolveImport(request, input, workspace) {
     const { file, source, project, resolutionHost, outputs } = input;
     const location = nodeLocation(file, source, request.node);
     const target = resolveModule(request, source, project, resolutionHost);
-    if (!target) return unresolvedImport(request, project, file, location);
+    const asset = assetSpecifier(request, project.options);
+    const to = authoredTarget(target, workspace, outputs, asset);
+    if (to !== undefined) return dependencyFact({ from: file, to, location }, workspace);
+    if (asset !== undefined)
+        return verifiesAsset(asset, request, input, workspace.host) ? {} : { diagnostic: unresolved(file, location, request.specifier) };
+    if (target || verifiesRuntimeImport(request, input, workspace.host)) return {};
+    return unresolvedImport(request, project, file, location);
+}
+
+function authoredTarget(target, workspace, outputs, asset) {
+    if (!target) return;
     const path = canonical(workspace.host.realpath(target));
-    const to = workspace.authored.get(path) ?? outputs.get(path);
-    return dependencyFact({ from: file, to, location }, workspace);
+    if (asset !== undefined && ts.isDeclarationFileName(target)) return outputs.get(path);
+    return workspace.authored.get(path) ?? outputs.get(path);
 }
 
 function dependencyFact(edge, workspace) {
@@ -37,15 +50,6 @@ function dependencyFact(edge, workspace) {
     if (contextId) return { edge, contextId };
     return { edge, diagnostic: { code: 'typescript.target_context_unverified', language, file, location,
         message: `Resolved module "${to}" has no unambiguous project configuration.` } };
-}
-
-export function resolveModule({ specifier, node, mode }, source, project, host) {
-    if (specifier === undefined) return;
-    const options = project.options;
-    const resolutionMode = mode ?? (ts.isStringLiteralLike(node) ?
-        ts.getModeForUsageLocation(source, node, options) : source.impliedNodeFormat);
-    return ts.resolveModuleName(specifier, source.fileName, options, host, project.cache, undefined, resolutionMode)
-        .resolvedModule?.resolvedFileName;
 }
 
 function unresolvedImport({ specifier }, project, file, location) {

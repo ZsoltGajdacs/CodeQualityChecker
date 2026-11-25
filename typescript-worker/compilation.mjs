@@ -1,7 +1,7 @@
 import path from 'node:path';
 import ts from 'typescript';
-import { resolveModule } from './dependencies.mjs';
 import { imports } from './imports.mjs';
+import { resolveModule } from './module-resolution.mjs';
 import { canonical } from './projects.mjs';
 
 export function compileProjects(projects, workspace) {

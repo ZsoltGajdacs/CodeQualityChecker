@@ -225,13 +225,109 @@ test('ambient imports leave dependency evidence complete only for matching modul
     }, {
         'node_modules/@types/node/index.d.ts': 'declare module "node:path" { export function join(...parts: string[]): string; }',
         'assets.d.ts': 'declare module "*.css"; declare module "./unexpected.js";',
-        'tsconfig.json': { compilerOptions: { types: ['node'] } }
+        'tsconfig.json': { compilerOptions: { types: ['node'], module: 'node16' } }
     });
     const facts = analyze(input);
     assert.equal(facts.types.find(type => type.id === 'view.tsx').evidence.dependencies, true);
     assert.deepEqual(facts.dependencies, []);
     assert.deepEqual(facts.diagnostics.map(({ code, file }) => [code, file]),
         [['typescript.module_unresolved', 'missing.ts']]);
+});
+
+test('bundler assets verify physical targets through relative paths, aliases and package exports', t => {
+    const input = fixture(t, {
+        'src/app.ts': [
+            'import "./view.css";',
+            'import icon from "@images/icon.png";',
+            'import worker from "pdf/worker.mjs?url";',
+            'import "./missing.css";',
+            'import missing from "pdf/missing.mjs?url";',
+            'import { theme } from "theme.css";',
+            'import "./declared.svg";',
+            'export const assets = [icon, worker, missing, theme];'
+        ].join('\n'),
+        'src/declared.d.svg.ts': 'declare const svg: string; export default svg;',
+        'src/theme.ts': 'export const theme = "blue";'
+    }, {
+        'tsconfig.json': { compilerOptions: { module: 'esnext', moduleResolution: 'bundler',
+            paths: { '@images/*': ['./images/*'], 'theme.css': ['./src/theme.ts'] } } },
+        'src/assets.d.ts': 'declare module "*.css"; declare module "*?url";',
+        'src/view.css': 'body { color: aqua; }',
+        'images/icon.png': 'test image presence',
+        'node_modules/pdf/package.json': {
+            name: 'pdf', exports: { './worker.mjs': { types: './worker.d.mts', import: './worker.mjs' } }
+        },
+        'node_modules/pdf/worker.d.mts': 'export declare const worker: number;',
+        'node_modules/pdf/worker.mjs': 'export const worker = 1;'
+    });
+    const facts = analyze(input);
+    assert.deepEqual(facts.dependencies.map(({ from, to }) => [from, to]), [['src/app.ts', 'src/theme.ts']]);
+    assert.deepEqual(facts.diagnostics.map(({ code, location }) => [code, location.startLine]), [
+        ['typescript.module_unresolved', 4],
+        ['typescript.module_unresolved', 5],
+        ['typescript.module_unresolved', 7]
+    ]);
+});
+
+test('bundler runtime package subpaths can bypass only type-version redirects', t => {
+    const input = fixture(t, {
+        'runtime.ts': 'import "moment-like/dist/locale"; import "sealed/dist/locale";',
+        'types.ts': [
+            'import type { Locale } from "moment-like/dist/locale";',
+            'import { type Locale as Other } from "moment-like/dist/locale";',
+            'export type { Locale as Public } from "moment-like/dist/locale";',
+            'export type Imported = import("moment-like/dist/locale").Locale;',
+            'import type Alias = require("moment-like/dist/locale");'
+        ].join('\n')
+    }, {
+        'tsconfig.json': { compilerOptions: { module: 'esnext', moduleResolution: 'bundler' } },
+        'node_modules/moment-like/package.json': {
+            name: 'moment-like', types: 'index.d.ts', typesVersions: { '*': { '*': ['types/*'] } }
+        },
+        'node_modules/moment-like/types/index.d.ts': 'export interface Locale {}',
+        'node_modules/moment-like/dist/locale.js': 'export const locale = "en";',
+        'node_modules/sealed/package.json': {
+            name: 'sealed', exports: { '.': './index.js' }, typesVersions: { '*': { '*': ['types/*'] } }
+        },
+        'node_modules/sealed/index.js': 'export const publicPart = 1;',
+        'node_modules/sealed/dist/locale.js': 'export const privatePart = 2;'
+    });
+    const facts = analyze(input);
+    assert.deepEqual(facts.dependencies, []);
+    assert.deepEqual(facts.diagnostics.map(({ code, file, location }) => [code, file, location.startLine]), [
+        ['typescript.module_unresolved', 'runtime.ts', 1],
+        ['typescript.module_unresolved', 'types.ts', 1],
+        ['typescript.module_unresolved', 'types.ts', 2],
+        ['typescript.module_unresolved', 'types.ts', 3],
+        ['typescript.module_unresolved', 'types.ts', 4],
+        ['typescript.module_unresolved', 'types.ts', 5]
+    ]);
+    assert.match(facts.diagnostics[0].message, /sealed\/dist\/locale/);
+});
+
+test('baseUrl deprecation is advisory and still owns files and resolves aliases', t => {
+    const input = fixture(t, {
+        'app/index.ts': 'export { value } from "shared";',
+        'app/shared.ts': 'export const value = 1;',
+        'orphan.ts': 'export const orphan = true;'
+    }, { 'tsconfig.json': { include: ['app/**/*'], compilerOptions: { module: 'esnext', baseUrl: './app' } } });
+    const facts = analyze(input);
+    assert.equal(facts.contexts[0].verified, true);
+    assert.deepEqual(facts.dependencies.map(({ from, to }) => [from, to]), [['app/index.ts', 'app/shared.ts']]);
+    assert.deepEqual(facts.diagnostics.map(({ code, file }) => [code, file]), [
+        ['typescript.configuration_deprecation', 'tsconfig.json'],
+        ['typescript.configuration_missing', 'orphan.ts']
+    ]);
+});
+
+test('baseUrl advisory does not suppress other compiler configuration errors', t => {
+    const input = fixture(t, { 'a.ts': 'export const value = 1;' }, {
+        'tsconfig.json': { compilerOptions: { baseUrl: '.', module: 'nodenext', moduleResolution: 'bundler' } }
+    });
+    const facts = analyze(input);
+    assert.equal(facts.contexts[0].verified, false);
+    assert.ok(facts.diagnostics.some(diagnostic => diagnostic.code === 'typescript.configuration_deprecation'));
+    assert.ok(facts.diagnostics.some(diagnostic => diagnostic.code === 'typescript.configuration'));
 });
 
 test('CommonJS dependencies prefer require exports, follow their sources and ignore shadowed calls', t => {

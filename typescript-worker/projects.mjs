@@ -15,9 +15,11 @@ function configId(root, file) {
 const fileCase = ts.sys.useCaseSensitiveFileNames ? file => file : file => file.toLowerCase();
 export const canonical = file => fileCase(path.resolve(file));
 
-function configDiagnostic(root, file, error) {
+function configDiagnostic(root, file, error, options) {
     const message = ts.flattenDiagnosticMessageText(error.messageText, '\n').replaceAll(root + path.sep, '');
-    return { code: 'typescript.configuration', message: `TS${error.code}: ${message}`, file: relative(root, file), language };
+    const advisory = error.code === 5101 && options?.baseUrl && message.startsWith("Option 'baseUrl' is deprecated");
+    const code = advisory ? 'typescript.configuration_deprecation' : 'typescript.configuration';
+    return { code, message: `TS${error.code}: ${message}`, file: relative(root, file), language };
 }
 
 function configErrors(parsed, errors) {
@@ -40,8 +42,9 @@ function project(root, file, host) {
     const parsed = ts.getParsedCommandLineOfConfigFile(file, {}, {
         ...host, onUnRecoverableConfigFileDiagnostic: error => errors.push(error)
     });
-    const failures = configErrors(parsed, errors);
     const { options, fileNames = [], projectReferences = [], raw } = parsed ?? {};
+    const diagnostics = configErrors(parsed, errors).map(error => configDiagnostic(root, file, error, options));
+    const blocked = !parsed || diagnostics.some(diagnostic => diagnostic.code === 'typescript.configuration');
     const modulePath = relative(root, file);
     return {
         id: configId(root, file),
@@ -53,8 +56,8 @@ function project(root, file, host) {
         references: projectReferences.map(ts.resolveProjectReferencePath),
         inheritedConfigs: options?.configFile?.extendedSourceFiles ?? [],
         explicitProject: isExplicitProject(file, raw),
-        blockers: parsed && failures.length === 0 ? [] : ['typescript.configuration'],
-        diagnostics: failures.map(error => configDiagnostic(root, file, error)),
+        blockers: blocked ? ['typescript.configuration'] : [],
+        diagnostics,
         cache: ts.createModuleResolutionCache(path.dirname(file), fileCase, options),
         reachable: new Set()
     };
