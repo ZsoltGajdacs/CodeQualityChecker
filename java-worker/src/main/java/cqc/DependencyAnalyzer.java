@@ -25,7 +25,7 @@ final class DependencyAnalyzer {
     Result analyze(TypeDeclaration<?> type) {
         String typeId = typeName(type);
         type.findAll(ClassOrInterfaceType.class).stream().filter(n -> owner(n).map(t -> t == type).orElse(false))
-            .forEach(reference -> reference(reference));
+            .filter(reference -> !typeQualifier(reference)).forEach(this::reference);
         type.findAll(MethodCallExpr.class).stream().filter(n -> owner(n).map(t -> t == type).orElse(false))
             .forEach(call -> call(call));
         type.findAll(FieldAccessExpr.class).stream().filter(n -> owner(n).map(t -> t == type).orElse(false))
@@ -42,27 +42,31 @@ final class DependencyAnalyzer {
         return new Result(result, complete);
     }
 
+    private static boolean typeQualifier(ClassOrInterfaceType reference) {
+        return reference.getParentNode().orElse(null) instanceof ClassOrInterfaceType qualified
+            && qualified.getScope().orElse(null) == reference;
+    }
+
     private void reference(ClassOrInterfaceType reference) {
         try {
             var resolved = reference.resolve();
             if (resolved.isReferenceType()) add(resolved.asReferenceType().getQualifiedName(), reference);
         } catch (RuntimeException exception) {
-            complete = false;
-            reporter.report("java.unresolved_type", "Cannot resolve type " + reference.asString() + "; supply restored Maven classpath for complete dependency analysis.", source.file());
+            unresolved("type", display(reference), reference);
         }
     }
 
     private void call(MethodCallExpr call) {
         try { add(call.resolve().declaringType().getQualifiedName(), call); }
         catch (RuntimeException exception) {
-            complete = false;
-            reporter.report("java.unresolved_call", "Cannot resolve call " + call.getNameAsString() + " at line " + line(call) + ".", source.file());
+            String target = call.getScope().map(scope -> display(scope) + ".").orElse("") + call.getNameAsString();
+            unresolved("call", target, call);
         }
     }
 
     private void field(FieldAccessExpr field) {
         try { value(field, field.resolve()); }
-        catch (RuntimeException exception) { if (!qualifier(field)) unresolvedField(field.toString()); }
+        catch (RuntimeException exception) { if (!qualifier(field)) unresolved("field", display(field), field); }
     }
 
     private void name(NameExpr name) {
@@ -70,25 +74,28 @@ final class DependencyAnalyzer {
         catch (RuntimeException exception) {
             // JavaParser represents a type qualifier (System in System.out) as a NameExpr.
             // Its enclosing field/method resolution supplies the actual dependency.
-            if (!qualifier(name)) unresolvedField(name.toString());
+            if (!qualifier(name)) unresolved("field", name.getNameAsString(), name);
         }
     }
 
     private static boolean qualifier(Expression expression) {
         var parent = expression.getParentNode().orElse(null);
         if (parent instanceof FieldAccessExpr field) return field.getScope() == expression;
-        if (parent instanceof MethodCallExpr call) return call.getScope().map(scope -> scope == expression).orElse(false);
+        if (parent instanceof MethodCallExpr call) return call.getScope().orElse(null) == expression;
+        if (parent instanceof MethodReferenceExpr reference) return reference.getScope() == expression;
         return false;
     }
 
     private void annotation(AnnotationExpr annotation) {
         try { add(annotation.resolve().getQualifiedName(), annotation); }
-        catch (RuntimeException exception) { unresolvedField(annotation.toString()); }
+        catch (RuntimeException exception) { unresolved("annotation", annotation.getNameAsString(), annotation); }
     }
 
     private void methodReference(MethodReferenceExpr reference) {
         try { add(reference.resolve().declaringType().getQualifiedName(), reference); }
-        catch (RuntimeException exception) { unresolvedField(reference.toString()); }
+        catch (RuntimeException exception) {
+            unresolved("method_reference", display(reference.getScope()) + "::" + reference.getIdentifier(), reference);
+        }
     }
 
     private void value(Expression expression, ResolvedValueDeclaration value) {
@@ -100,8 +107,23 @@ final class DependencyAnalyzer {
         references.computeIfAbsent(target, ignored -> new LinkedHashSet<>()).add(location(source.file(), reference));
     }
 
-    private void unresolvedField(String name) {
+    private void unresolved(String kind, String name, Node node) {
         complete = false;
-        reporter.report("java.unresolved_field", "Cannot resolve field/name " + name + ".", source.file());
+        String description = kind.replace('_', ' ');
+        reporter.report("java.unresolved_" + kind, "Cannot resolve " + description + " " + name + ".",
+            location(source.file(), node), name);
+    }
+
+    private static String display(Node node) {
+        var tokens = node.getTokenRange().orElse(null);
+        if (tokens == null) return node.getClass().getSimpleName();
+        var text = new StringBuilder();
+        for (var token : tokens) {
+            String piece = token.getText();
+            int available = 100 - text.length();
+            text.append(piece, 0, Math.min(available, piece.length()));
+            if (piece.length() > available) return text.substring(0, 97).replaceAll("\\s+", " ") + "...";
+        }
+        return text.toString().replaceAll("\\s+", " ");
     }
 }

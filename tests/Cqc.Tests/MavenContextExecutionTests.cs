@@ -10,6 +10,27 @@ public sealed class MavenContextExecutionTests
 {
     [Fact]
     [Trait("Category", "Execution")]
+    public async Task ExecutionResolvesGeneratedMembersThroughMavenOutputs()
+    {
+        using var workspace = FixtureWorkspace.Copy("maven-generated");
+        var service = new AnalysisService([new JavaAnalyzer()]);
+        var result = await service.AnalyzeAsync(
+            new() { ProjectRoot = workspace.Root, Execute = true }, ["dependencies", "tests"], CancellationToken.None);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "execution_failed" ||
+            diagnostic.Code.StartsWith("java.unresolved_", StringComparison.Ordinal));
+        var dependencies = Assert.Single(result.Results, family => family.Family == "dependencies");
+        Assert.NotNull(Assert.Single(dependencies.Entities, entity =>
+            entity.EntityId == "java:service/pom.xml#main::sample.service.DueDates").Score);
+        var tests = Assert.Single(result.Results, family => family.Family == "tests");
+        var test = Assert.Single(tests.Entities, entity =>
+            entity.EntityId == "java:service/pom.xml#test::sample.service.DueDatesTest");
+        Assert.NotNull(test.Score);
+        Assert.Equal(2, test.Metrics["method:java:service/pom.xml#test::sample.service.DueDatesTest.readsGeneratedDate():assertionsWithHelpers"]);
+    }
+
+    [Fact]
+    [Trait("Category", "Execution")]
     public async Task ExecutionPublishesOrderedMainAndTestContextsWithReactorOwnership()
     {
         using var workspace = FixtureWorkspace.Copy("maven-reactor");

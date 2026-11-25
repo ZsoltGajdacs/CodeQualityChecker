@@ -2,13 +2,11 @@ package cqc;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
-import com.github.javaparser.symbolsolver.JavaSymbolSolver;
-import com.github.javaparser.symbolsolver.resolution.typesolvers.*;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 
-/** Owns parser/resolver lifetime; fact extraction does not configure classpaths. */
+/** Parses authored sources and assigns their Maven contexts. */
 final class SnapshotParser {
     private final Worker.Snapshot input;
     private final Path root;
@@ -38,34 +36,15 @@ final class SnapshotParser {
         var contexts = new ArrayList<>(definitions.contexts());
         var symbols = new SymbolContexts(sources, contexts);
         if (input.sourceOnly()) return new Context(sources, contexts, List.copyOf(gaps), symbols);
-        var index = new ResolutionSources(contexts, sources);
-        for (int position = 0; position < contexts.size(); position++)
-            contexts.set(position, inject(contexts.get(position), index, symbols));
-        var effective = contexts.stream().collect(java.util.stream.Collectors.toMap(ContextManifest.Context::id, context -> context));
+        var resolver = new ContextResolver(root, reporter, new ResolutionSources(contexts, sources), symbols);
+        var effective = new LinkedHashMap<String, ContextManifest.Context>();
+        for (var context : contexts) effective.put(context.id(), resolver.configure(context));
         var configuredSources = sources.stream().map(source -> new Worker.Source(source.file(), source.unit(), effective.get(source.context().id()))).toList();
-        return new Context(configuredSources, contexts, List.copyOf(gaps), symbols);
+        return new Context(configuredSources, List.copyOf(effective.values()), List.copyOf(gaps), symbols);
     }
 
     private static boolean javaSource(String file) {
         return file.toLowerCase(Locale.ROOT).endsWith(".java");
-    }
-
-    private ContextManifest.Context inject(ContextManifest.Context context, ResolutionSources sources, SymbolContexts symbols) {
-        var solver = new CombinedTypeSolver(new ReflectionTypeSolver(ReflectionTypeSolver.JCL_ONLY));
-        Set<String> visible = symbols.visible(context.id());
-        var roots = sources.roots(visible);
-        for (String sourceRoot : roots) {
-            Path path = root.resolve(sourceRoot).normalize();
-            if (path.startsWith(root) && Files.isDirectory(path)) solver.add(new JavaParserTypeSolver(path, configuration()));
-        }
-        boolean complete = true;
-        for (var artifact : context.artifacts()) complete &= addArtifact(solver, artifact, context);
-        var resolver = new JavaSymbolSolver(solver);
-        sources.owned(context.id()).forEach(source -> resolver.inject(source.unit()));
-        if (complete) return context;
-        var blockers = new TreeSet<>(Arrays.asList(context.blockers()));
-        blockers.add("context.artifactChanged");
-        return new ContextManifest.Context(context.definition(), context.artifacts(), false, blockers.toArray(String[]::new));
     }
 
     private Optional<Worker.Source> parseFile(JavaParser parser, String file, String contextId) throws IOException {
@@ -84,16 +63,7 @@ final class SnapshotParser {
         return result.getResult().map(unit -> new Worker.Source(file, unit, null));
     }
 
-    private boolean addArtifact(CombinedTypeSolver solver, ClasspathArtifact artifact, ContextManifest.Context context) {
-        // JavaParser's bytecode solver also accepts compiled class directories directly.
-        try { solver.add(new JarTypeSolver(artifact.path())); return true; }
-        catch (Exception exception) {
-            reporter.report("java.classpath", "Cannot load dependency " + artifact.path().getFileName() + " in " + context.id(), context.modulePath());
-            return false;
-        }
-    }
-
-    private static ParserConfiguration configuration() {
+    static ParserConfiguration configuration() {
         return new ParserConfiguration().setLanguageLevel(ParserConfiguration.LanguageLevel.BLEEDING_EDGE);
     }
 }

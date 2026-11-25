@@ -16,15 +16,14 @@ public final class Worker {
     private final List<MethodFact> methods = new ArrayList<>();
     private final List<ExecutableFact> executables = new ArrayList<>();
     private final List<DependencyFact> dependencies = new ArrayList<>();
-    private final List<Diagnostic> diagnostics = new ArrayList<>();
-    private final Set<String> reported = new HashSet<>();
+    private final Set<Diagnostic> diagnostics = new LinkedHashSet<>();
     private final List<SyntaxGap> syntaxGaps = new ArrayList<>();
 
     record Module(String language, String path) { }
     record Snapshot(String root, String[] files, String sourceFingerprint, Module[] modules, String schemaVersion, boolean sourceOnly,
         String referenceEvidenceDirectory) { }
     record Location(String file, int startLine, int endLine) { }
-    record Diagnostic(String code, String message, String file, String language) { }
+    record Diagnostic(String code, String message, String file, String language, Location location, String construct) { }
     record EvidenceState(boolean syntax, boolean identity, boolean calls, boolean dependencies, boolean verifiedContext, String[] blockers) {
         EvidenceState {
             var reasons = new TreeSet<>(Arrays.asList(blockers));
@@ -69,8 +68,8 @@ public final class Worker {
     }
 
     private AnalysisFacts analyze(Snapshot input) throws IOException {
-        var parsed = new SnapshotParser(input, this::diagnostic).load();
-        var analyzer = new TypeAnalysis(this::diagnostic, parsed.symbols(), input.sourceOnly());
+        var parsed = new SnapshotParser(input, diagnostics::add).load();
+        var analyzer = new TypeAnalysis(diagnostics::add, parsed.symbols(), input.sourceOnly());
         syntaxGaps.addAll(parsed.gaps());
         for (var source : parsed.sources())
             for (var type : source.unit().findAll(TypeDeclaration.class)) {
@@ -82,7 +81,7 @@ public final class Worker {
             }
         sortResults();
         boolean complete = syntaxGaps.isEmpty() && types.stream().allMatch(TypeFact::complete) && methods.stream().allMatch(MethodFact::complete);
-        return new AnalysisFacts(types, methods, dependencies, diagnostics, complete, input.schemaVersion(),
+        return new AnalysisFacts(types, methods, dependencies, orderedDiagnostics(), complete, input.schemaVersion(),
             parsed.contexts().stream().map(ContextManifest.Context::fact).sorted(Comparator.comparing(AnalysisContext::id)).toList(), syntaxGaps, executables);
     }
 
@@ -91,11 +90,12 @@ public final class Worker {
         methods.sort(Comparator.comparing(MethodFact::id).thenComparing(m -> m.location().file()));
         executables.sort(Comparator.comparing(ExecutableFact::id));
         dependencies.sort(Comparator.comparing(DependencyFact::from).thenComparing(DependencyFact::to).thenComparing(d -> d.location().file()).thenComparingInt(d -> d.location().startLine()));
-        diagnostics.sort(Comparator.comparing((Diagnostic d) -> Objects.toString(d.file(), "")).thenComparing(Diagnostic::code).thenComparing(Diagnostic::message));
         syntaxGaps.sort(Comparator.comparing(SyntaxGap::file).thenComparing(SyntaxGap::code));
     }
 
-    private void diagnostic(String code, String message, String file) {
-        if (reported.add(code + ":" + file + ":" + message)) diagnostics.add(new Diagnostic(code, message, file, "java"));
+    private List<Diagnostic> orderedDiagnostics() {
+        return diagnostics.stream().sorted(Comparator.comparing((Diagnostic d) -> Objects.toString(d.file(), ""))
+            .thenComparing(Diagnostic::code).thenComparing(Diagnostic::message)).toList();
     }
+
 }

@@ -467,6 +467,24 @@ record Pair(List<String> values, String... labels) {
         methods = {method["qualifiedName"]: method for method in facts["methods"]}
         self.assertIn("pom.xml#main::Example.helper()", methods["Example.exercise()"]["calls"])
 
+    def test_dependency_diagnostics_locate_references_without_treating_package_prefixes_as_types(self):
+        files = {"src/main/java/Example.java": """class Example {
+    java.util.List<String> values;
+    void exercise() {
+        java.util.function.Function<String, Integer> action = String::missing;
+        values.missing(
+            3);
+    }
+}
+"""}
+        facts = self.analyze(files)
+        diagnostics = [diagnostic for diagnostic in facts["diagnostics"] if diagnostic["code"].startswith("java.unresolved_")]
+        self.assertEqual([
+            ("java.unresolved_call", "values.missing", 5, 6),
+            ("java.unresolved_method_reference", "String::missing", 4, 4),
+        ], [(diagnostic["code"], diagnostic["construct"], diagnostic["location"]["startLine"],
+             diagnostic["location"]["endLine"]) for diagnostic in diagnostics])
+
     def test_maven_test_helpers_are_test_support_without_test_annotations(self):
         facts = self.analyze({"src/test/java/demo/Checks.java": "package demo; class Checks { void check(int value) { assert value > 0; } }"})
         self.assertTrue(facts["types"][0]["isTest"])

@@ -24,6 +24,8 @@ A non-null cursor means more records exist. Source-only production entities expo
 
 Diagnostic groups include scoped counts when available. `selectedCount` counts diagnostic records in selected files, `contextCount` counts records in other repository files, and `projectWideCount` counts repository-wide records. Omitted scope counts represent zero for that scope in scoped reports. Diagnostic pages list selected-file entries first. Use the detailed parser or configuration message, construct, and line range when available to explain incomplete static assessments. For `unsupported_language`, report the distinct repository-wide `extensions` in the summary. Use the `files` section to verify whether a particular path was selected.
 
+For Java dependency analysis, use the location and construct on unresolved symbol diagnostics to identify the affected reference. Check classpath and context diagnostics before attributing an unresolved symbol to missing Maven evidence.
+
 For an oversized individual record or when the complete original report is needed, request `section: "raw"` without family or entity filters. Concatenate `rawChunk` strings in cursor order and parse the resulting JSON. Retrieval uses an immutable snapshot without rerunning analysis or executing project code.
 
 Reports expire after 60 minutes, can be evicted earlier when the 10-report or 512 MiB limits are reached, and are cleared on server restart. If details are still needed, run a fresh check with the same scope and execution authorization. Report retrieval failures explicitly.
