@@ -21,6 +21,10 @@ public sealed class McpTests
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
         Assert.Equal(new[] { "check_all", "check_code_quality", "check_dependencies", "check_duplication", "check_test_quality",
             "check_uncommitted_changes_quality", "get_report_page", "inspect_project" }, tools.Select(t => t.Name).Order(StringComparer.Ordinal));
+        var pageRequest = Assert.Single(tools, tool => tool.Name == "get_report_page").JsonSchema
+            .GetProperty("properties").GetProperty("request");
+        Assert.True(pageRequest.GetProperty("properties").TryGetProperty("diagnosticCode", out _));
+        Assert.DoesNotContain(pageRequest.GetProperty("required").EnumerateArray(), property => property.GetString() == "diagnosticCode");
         foreach (var tool in tools.Where(t => t.Name != "get_report_page"))
         {
             Assert.Contains(Wire.Target, tool.Description);

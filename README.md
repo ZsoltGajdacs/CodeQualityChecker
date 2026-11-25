@@ -26,9 +26,9 @@ In Claude Code, type `/cqc:check-` and choose `/cqc:check-uncommitted` for your 
 | `check_duplication` | Find structural duplication |
 | `check_dependencies` | Find dependency cycles and coupling |
 | `check_all` | Run all four check families |
-| `get_report_page` | Read details from a completed report |
+| `get_report_page` | Read details from a completed report and filter diagnostic pages by exact code |
 
-Each check-family score starts at 10 and deducts one point per distinct scored finding. Missing evidence leaves the affected score incomplete. [Ruleset and configuration](docs/ruleset.md)
+Each check-family score starts at 10 and deducts one point per distinct scored finding. Family summaries count scored, incomplete, and not-applicable class and file entities. [Ruleset and configuration](docs/ruleset.md)
 
 ## Development
 

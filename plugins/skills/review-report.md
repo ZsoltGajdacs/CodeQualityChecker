@@ -26,13 +26,17 @@ Call `get_report_page` with a nested request such as `{"reportId":"<id>","sectio
 
 A non-null cursor means more records exist. Source-only production entities expose `staticComplexity`. The code family exposes `staticComplexityScores`, `scoredFileCount`, and `unscoredFileCount` with `scores` omitted. Score distributions include class and file entities. Use the file counts when explaining how much selected production code was scored. Incomplete assessments expose blockers when available. Duplication can report verified matches while an incomplete language comparison pool prevents numeric scores.
 
+Use `entityStatusCounts` to report scored, incomplete, and not-applicable totals across class and file entities. Source-only code summaries count their static scores.
+
 Diagnostic groups include scoped counts when available. `selectedCount` counts diagnostic records in selected files, `contextCount` counts records in other repository files, and `projectWideCount` counts repository-wide records. Omitted scope counts represent zero for that scope in scoped reports. Diagnostic pages list selected-file entries first. Use the detailed parser or configuration message, construct, and line range when available to explain incomplete static assessments. For `unsupported_language`, report the distinct repository-wide `extensions` in the summary. Use the `files` section to verify whether a particular path was selected.
+
+Use `diagnosticCode` to retrieve a specific diagnostic or prerequisite by exact code. For example, request `{"reportId":"<id>","section":"diagnostics","diagnosticCode":"java.classpath_conflict"}` and keep the filter when following `nextCursor`.
 
 For Java dependency analysis, use the location and construct on unresolved symbol diagnostics to identify the affected reference. Check classpath and context diagnostics before attributing an unresolved symbol to missing Maven evidence.
 
 For `java.coverage_signature_ambiguous`, report the owning Maven module and the JVM signature listed in `construct`. CQC withholds the affected method's coverage when several authored methods match that entry.
 
-For an oversized individual record or when the complete original report is needed, request `section: "raw"` without family or entity filters. Concatenate `rawChunk` strings in cursor order and parse the resulting JSON. Retrieval uses an immutable snapshot without rerunning analysis or executing project code.
+For an oversized individual record or when the complete original report is needed, request unfiltered `section: "raw"` pages. Concatenate `rawChunk` strings in cursor order and parse the resulting JSON. Retrieval uses an immutable snapshot without rerunning analysis or executing project code.
 
 Reports expire after 60 minutes, can be evicted earlier when the 10-report or 512 MiB limits are reached, and are cleared on server restart. If details are still needed, run a fresh check with the same scope and execution authorization. Report retrieval failures explicitly.
 

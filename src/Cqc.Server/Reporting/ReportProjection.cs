@@ -25,15 +25,33 @@ internal static class ReportProjection
         },
         _ => throw new ArgumentException("Unsupported report type.")
     };
-    private static FamilySummary Family(FamilyResult family, bool sourceOnly) =>
-        new(family.Family, family.Status, family.Entities.Length, family.Findings.Length)
+    private static FamilySummary Family(FamilyResult family, bool sourceOnly)
+    {
+        var staticOnly = sourceOnly && family.Family == "code";
+        return new(family.Family, family.Status, family.Entities.Length, family.Findings.Length)
         {
-            Scores = sourceOnly && family.Family == "code" ? null : ScoreDistribution(family.Entities.Select(e => e.Score)),
+            Scores = staticOnly ? null : ScoreDistribution(family.Entities.Select(e => e.Score)),
+            EntityStatusCounts = StatusCounts(family.Entities, staticOnly),
             StaticComplexityScores = ScoreDistribution(family.Entities.Where(e => e.StaticComplexity is not null)
                 .Select(e => e.StaticComplexity!.Score)),
             ScoredFileCount = family.ScoredFileCount,
             UnscoredFileCount = family.UnscoredFileCount
         };
+    }
+
+    private static EntityStatusCounts StatusCounts(EntityScore[] entities, bool staticOnly)
+    {
+        var scored = 0;
+        var notApplicable = 0;
+        foreach (var entity in entities)
+        {
+            var score = staticOnly ? entity.StaticComplexity?.Score : entity.Score;
+            var status = staticOnly ? entity.StaticComplexity?.Status ?? entity.Status : entity.Status;
+            if (score is not null) scored++;
+            else if (status == "notApplicable") notApplicable++;
+        }
+        return new(scored, entities.Length - scored - notApplicable, notApplicable);
+    }
     private static ScoreCount[] ScoreDistribution(IEnumerable<double?> scores) =>
         scores.GroupBy(score => score).OrderBy(g => g.Key).Select(g => new ScoreCount(g.Key, g.Count())).ToArray();
     private static DiagnosticCount[] Counts(IEnumerable<Diagnostic> diagnostics) => diagnostics.GroupBy(d => d.Code)

@@ -85,8 +85,9 @@ public sealed class FixedScopeMcpTests
         Assert.True(codeSummary.GetProperty("scoredFileCount").GetInt32() > 0);
         var reportId = McpTests.ReportId(summary);
         var raw = await McpTests.Raw(client, reportId, timeout.Token);
-        Assert.Contains(raw.GetProperty("diagnostics").EnumerateArray(), diagnostic =>
+        var syntax = raw.GetProperty("diagnostics").EnumerateArray().First(diagnostic =>
             diagnostic.TryGetProperty("file", out var file) && file.GetString() == "Broken.cs");
+        await AssertFilteredDiagnostic(client, reportId, syntax, timeout.Token);
         var code = Family(raw, "results", "code");
         var duplication = Family(raw, "results", "duplication");
         Assert.Equal("incomplete", duplication.GetProperty("status").GetString());
@@ -173,6 +174,15 @@ public sealed class FixedScopeMcpTests
         });
     }
 
+    private static async Task AssertFilteredDiagnostic(McpClient client, string reportId, JsonElement expected, CancellationToken token)
+    {
+        var diagnosticCode = expected.GetProperty("code").GetString();
+        var page = await McpTests.Read(client, "get_report_page", new { reportId, section = "diagnostics", diagnosticCode }, token);
+        var items = page.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Contains(items, item => EntityFile(item) == "Broken.cs");
+        Assert.All(items, item => Assert.Equal(diagnosticCode, item.GetProperty("code").GetString()));
+    }
+
     private static void AssertSourceSummary(JsonElement summary)
     {
         Assert.Equal(AnalysisNote, summary.GetProperty("analysisNote").GetString());
@@ -182,6 +192,8 @@ public sealed class FixedScopeMcpTests
         Assert.NotEmpty(code.GetProperty("staticComplexityScores").EnumerateArray());
         Assert.All(code.GetProperty("staticComplexityScores").EnumerateArray(),
             score => Assert.Equal(JsonValueKind.Number, score.GetProperty("score").ValueKind));
+        Assert.Equal(code.GetProperty("entityCount").GetInt32(),
+            code.GetProperty("entityStatusCounts").GetProperty("scored").GetInt32());
     }
 
     private static void AssertStaticEntity(JsonElement entity)

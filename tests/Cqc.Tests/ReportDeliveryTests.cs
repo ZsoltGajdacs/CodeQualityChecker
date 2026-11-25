@@ -56,6 +56,31 @@ public sealed class ReportDeliveryTests
     }
 
     [Fact]
+    public async Task FamilyStatusCountsDistinguishZeroScoresAndNonApplicableEntities()
+    {
+        using var store = new ReportStore(TimeProvider.System);
+        var original = Report(3);
+        var family = Assert.Single(original.Results);
+        var entities = family.Entities;
+        var code = family with
+        {
+            Entities =
+            [
+                entities[0] with { Status = "complete", Score = 0 },
+                entities[1] with { Status = "incomplete", Score = null },
+                entities[2] with { Status = "notApplicable", Score = null }
+            ]
+        };
+        var summary = await store.PublishAsync(original with { Results = [code, new("tests", "notApplicable")] }, CancellationToken.None);
+        Assert.Equal(1, summary.Families[0].EntityStatusCounts.Scored);
+        Assert.Equal(1, summary.Families[0].EntityStatusCounts.Incomplete);
+        Assert.Equal(1, summary.Families[0].EntityStatusCounts.NotApplicable);
+        Assert.Equal(0, summary.Families[1].EntityStatusCounts.Scored);
+        Assert.Equal(0, summary.Families[1].EntityStatusCounts.Incomplete);
+        Assert.Equal(0, summary.Families[1].EntityStatusCounts.NotApplicable);
+    }
+
+    [Fact]
     public async Task RawReconstructionPreservesEscapingUnicodeAndOversizedRecords()
     {
         using var store = new ReportStore(TimeProvider.System);
@@ -164,9 +189,12 @@ public sealed class ReportDeliveryTests
         Assert.Single(await All(store, new() { ReportId = summary.ReportId, Section = "files" }));
         Assert.Equal(20, summary.Diagnostics.Length);
         Assert.Equal(6, summary.RemainingDiagnosticGroups);
-        var prerequisites = await All(store, new() { ReportId = summary.ReportId, Section = "prerequisites" });
+        var filter = new ReportPageRequest { ReportId = summary.ReportId, Section = "diagnostics", DiagnosticCode = "code24" };
+        Assert.Equal("code24", Assert.Single(await All(store, filter)).GetProperty("code").GetString());
+        var prerequisites = await All(store, filter with { Section = "prerequisites", DiagnosticCode = "missing_build_tool" });
         Assert.Single(prerequisites);
         Assert.Equal("missing_build_tool", prerequisites[0].GetProperty("code").GetString());
+        await Assert.ThrowsAsync<ArgumentException>(() => store.ReadPageAsync(filter with { Section = "files" }, CancellationToken.None));
         Assert.Equal(JsonSerializer.Serialize(report, CompactJson.Options), await Raw(store, summary.ReportId));
     }
 

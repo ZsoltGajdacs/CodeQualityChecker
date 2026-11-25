@@ -14,32 +14,33 @@ internal sealed class ReportIndexWriter(Stream stream, JsonSerializerOptions opt
     }
     private async Task Analysis(AnalysisResponse analysis)
     {
-        foreach (var file in analysis.AnalyzedFiles) await Add("files", null, [], file);
-        foreach (var module in analysis.Modules) await Add("modules", null, [], module);
+        foreach (var file in analysis.AnalyzedFiles) await Add(new("files"), [], file);
+        foreach (var module in analysis.Modules) await Add(new("modules"), [], module);
         foreach (var row in ReportDiagnostics.For(analysis).OrderByDescending(row => row.Diagnostic.Scope == "selected"))
             await AddDiagnostic(row);
         foreach (var family in analysis.Results) await Family(family);
     }
     private async Task Inspection(InspectionResponse inspection)
     {
-        foreach (var file in inspection.Project.SelectedFiles) await Add("files", null, [], file);
-        foreach (var module in inspection.Project.Modules) await Add("modules", null, [], module);
+        foreach (var file in inspection.Project.SelectedFiles) await Add(new("files"), [], file);
+        foreach (var module in inspection.Project.Modules) await Add(new("modules"), [], module);
         foreach (var diagnostic in inspection.Project.Diagnostics.OrderByDescending(diagnostic => diagnostic.Scope == "selected"))
-            await Add("diagnostics", null, [], diagnostic);
-        foreach (var prerequisite in inspection.Prerequisites) await Add("prerequisites", null, [], prerequisite);
+            await Add(new("diagnostics", DiagnosticCode: diagnostic.Code), [], diagnostic);
+        foreach (var prerequisite in inspection.Prerequisites)
+            await Add(new("prerequisites", DiagnosticCode: prerequisite.Code), [], prerequisite);
     }
     private async Task Family(FamilyResult family)
     {
         var findingEntities = family.Entities.SelectMany(entity => FindingIds(entity).Select(id => (id, entity.EntityId)))
             .ToLookup(entry => entry.id, entry => entry.EntityId, StringComparer.Ordinal);
-        foreach (var finding in family.Findings) await Add("findings", family.Family, finding.EntityIds.Concat(findingEntities[finding.Id]).Distinct(StringComparer.Ordinal).ToArray(), new { family = family.Family, finding.Id, finding.Rule, finding.Message, finding.Advice, finding.EntityIds, finding.Locations, finding.Deduction });
+        foreach (var finding in family.Findings) await Add(new("findings", family.Family), finding.EntityIds.Concat(findingEntities[finding.Id]).Distinct(StringComparer.Ordinal).ToArray(), new { family = family.Family, finding.Id, finding.Rule, finding.Message, finding.Advice, finding.EntityIds, finding.Locations, finding.Deduction });
         foreach (var entity in family.Entities)
         {
-            await Add("entities", family.Family, [entity.EntityId], new EntityPageItem(family.Family, entity.EntityId,
+            await Add(new("entities", family.Family), [entity.EntityId], new EntityPageItem(family.Family, entity.EntityId,
                 entity.Kind, entity.File, entity.Status, entity.Score, entity.Blockers, entity.StaticComplexity,
                 FindingIds(entity).Count(), entity.Metrics.Count));
             foreach (var metric in entity.Metrics)
-                await Add("metrics", family.Family, [entity.EntityId], new { family = family.Family, entity.EntityId, name = metric.Key, value = metric.Value });
+                await Add(new("metrics", family.Family), [entity.EntityId], new { family = family.Family, entity.EntityId, name = metric.Key, value = metric.Value });
         }
     }
 
@@ -49,20 +50,21 @@ internal sealed class ReportIndexWriter(Stream stream, JsonSerializerOptions opt
     private Task AddDiagnostic(ReportDiagnostics.Row row)
     {
         var diagnostic = row.Diagnostic;
-        if (row.Family is null) return Add("diagnostics", null, [], diagnostic);
-        return Add("diagnostics", row.Family, [], new
+        var section = new ReportSection("diagnostics", row.Family, diagnostic.Code);
+        if (row.Family is null) return Add(section, [], diagnostic);
+        return Add(section, [], new
         {
             family = row.Family, diagnostic.Code, diagnostic.Message, diagnostic.File, diagnostic.Language,
             diagnostic.Scope, diagnostic.Location, diagnostic.Construct, diagnostic.Extension
         });
     }
-    private async Task Add(string section, string? family, string[] entities, object value)
+    private async Task Add(ReportSection section, string[] entities, object value)
     {
         token.ThrowIfCancellationRequested();
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value, options);
         var offset = stream.Position;
         await stream.WriteAsync(bytes, token);
-        rows.Add(new(section, family, entities, offset, bytes.Length));
+        rows.Add(new(section, entities, offset, bytes.Length));
     }
 }
 

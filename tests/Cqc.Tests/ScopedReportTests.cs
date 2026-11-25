@@ -57,6 +57,9 @@ public sealed class ScopedReportTests
         Assert.Null(code.Scores);
         Assert.Equal(1, code.ScoredFileCount);
         Assert.Equal(1, code.UnscoredFileCount);
+        Assert.Equal(1, code.EntityStatusCounts.Scored);
+        Assert.Equal(1, code.EntityStatusCounts.Incomplete);
+        Assert.Equal(0, code.EntityStatusCounts.NotApplicable);
         var request = new ReportPageRequest { ReportId = summary.ReportId, Section = "entities", Family = "code" };
         var page = await store.ReadPageAsync(request, CancellationToken.None);
         AssertAssessment(page.Items[0], page.Items[1]);

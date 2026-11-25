@@ -75,6 +75,7 @@ public sealed class TypeScriptMcpTests
             """import "./entry.css"; export const peer = require("./peer");""");
         await ChangedScopeTests.Write(workspace, "peer.ts", """export const entry = require("./entry");""");
         await ChangedScopeTests.Write(workspace, "assets.d.ts", """declare module "*.css";""");
+        await ChangedScopeTests.Write(workspace, "entry.css", ".entry { display: block; }");
         var original = workspace.SourceContents();
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));

@@ -10,7 +10,8 @@ internal sealed class ReportPager(ReportCursor cursors)
         ReportPageValidation.Validate(report, request);
         var position = cursors.Decode(request);
         if (request.Section == "raw") return await Raw(report, request, position, token);
-        var rows = report.Rows.Where(r => Matches(r, request)).ToArray();
+        var section = request.IndexSection;
+        var rows = report.Rows.Where(r => Matches(r, section, request.EntityId)).ToArray();
         if (position > rows.Length) throw new ArgumentException("Cursor is outside the section.");
         var items = new List<JsonElement>();
         await using var stream = File.OpenRead(Path.Combine(report.Directory, "rows"));
@@ -28,9 +29,10 @@ internal sealed class ReportPager(ReportCursor cursors)
         }
         return new(report.Id, request.Section, rows.Length) { Items = items.ToArray(), NextCursor = next < rows.Length ? cursors.Encode(request, next) : null };
     }
-    private static bool Matches(IndexedRow row, ReportPageRequest request) => row.Section == request.Section
-        && (request.Family is null || row.Family == request.Family)
-        && (request.EntityId is null || row.Entities.Contains(request.EntityId, StringComparer.Ordinal));
+    private static bool Matches(IndexedRow row, ReportSection section, string? entityId) => row.Section.Name == section.Name
+        && (section.Family is null || row.Section.Family == section.Family)
+        && (section.DiagnosticCode is null || row.Section.DiagnosticCode == section.DiagnosticCode)
+        && (entityId is null || row.Entities.Contains(entityId, StringComparer.Ordinal));
     private static async Task<JsonElement> ReadRow(FileStream stream, IndexedRow row, int index, CancellationToken token)
     {
         if (row.Length > 190 * 1024)

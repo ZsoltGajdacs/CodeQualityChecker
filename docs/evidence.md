@@ -8,6 +8,8 @@ The Java integration runs Maven tests and captures module-specific main/test res
 
 Project-controlled restores, builds, and tests can modify the checkout, including source or configuration if the project tooling rewrites them. Network access can be used by Maven/NuGet restores through their normal configured repositories.
 
+For JaCoCo agents 0.8.14 and 0.8.15, CQC also merges probes from downstream Surefire tests in the same reactor when the evaluated classpath and compiled bytes establish a unique production owner. A module can receive coverage solely from downstream tests. CQC keeps valid local coverage when downstream probes are incompatible or ownership is ambiguous.
+
 TypeScript dependency checks read static `tsconfig` configuration, local package metadata, and installed declarations. They skip package installation, project scripts, and code emission. A missing or ambiguous project context, unresolved import, or nonliteral dynamic import leaves affected dependency assessments incomplete. Static complexity and duplication can still be assessed when their syntax evidence is complete. TypeScript participates in analysis only, including when Java or C# execution is authorized in the same request.
 
 Builds that generate source or build metadata outside the standard output directories should put those files in a dedicated ignored directory or exclude that directory in CQC configuration. Files discovered as source or build inputs are fingerprinted before and after execution.

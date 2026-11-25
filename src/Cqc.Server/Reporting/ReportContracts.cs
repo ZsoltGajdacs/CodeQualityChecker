@@ -15,8 +15,11 @@ public sealed record ReportPageRequest
     public required string Section { get; init; }
     public string? Family { get; init; }
     public string? EntityId { get; init; }
+    [Description("Exact code filter for diagnostics and inspection prerequisites.")]
+    public string? DiagnosticCode { get; init; }
     public string? Cursor { get; init; }
     public int Limit { get; init; } = 50;
+    internal ReportSection IndexSection => new(Section, Family, DiagnosticCode);
 }
 public sealed record DiagnosticCount(string Code, int Count)
 {
@@ -34,8 +37,11 @@ public sealed record DiagnosticCount(string Code, int Count)
     public string[]? Extensions { get; init; }
 }
 public sealed record ScoreCount(double? Score, int Count);
+public sealed record EntityStatusCounts(int Scored, int Incomplete, int NotApplicable);
 public sealed record FamilySummary(string Family, string Status, int EntityCount, int FindingCount)
 {
+    [Description("Counts of class and file entities. Source-only code summaries count static-complexity scores.")]
+    public EntityStatusCounts EntityStatusCounts { get; init; } = new(0, 0, 0);
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ScoreCount[]? Scores { get; init; }
     public ScoreCount[] StaticComplexityScores { get; init; } = [];
@@ -76,6 +82,7 @@ public sealed record ReportStoreOptions
     public int MaximumReports { get; init; } = 10;
     public long MaximumBytes { get; init; } = 512L * 1024 * 1024;
 }
-internal sealed record IndexedRow(string Section, string? Family, string[] Entities, long Offset, int Length);
+internal readonly record struct ReportSection(string Name, string? Family = null, string? DiagnosticCode = null);
+internal sealed record IndexedRow(ReportSection Section, string[] Entities, long Offset, int Length);
 internal sealed record StoredReport(string Id, string Directory, DateTimeOffset ExpiresAt, long Bytes,
     IndexedRow[] Rows, string[] Families, bool Inspection);
