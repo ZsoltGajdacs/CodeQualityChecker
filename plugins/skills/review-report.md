@@ -12,6 +12,8 @@ For a requested `.ts` or `.tsx` dependency check, use `check_dependencies` with 
 
 Use `check_hotspots` for a focused source-only review. Its input supports `projectRoot`, `scope`, `paths`, `gitBase`, `configPath`, and `timeoutSeconds`. The `gitBase` option only changes file selection. Report the pinned HEAD window from `hotspotHistory` and explain low scores using the `editCommits`, `constructorParameters`, and `classLines` metrics. Uncommitted reviews select touched class declarations and score the whole class. File scores use the lowest included class score. A shallow or unavailable history can leave scores incomplete. TypeScript hotspot results represent authored classes.
 
+Hotspot bounds come from `.cqc/config.json` or the explicitly supplied `configPath`. Omitted bounds use built-in defaults. By default the constructor penalty starts at eight parameters. Source-only checks read configuration without creating it. Explicit execution seeds the project config when publishing evidence and preserves an existing file.
+
 For TypeScript bundler projects, existing CSS, PNG, SVG and `?url` assets can resolve without contributing source dependency edges. A missing recognized asset remains unresolved even if a wildcard declaration supplies its type. Treat `typescript.configuration_deprecation` for `baseUrl` as an advisory and check for separate blocking configuration diagnostics.
 
 Duplication checks require at least four lines of body code. Signatures, comments, blank lines, brace-only lines, and separately analyzed nested bodies are excluded from the count. A project can raise the minimum with `duplicateMinLines`. Node-count and similarity thresholds also apply.

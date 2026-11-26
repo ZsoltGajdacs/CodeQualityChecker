@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Cqc.Core;
 using ModelContextProtocol.Client;
 using Xunit;
@@ -116,17 +117,35 @@ public sealed class FixedScopeMcpTests
         await using var client = await McpTests.Connect(timeout.Token);
         var sourceRequest = new { projectRoot = workspace.Root };
         var before = await McpTests.Read(client, ChangesTool, sourceRequest, timeout.Token);
+        var configPath = Path.Combine(workspace.Root, ".cqc", "config.json");
+        Assert.False(File.Exists(configPath));
         var executed = await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root, execute = true }, timeout.Token);
         Assert.Equal(new[] { "code", "dependencies", "duplication", "hotspots", "tests" }, Families(executed, "families"));
         Assert.Equal(3, executed.GetProperty("fileCount").GetInt32());
         Assert.False(executed.TryGetProperty("analysisNote", out var note) && note.ValueKind == JsonValueKind.String);
         Assert.True(File.Exists(Path.Combine(workspace.Root, ".cqc", EvidenceBundle.FileName)));
+        var expectedConfig = JsonNode.Parse("""
+            {
+              "hotspots": {
+                "editCommits": { "lower": 10, "upper": 30 },
+                "constructorParameters": { "lower": 7, "upper": 10 },
+                "classLines": { "lower": 400, "upper": 800 }
+              }
+            }
+            """);
+        Assert.True(JsonNode.DeepEquals(expectedConfig, JsonNode.Parse(await File.ReadAllTextAsync(configPath, timeout.Token))));
         Assert.Contains(Family(executed, "families", "code").GetProperty("scores").EnumerateArray(),
             bucket => bucket.GetProperty("score").ValueKind == JsonValueKind.Number);
         var after = await McpTests.Read(client, ChangesTool, sourceRequest, timeout.Token);
         var beforeRaw = await McpTests.Raw(client, McpTests.ReportId(before), timeout.Token);
         var afterRaw = await McpTests.Raw(client, McpTests.ReportId(after), timeout.Token);
         Assert.Equal(beforeRaw.GetRawText(), afterRaw.GetRawText());
+
+        const string custom = """{"hotspots":{"constructorParameters":{"lower":3}}}""";
+        await File.WriteAllTextAsync(configPath, custom, timeout.Token);
+        await workspace.Git("add", "-f", ".cqc/config.json");
+        await McpTests.Read(client, ChangesTool, new { projectRoot = workspace.Root, execute = true }, timeout.Token);
+        Assert.Equal(custom, await File.ReadAllTextAsync(configPath, timeout.Token));
     }
 
     private static async Task StageComplexityAndRestoreCloneInWorkingTree(FixtureWorkspace workspace)

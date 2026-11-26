@@ -87,7 +87,7 @@ public sealed class GitHotspotHistoryTests
         await ChangedScopeTests.Write(workspace, "B.cs", """
             partial class Example
             {
-                public Example(int a, int b, int c, int d, int e) { }
+                public Example(int a, int b, int c, int d, int e, int f, int g, int h) { }
             }
             """);
         await Commit(workspace, "2026-02-01T12:00:00Z");
@@ -96,11 +96,11 @@ public sealed class GitHotspotHistoryTests
             new() { ProjectRoot = workspace.Root, Scope = "paths", Paths = ["A.cs"] }, CancellationToken.None);
         var entity = Class(report);
         Assert.Equal(1, entity.Metrics["editCommits"]);
-        Assert.Equal(5, entity.Metrics["constructorParameters"]);
+        Assert.Equal(8, entity.Metrics["constructorParameters"]);
         Assert.Equal(5, entity.Metrics["classLines"]);
         var file = Assert.Single(Assert.Single(report.Results).Entities, item => item.Kind == "file");
         Assert.Equal("A.cs", file.File);
-        Assert.Equal(9.5, file.Score);
+        Assert.Equal(9, file.Score);
     }
 
     [Fact]

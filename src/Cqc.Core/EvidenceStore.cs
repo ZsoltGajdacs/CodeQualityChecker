@@ -21,8 +21,8 @@ public static class EvidenceStore
             .Append(CoverageFileName).ToArray();
         var source = new DirectoryInfo(artifacts.RunDirectory);
         await WriteJsonAsync(source, CoverageFileName, coverage, token);
-        var destination = ArtifactDirectory(root);
-        EnsureSafeArtifactDirectory(destination);
+        var destination = CqcDirectory.Locate(root.FullName);
+        CqcDirectory.EnsureSafe(destination);
         var target = EvidencePath(destination, EvidenceBundle.FileName);
         var staged = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
@@ -38,7 +38,7 @@ public static class EvidenceStore
 
     internal static async Task<EvidenceSnapshot> OpenAsync(DirectoryInfo root, List<Diagnostic> diagnostics, CancellationToken token)
     {
-        var legacy = ArtifactDirectory(root);
+        var legacy = CqcDirectory.Locate(root.FullName);
         try
         {
             await using var input = OpenPublishedBundle(legacy);
@@ -87,8 +87,6 @@ public static class EvidenceStore
         return Path.Combine(directory.FullName, name);
     }
 
-    private static DirectoryInfo ArtifactDirectory(DirectoryInfo root) => new(Path.Combine(root.FullName, ".cqc"));
-
     public static CoverageEvidence Read(string json)
     {
         var evidence = JsonSerializer.Deserialize<CoverageEvidence>(json, Wire.Json)
@@ -101,29 +99,9 @@ public static class EvidenceStore
         return evidence;
     }
 
-    public static void EnsureArtifactDirectory(string root) => EnsureSafeArtifactDirectory(ArtifactDirectory(new(root)));
+    public static void EnsureArtifactDirectory(string root) => CqcDirectory.EnsureSafe(CqcDirectory.Locate(root));
 
-    private static void EnsureSafeArtifactDirectory(DirectoryInfo directory)
-    {
-        directory.Refresh();
-        if (directory.Exists && (directory.Attributes & FileAttributes.ReparsePoint) != 0)
-            throw new ArgumentException("The .cqc artifact directory must not be a symbolic link.");
-        directory.Create();
-    }
-
-    public static async Task EnsureWritableAsync(string root, CancellationToken token)
-    {
-        var directory = ArtifactDirectory(new(root));
-        if (!directory.Exists) return;
-        try
-        {
-            var tracked = await ProcessRunner.RunAsync("git", ["ls-files", "-z", "--", ".cqc"], root, token);
-            if (tracked.ExitCode == 0 && tracked.Output.Length > 0)
-                throw new ArgumentException("The .cqc directory contains tracked files. Move tracked evidence before requesting execution.");
-        }
-        catch (System.ComponentModel.Win32Exception) { }
-        EnsureSafeArtifactDirectory(directory);
-    }
+    public static Task EnsureWritableAsync(string root, CancellationToken token) => CqcDirectory.EnsureWritableAsync(root, token);
 
     private static bool Valid(MethodCoverage method) => method is not null && !string.IsNullOrWhiteSpace(method.MethodId)
         && ValidCounter(method.CoveredBranches, method.TotalBranches) && ValidCounter(method.CoveredLines, method.TotalLines);

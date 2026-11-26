@@ -27,7 +27,7 @@ public static class QualityEngine
             "tests" => TestRules.Evaluate(context, request.Config),
             "duplication" => DuplicationRules.Evaluate(context, request.Config),
             "dependencies" => DependencyRules.Evaluate(context, request.Config),
-            "hotspots" => HotspotRules.Evaluate(context, request.HotspotEvidence),
+            "hotspots" => HotspotRules.Evaluate(context, request.HotspotEvidence, request.Config.Hotspots),
             _ => throw new ArgumentException($"Unknown check family: {family}", nameof(request))
         }).Where(family => !request.Snapshot.SourceOnly || request.Families.Length == 1
             || family.Status != "notApplicable").ToArray();

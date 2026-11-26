@@ -96,7 +96,11 @@ public sealed class AnalysisService
         await ChangedCodeScope.VerifyAsync(changedCode, verified, token);
         token.ThrowIfCancellationRequested();
         if (artifacts is not null && coverage is not null)
-            await EvidenceStore.PublishRunAsync(new(snapshot.Root), artifacts, coverage, token);
+        {
+            var root = new DirectoryInfo(snapshot.Root);
+            await Configuration.CreateProjectDefaultsAsync(root, token);
+            await EvidenceStore.PublishRunAsync(root, artifacts, coverage, token);
+        }
         return report with
         {
             Results = results.Select(family => family with { Diagnostics = DiagnosticScope.Classify(snapshot, family.Diagnostics) }).ToArray(),
@@ -124,7 +128,7 @@ public sealed class AnalysisService
             .Select(definition => definition.Language).ToHashSet(StringComparer.Ordinal);
         var modules = snapshot.Modules.Where(module => !analysisOnly.Contains(module.Language)).ToArray();
         if (modules.Length == 0 && snapshot.Modules.Length != 0) return null;
-        await EvidenceStore.EnsureWritableAsync(snapshot.Root, token);
+        await CqcDirectory.EnsureWritableAsync(snapshot.Root, token);
         try
         {
             var artifacts = await buildExecutor.CollectAsync(snapshot with { Modules = modules }, token);

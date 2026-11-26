@@ -4,14 +4,16 @@ namespace Cqc.Core;
 
 public static class Configuration
 {
+    internal const string ProjectFileName = "config.json";
+    private static readonly JsonSerializerOptions ReadOptions = new(Wire.Json)
+    {
+        Converters = { new HotspotThresholdsReader() }
+    };
+
     public static (QualityConfig Config, string Fingerprint) Load(string root, string? path)
     {
-        var file = path is null ? Path.Combine(root, ".cqc.json") : Path.GetFullPath(path, root);
-        if (path is not null && !File.Exists(file)) throw new ArgumentException("Configuration file does not exist.");
-        var config = File.Exists(file)
-            ? JsonSerializer.Deserialize<QualityConfig>(File.ReadAllText(file), Wire.Json)
-              ?? throw new ArgumentException("Configuration must be an object.")
-            : new QualityConfig();
+        var config = path is null ? LoadProject(new DirectoryInfo(root))
+            : Read<QualityConfig>(new FileInfo(Path.GetFullPath(path, root)), ConfigSource.Explicit)!;
         if (!ThresholdsValid(config))
             throw new ArgumentException("Invalid quality threshold.");
         if (!PolicyValid(config))
@@ -22,6 +24,61 @@ public static class Configuration
             AllowedDependencies = new SortedDictionary<string, string[]>(config.AllowedDependencies, StringComparer.Ordinal)
         };
         return (config, Wire.Hash(JsonSerializer.Serialize(config, Wire.Json)));
+    }
+
+    private static QualityConfig LoadProject(DirectoryInfo root)
+    {
+        var general = Read<QualityConfig>(new FileInfo(Path.Combine(root.FullName, ".cqc.json")), ConfigSource.Legacy) ?? new();
+        var hotspots = Read<ProjectConfig>(ProjectFile(CqcDirectory.Locate(root.FullName)), ConfigSource.Project);
+        return hotspots is null ? general : general with { Hotspots = hotspots.Hotspots };
+    }
+
+    private enum ConfigSource { Legacy, Project, Explicit }
+
+    private static T? Read<T>(FileInfo file, ConfigSource source) where T : class
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(file.FullName));
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new JsonException("Configuration must be an object.");
+            if (source == ConfigSource.Legacy && document.RootElement.EnumerateObject().Any(property =>
+                property.Name.Equals("hotspots", StringComparison.OrdinalIgnoreCase)))
+                throw new JsonException("Set 'hotspots' in .cqc/config.json or pass this file as configPath.");
+            return document.RootElement.Deserialize<T>(ReadOptions)!;
+        }
+        catch (FileNotFoundException) when (source != ConfigSource.Explicit) { return null; }
+        catch (DirectoryNotFoundException) when (source != ConfigSource.Explicit) { return null; }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            throw new ArgumentException($"Configuration '{file}': {exception.Message}", exception);
+        }
+    }
+
+    private static FileInfo ProjectFile(DirectoryInfo directory) => new(Path.Combine(directory.FullName, ProjectFileName));
+
+    internal static async Task CreateProjectDefaultsAsync(DirectoryInfo root, CancellationToken token)
+    {
+        var directory = CqcDirectory.Locate(root.FullName);
+        CqcDirectory.EnsureSafe(directory);
+        var file = ProjectFile(directory).FullName;
+        if (File.Exists(file)) return;
+
+        var staged = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await using (var stream = new FileStream(staged, FileMode.CreateNew, FileAccess.Write))
+                await JsonSerializer.SerializeAsync(stream, new ProjectConfig(), Wire.Json, token);
+            token.ThrowIfCancellationRequested();
+            try { File.Move(staged, file, overwrite: false); }
+            catch (IOException) when (File.Exists(file)) { }
+        }
+        finally { File.Delete(staged); }
+    }
+
+    private sealed record ProjectConfig
+    {
+        public HotspotThresholds Hotspots { get; init; } = HotspotThresholds.Defaults;
     }
 
     private static bool ThresholdsValid(QualityConfig config)

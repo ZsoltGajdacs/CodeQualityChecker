@@ -2,12 +2,12 @@ namespace Cqc.Core;
 
 internal static class HotspotRules
 {
-    internal static FamilyResult Evaluate(RuleContext context, GitHotspotEvidence? history)
+    internal static FamilyResult Evaluate(RuleContext context, GitHotspotEvidence? history, HotspotThresholds thresholds)
     {
         var selected = context.Snapshot.SelectedFiles.ToHashSet(StringComparer.Ordinal);
         var classes = context.Facts.ClassDeclarations.GroupBy(declaration => declaration.Id, StringComparer.Ordinal)
             .Where(group => group.Any(declaration => selected.Contains(declaration.Location.File)))
-            .ToDictionary(group => group.Key, group => Measure(group, history), StringComparer.Ordinal);
+            .ToDictionary(group => group.Key, group => Measure(group, history, thresholds), StringComparer.Ordinal);
         var diagnostics = history?.Diagnostic is { } failure ? new[] { failure } : [];
         var unknownClasses = context.Facts.SyntaxGaps.Any(gap => selected.Contains(gap.File) && IncludesSyntaxGap(gap));
         var analyzerFailed = context.Facts.Diagnostics.Any(StructuralEvidence.IsAnalyzerFailure);
@@ -25,7 +25,7 @@ internal static class HotspotRules
             Aggregate = evidence =>
             {
                 var item = classes[evidence.TypeId];
-                return new(true, false, item.Blockers, [], item.Metrics);
+                return new(true, false, item.Blockers, [], item.Metrics());
             },
             CalculatePrimaryScore = entity => entity.TypeIds.Min(id => classes[id].Score)
         });
@@ -33,7 +33,8 @@ internal static class HotspotRules
 
     private static bool IncludesSyntaxGap(SyntaxGap gap) => gap.UnknownEntities && gap.Code != "csharp.unmodeled_executable";
 
-    private static Measurement Measure(IEnumerable<ClassDeclarationFact> parts, GitHotspotEvidence? history)
+    private static Measurement Measure(IEnumerable<ClassDeclarationFact> parts, GitHotspotEvidence? history,
+        HotspotThresholds thresholds)
     {
         var declarations = parts.Distinct().ToArray();
         var locations = declarations.Select(declaration => declaration.Location).Distinct().ToArray();
@@ -43,7 +44,8 @@ internal static class HotspotRules
         var blockers = AssessmentEvidence.Reasons(
             (declarations.All(declaration => declaration.Complete), "syntax.incomplete"),
             (edits.HasValue, "hotspots.history_unavailable"));
-        return new(declarations, blockers, new(edits, parameters, lines));
+        var signals = new HotspotSignals(edits, parameters, lines);
+        return new(declarations, blockers, signals, CalculatePenalties(signals, thresholds));
     }
 
     private static int EditCount(Location[] locations, IReadOnlyDictionary<string, HashSet<string>> edits)
@@ -54,8 +56,13 @@ internal static class HotspotRules
         return commits.Count;
     }
 
-    private static decimal Penalty(int value, int lower, int upper, int cap) =>
-        cap * Math.Clamp((decimal)(value - lower) / (upper - lower), 0, 1);
+    private static HotspotPenalties CalculatePenalties(HotspotSignals signals, HotspotThresholds thresholds) => new(
+        signals.Edits is { } edits ? Penalty(edits, thresholds.EditCommits, 5) : null,
+        Penalty(signals.Parameters, thresholds.ConstructorParameters, 3),
+        Penalty(signals.Lines, thresholds.ClassLines, 2));
+
+    private static decimal Penalty(int value, HotspotRange range, int cap) =>
+        cap * Math.Clamp(((decimal)value - range.Lower) / (range.Upper - range.Lower), 0, 1);
 
     private static Finding? Finding(string id, Measurement assessment)
     {
@@ -73,27 +80,23 @@ internal static class HotspotRules
         });
     }
 
-    private sealed record Measurement(ClassDeclarationFact[] Declarations, string[] Blockers, HotspotSignals Signals)
+    private sealed record Measurement(ClassDeclarationFact[] Declarations, string[] Blockers,
+        HotspotSignals Signals, HotspotPenalties Penalties)
     {
-        internal double Score => Signals.Score;
-        internal SortedDictionary<string, double?> Metrics => Signals.Metrics;
-    }
-
-    private sealed record HotspotSignals(int? Edits, int Parameters, int Lines)
-    {
-        private decimal? EditPenalty => Edits is { } count ? Penalty(count, 10, 30, 5) : null;
-        private decimal ConstructorPenalty => Penalty(Parameters, 4, 10, 3);
-        private decimal LengthPenalty => Penalty(Lines, 400, 800, 2);
-        internal double Score => (double)Math.Round(10 - (EditPenalty ?? 0) - ConstructorPenalty - LengthPenalty,
+        internal double Score { get; } = (double)Math.Round(10 - (Penalties.Edits ?? 0) - Penalties.Constructor - Penalties.Length,
             2, MidpointRounding.AwayFromZero);
-        internal SortedDictionary<string, double?> Metrics => new(StringComparer.Ordinal)
+
+        internal SortedDictionary<string, double?> Metrics() => new(StringComparer.Ordinal)
         {
-            ["editCommits"] = Edits,
-            ["constructorParameters"] = Parameters,
-            ["classLines"] = Lines,
-            ["editPenalty"] = (double?)EditPenalty,
-            ["constructorPenalty"] = (double)ConstructorPenalty,
-            ["lengthPenalty"] = (double)LengthPenalty
+            ["editCommits"] = Signals.Edits,
+            ["constructorParameters"] = Signals.Parameters,
+            ["classLines"] = Signals.Lines,
+            ["editPenalty"] = (double?)Penalties.Edits,
+            ["constructorPenalty"] = (double)Penalties.Constructor,
+            ["lengthPenalty"] = (double)Penalties.Length
         };
     }
+
+    private sealed record HotspotSignals(int? Edits, int Parameters, int Lines);
+    private sealed record HotspotPenalties(decimal? Edits, decimal Constructor, decimal Length);
 }

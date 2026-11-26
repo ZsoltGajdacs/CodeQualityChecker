@@ -36,7 +36,7 @@ The `hotspots` family subtracts three capped penalties from 10 and rounds to two
 | Measurement | Lower threshold | Upper threshold | Maximum penalty |
 | --- | ---: | ---: | ---: |
 | Commits editing the class's files in 12 months | 10 | 30 | 5 |
-| Parameters in the widest constructor | 4 | 10 | 3 |
+| Parameters in the widest constructor | 7 | 10 | 3 |
 | Physical class lines | 400 | 800 | 2 |
 
 The history window ends at the pinned local HEAD's committer timestamp. The check walks its first-parent chain and compares merge commits to their first parent. It follows committed renames detected by Git. File creation and pure renames contribute zero. Classes in the same file share its edit history. A partial class counts each commit once across its declarations and sums their physical line spans. A working-tree path absent from HEAD starts with zero edits.
@@ -47,7 +47,21 @@ A file receives the lowest score among its selected classes and is incomplete if
 
 ## Configuration
 
-An optional `.cqc.json` at the project root overrides defaults:
+Project hotspot bounds live in `.cqc/config.json`. An explicit execution that publishes evidence creates this file with the following defaults if it is absent. Analysis-only checks read it without creating it. Subsequent runs preserve edits to the file.
+
+```json
+{
+  "hotspots": {
+    "editCommits": { "lower": 10, "upper": 30 },
+    "constructorParameters": { "lower": 7, "upper": 10 },
+    "classLines": { "lower": 400, "upper": 800 }
+  }
+}
+```
+
+A missing file or omitted bound uses the corresponding built-in default. Bounds must be non-negative integers with `upper` greater than `lower`. The default constructor penalty is zero through seven parameters, starts at eight, and reaches three points at ten. You can track `.cqc/config.json` in Git.
+
+An optional `.cqc.json` at the project root overrides general quality defaults. When a request supplies `configPath`, that file is the sole configuration source for the request and can contain both the general settings and the `hotspots` section.
 
 ```json
 {

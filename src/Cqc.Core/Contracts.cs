@@ -92,6 +92,7 @@ public sealed record QualityConfig
     public double DuplicateSimilarity { get; init; } = .82;
     public int DuplicateMinLines { get; init; } = MinimumDuplicateLines;
     public int DuplicateMinNodes { get; init; } = 20;
+    public HotspotThresholds Hotspots { get; init; } = HotspotThresholds.Defaults;
     public SortedDictionary<string, string[]> Components { get; init; } = new(StringComparer.Ordinal);
     public SortedDictionary<string, string[]> AllowedDependencies { get; init; } = new(StringComparer.Ordinal);
     public string[][] ForbiddenDependencies { get; init; } = [];

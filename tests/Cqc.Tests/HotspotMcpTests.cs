@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ModelContextProtocol.Client;
 using Xunit;
 
 namespace Cqc.Tests;
@@ -37,6 +38,36 @@ public sealed class HotspotMcpTests
         Assert.Equal(600, metrics.GetProperty("classLines").GetInt32());
         Assert.Single(family.GetProperty("findings").EnumerateArray());
         Assert.Equal(JsonValueKind.Object, raw.GetProperty("hotspotHistory").ValueKind);
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, ".cqc")));
+        await AssertProjectBounds(client, workspace, timeout.Token);
+    }
+
+    private static async Task AssertProjectBounds(McpClient client, FixtureWorkspace workspace, CancellationToken token)
+    {
+        Directory.CreateDirectory(Path.Combine(workspace.Root, ".cqc"));
+        await ChangedScopeTests.Write(workspace, ".cqc/config.json", """
+            { "hotspots": {
+                "editCommits": { "lower": 0, "upper": 20 },
+                "constructorParameters": { "upper": 13 },
+                "classLines": { "lower": 200, "upper": 600 }
+            } }
+            """);
+
+        foreach (var tool in new[] { "check_hotspots", "check_code_quality" })
+        {
+            var summary = await McpTests.Read(client, tool, new { projectRoot = workspace.Root }, token);
+            var raw = await McpTests.Raw(client, McpTests.ReportId(summary), token);
+            var family = Assert.Single(raw.GetProperty("results").EnumerateArray(),
+                family => family.GetProperty("family").GetString() == "hotspots");
+            var entities = family.GetProperty("entities").EnumerateArray().ToArray();
+            Assert.Equal(2, entities.Length);
+            Assert.All(entities, entity => Assert.Equal(1.5, entity.GetProperty("score").GetDouble()));
+            var metrics = Assert.Single(entities, entity => entity.GetProperty("kind").GetString() == "class").GetProperty("metrics");
+            Assert.Equal(5, metrics.GetProperty("editPenalty").GetDouble());
+            Assert.Equal(1.5, metrics.GetProperty("constructorPenalty").GetDouble());
+            Assert.Equal(2, metrics.GetProperty("lengthPenalty").GetDouble());
+            Assert.Single(family.GetProperty("findings").EnumerateArray());
+        }
     }
 
     [Fact]
@@ -65,7 +96,7 @@ public sealed class HotspotMcpTests
         var page = await McpTests.Read(client, "get_report_page", new { reportId, section = "entities", family = "hotspots" }, timeout.Token);
         var entities = page.GetProperty("items").EnumerateArray().ToArray();
         Assert.Contains(entities, entity => entity.GetProperty("file").GetString() == "Example.java"
-            && entity.GetProperty("kind").GetString() == "class" && entity.GetProperty("score").GetDouble() == 9);
+            && entity.GetProperty("kind").GetString() == "class" && entity.GetProperty("score").GetDouble() == 10);
         var typescript = entities.Where(entity => entity.GetProperty("file").GetString() == "Example.ts").ToArray();
         Assert.Equal(3, typescript.Length);
         var file = Assert.Single(typescript, entity => entity.GetProperty("kind").GetString() == "file");
